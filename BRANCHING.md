@@ -101,28 +101,32 @@ git push -u origin feature/oauth-authorize-endpoint
 
 ### Promotion to Upper Branches
 
+The version tag is cut on `docs` (when content is documented) and travels forward through the chain.
+
 ```bash
-# Promote develop -> docs
+# Promote develop -> docs (cut the version tag here)
 git checkout docs
 git pull
 git merge develop
-git push
+git tag v0.1.0
+git push --atomic origin docs v0.1.0
 
-# Promote docs -> integration
+# Promote docs -> integration (tag travels with the merge)
 git checkout integration
 git pull
 git merge docs
-git push
+git push --atomic origin integration v0.1.0
 
-# Promote integration -> main (release)
+# Promote integration -> main (release — tag travels to production)
 git checkout main
 git pull
 git merge integration
-git tag v0.1.0
 git push --atomic origin main v0.1.0
 ```
 
 ### Hotfix (Production Fix)
+
+Hotfix tag is cut on `main` (it's a production fix), then travels backward through the chain.
 
 ```bash
 # 1. Create hotfix from main
@@ -134,28 +138,28 @@ git checkout -b fix/critical-token-bug
 git add .
 git commit -m "fix: critical token validation bug"
 
-# 3. PR -> squash merge into main
+# 3. PR -> squash merge into main, tag here
 git push -u origin fix/critical-token-bug
 # Create PR targeting main -> squash merge
 
-# 4. Tag release
+# 4. Tag release on main
 git checkout main
 git pull
 git tag v0.1.1
-git push origin v0.1.1
+git push --atomic origin main v0.1.1
 
-# 5. Backport to all branches
+# 5. Backport to all branches (tag travels backward)
 git checkout integration
 git merge main
-git push
+git push --atomic origin integration v0.1.1
 
 git checkout docs
 git merge integration
-git push
+git push --atomic origin docs v0.1.1
 
 git checkout develop
 git merge docs
-git push
+git push --atomic origin develop v0.1.1
 ```
 
 ### Syncing Branches (Bidirectional)
@@ -175,5 +179,6 @@ Regular sync is encouraged to keep branches aligned. A stale `integration` or `d
 ## Versioning
 
 - Semantic versioning: `MAJOR.MINOR.PATCH`
-- Tags on `main` branch only: `v1.0.0`, `v1.1.0`
-- Pre-release tags for integration: `v1.0.0-rc1`
+- Tags are cut on `docs` (normal release) or `main` (hotfix) and travel with the code through all branches.
+- A given tag `v1.0.0` exists on all branches: `develop` → `docs` → `integration` → `main`.
+- Pre-release tags for integration testing: `v1.0.0-rc1`.
