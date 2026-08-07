@@ -30,7 +30,7 @@
 ## 2. Solution Structure
 
 ```
-DgDevelopment.Identity.sln
+DgDevelopment.Identity.slnx
 ├── src/
 │   ├── DgDevelopment.Identity.AppHost/          Aspire orchestration (Aspire.AppHost.Sdk)
 │   ├── DgDevelopment.Identity.ServiceDefaults/  Service Discovery, HTTP Resilience
@@ -77,7 +77,7 @@ Client.[Platform] ──> Client.Core
 | Infrastructure | EF Core (to be added in domain implementation) |
 | Server | ASP.NET Core (implicit via SDK) |
 
-## 2. Clean Architecture (Internal)
+## 3. Clean Architecture (Internal)
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -114,9 +114,9 @@ Client.[Platform] ──> Client.Core
 
 Dependency rule: dependencies point inward. Outer layers depend on inner layers. Domain has zero external dependencies.
 
-## 3. Domain Model
+## 4. Domain Model
 
-### 3.1 Core Entities
+### 4.1 Core Entities
 
 ```
 User (Aggregate Root)
@@ -221,7 +221,7 @@ UserSession
 └── IsRevoked: bool
 ```
 
-### 3.2 Token Entities
+### 4.2 Token Entities
 
 ```
 AuthorizationCode
@@ -261,7 +261,7 @@ DeviceCode
 └── ExpiresAt: DateTime
 ```
 
-### 3.3 Audit & Event Store
+### 4.3 Audit & Event Store
 
 ```
 AuditLog
@@ -287,9 +287,9 @@ Event (Event Store)
 └── Timestamp: DateTime
 ```
 
-## 4. OAuth 2.0 / OIDC Flows
+## 5. OAuth 2.0 / OIDC Flows
 
-### 4.1 Authorization Code + PKCE
+### 5.1 Authorization Code + PKCE
 
 ```
 Client (SPA/Mobile)                Identity Server            User (Browser)
@@ -329,7 +329,7 @@ Client (SPA/Mobile)                Identity Server            User (Browser)
       │<─────────────────────────────────│                         │
 ```
 
-### 4.2 Device Code Flow
+### 5.2 Device Code Flow
 
 ```
 Device Client                     Identity Server            User (Browser)
@@ -355,7 +355,7 @@ Device Client                     Identity Server            User (Browser)
       │<─────────────────────────────────│                         │
 ```
 
-## 5. SAML 2.0 SSO Flow
+## 6. SAML 2.0 SSO Flow
 
 ```
 Service Provider (SP)            Identity Provider (IdP)         User (Browser)
@@ -380,9 +380,9 @@ Service Provider (SP)            Identity Provider (IdP)         User (Browser)
       │     User is authenticated        │                              │
 ```
 
-## 6. JWT Token Structure
+## 7. JWT Token Structure
 
-### 6.1 ID Token
+### 7.1 ID Token
 
 ```json
 {
@@ -400,7 +400,7 @@ Service Provider (SP)            Identity Provider (IdP)         User (Browser)
 }
 ```
 
-### 6.2 Access Token (IdentityManaged mode)
+### 7.2 Access Token (IdentityManaged mode)
 
 ```json
 {
@@ -419,7 +419,7 @@ Service Provider (SP)            Identity Provider (IdP)         User (Browser)
 }
 ```
 
-## 7. Effective Permissions Algorithm
+## 8. Effective Permissions Algorithm
 
 ```
 GetEffectivePermissions(userId):
@@ -458,7 +458,7 @@ GetEffectivePermissions(userId):
   return ResolvePermissionConflicts(permissions)
 ```
 
-## 8. Database Schema (SQL Server)
+## 9. Database Schema (SQL Server)
 
 ```
 ┌─────────────────────┐     ┌─────────────────────┐
@@ -589,9 +589,9 @@ GetEffectivePermissions(userId):
 └─────────────────────┘
 ```
 
-## 9. API Design
+## 10. API Design
 
-### 9.1 URL Convention
+### 10.1 URL Convention
 
 | Type | Pattern | Example |
 |---|---|---|
@@ -600,7 +600,7 @@ GetEffectivePermissions(userId):
 | Admin API | `/api/v1/{resource}` | `/api/v1/users` |
 | UI Pages | `/{page}` | `/login`, `/consent` |
 
-### 9.2 Error Responses (RFC 7807)
+### 10.2 Error Responses (RFC 7807)
 
 ```json
 {
@@ -613,7 +613,7 @@ GetEffectivePermissions(userId):
 }
 ```
 
-### 9.3 OAuth Error Responses
+### 10.3 OAuth Error Responses
 
 Per RFC 6749, errors from OAuth endpoints use the standard format:
 
@@ -624,7 +624,7 @@ Per RFC 6749, errors from OAuth endpoints use the standard format:
 }
 ```
 
-## 10. Key Rotation Strategy
+## 11. Key Rotation Strategy
 
 - Signing keys (RSA 2048-bit or ECDSA P-256) managed via JWKS
 - Active key + up to N previous keys for validation during rotation
@@ -632,7 +632,7 @@ Per RFC 6749, errors from OAuth endpoints use the standard format:
 - Keys never hardcoded; generated at startup and persisted securely
 - Certificate-based keys for SAML signing
 
-## 11. Security Considerations
+## 12. Security Considerations
 
 - **Passwords**: hashed with Argon2id
 - **Secrets**: client secrets hashed with HMAC-SHA256

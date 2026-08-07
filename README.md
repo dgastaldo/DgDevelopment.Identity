@@ -34,11 +34,8 @@ Provides authentication, authorization, user profile management and multi-client
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/dgastaldo/DgDevelopment.Identity.git
 cd DgDevelopment.Identity
-
-# Initialize Aspire (first time only)
-aspire init --language csharp
 
 # Configure database connection in appsettings.Development.json
 # (src/DgDevelopment.Identity.Server/appsettings.Development.json)
@@ -53,7 +50,7 @@ aspire run
 DgDevelopment.Identity/
 ├── src/
 │   ├── DgDevelopment.Identity.AppHost/          # .NET Aspire orchestration host
-│   ├── DgDevelopment.Identity.ServiceDefaults/   # Health checks, telemetry, resilience
+│   ├── DgDevelopment.Identity.ServiceDefaults/   # Service Discovery, HTTP Resilience
 │   ├── DgDevelopment.Identity.Domain/            # Entities, Value Objects, interfaces
 │   ├── DgDevelopment.Identity.Application/       # Use cases, CQRS handlers, DTOs
 │   ├── DgDevelopment.Identity.Infrastructure/    # EF Core, SQL Server, external services
@@ -78,6 +75,7 @@ DgDevelopment.Identity/
 
 - [Functional Specification](docs/functional-specification.md)
 - [Architecture Document](docs/architecture.md)
+- [Branching Strategy](BRANCHING.md)
 - [CONTEXT.md](CONTEXT.md) — Context for AI tools
 
 ## Milestones
