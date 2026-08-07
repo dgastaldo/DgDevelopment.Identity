@@ -97,7 +97,37 @@ dotnet format
 
 ## Branch Strategy
 
-Trunk-based development on `main`. Short-lived feature branches with format `feature/<description>` or `fix/<description>`. Commit messages in English, format: `type: short description`.
+### Branches
+
+```
+main ──── Production
+  ▲
+integration ──── Third-party integration testing
+  ▲
+docs ──── API documentation + generated OpenAPI
+  ▲
+develop ──── Active development (base for all feature/fix branches)
+  ▲
+feature/*  fix/*
+```
+
+### Rules
+
+- `main`, `integration`, `docs`: **no direct commits** — only merges from lower branches.
+- `develop`: feature/fix branches merged via **PR + squash merge** (1 approval required).
+- **Merge forward**: `develop` → `docs` → `integration` → `main` (when promoted).
+- **Merge backward**: hotfixes on `main` flow back: `main` → `integration` → `docs` → `develop`.
+- Branch naming: `feature/<description>` or `fix/<description>` (kebab-case, English).
+
+### Commit Convention
+
+```
+<type>: <short description>
+```
+
+Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`, `style`.
+
+See `BRANCHING.md` for detailed flow and examples.
 
 ## Notes for AI / LLM
 
