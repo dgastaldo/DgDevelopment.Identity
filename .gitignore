@@ -27,6 +27,7 @@ _ReSharper*/
 
 ## Aspire
 **/.aspire/
+.agents/
 
 ## NuGet
 **/packages/*

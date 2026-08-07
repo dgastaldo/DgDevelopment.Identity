@@ -22,8 +22,60 @@
 │  │  │ Login/Consent UI │ │    │  Localization Service    │   │
 │  │  └─────────────────┘ │    │  (M4)                     │   │
 │  └──────────────────────┘    └──────────────────────────┘   │
+│                                                              │
+│  Service Defaults: Service Discovery, HTTP Resilience        │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+## 2. Solution Structure
+
+```
+DgDevelopment.Identity.sln
+├── src/
+│   ├── DgDevelopment.Identity.AppHost/          Aspire orchestration (Aspire.AppHost.Sdk)
+│   ├── DgDevelopment.Identity.ServiceDefaults/  Service Discovery, HTTP Resilience
+│   ├── DgDevelopment.Identity.Domain/           Entities, Value Objects, Interfaces
+│   ├── DgDevelopment.Identity.Application/      Use Cases, CQRS, DTOs
+│   ├── DgDevelopment.Identity.Infrastructure/   EF Core, SQL Server, Repositories
+│   ├── DgDevelopment.Identity.Server/           ASP.NET Core host (API + Razor Pages)
+│   ├── DgDevelopment.Identity.OAuth/            OAuth 2.0 / OIDC custom engine
+│   └── DgDevelopment.Identity.Saml/             SAML 2.0 custom engine
+├── clients/
+│   ├── DgDevelopment.Identity.Client.Core/      Base .NET SDK
+│   ├── DgDevelopment.Identity.Client.Blazor/     Blazor components (Razor Class Library)
+│   ├── DgDevelopment.Identity.Client.Wpf/        WPF integration
+│   ├── DgDevelopment.Identity.Client.Maui/       .NET MAUI integration
+│   └── DgDevelopment.Identity.Client.React/      TypeScript SDK (package.json)
+└── tests/
+    ├── DgDevelopment.Identity.UnitTests/         xUnit unit tests
+    └── DgDevelopment.Identity.IntegrationTests/  xUnit integration tests
+```
+
+### Project References (Clean Architecture)
+
+```
+Server ──> Application ──> Domain
+  │            ▲               ▲
+  ├──> Infrastructure ────────┘
+  ├──> OAuth ────────> Application
+  │     └─────────────> Domain
+  ├──> Saml ────────> Application
+  │     └─────────────> Domain
+  └──> ServiceDefaults
+
+AppHost ──> Server
+
+Client.[Platform] ──> Client.Core
+```
+
+### Key NuGet Dependencies
+
+| Project | Key Packages |
+|---|---|
+| AppHost | `Aspire.Hosting.SqlServer` |
+| ServiceDefaults | `Microsoft.Extensions.ServiceDiscovery`, `Microsoft.Extensions.Http.Resilience` |
+| Infrastructure | EF Core (to be added in domain implementation) |
+| Server | ASP.NET Core (implicit via SDK) |
 
 ## 2. Clean Architecture (Internal)
 

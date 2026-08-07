@@ -37,11 +37,14 @@ Provides authentication, authorization, user profile management and multi-client
 git clone <repository-url>
 cd DgDevelopment.Identity
 
+# Initialize Aspire (first time only)
+aspire init --language csharp
+
 # Configure database connection in appsettings.Development.json
 # (src/DgDevelopment.Identity.Server/appsettings.Development.json)
 
 # Run with Aspire
-dotnet run --project src/DgDevelopment.Identity.AppHost
+aspire run
 ```
 
 ## Solution Structure

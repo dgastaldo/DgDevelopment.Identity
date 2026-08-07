@@ -86,7 +86,7 @@ dotnet build
 dotnet test
 
 # Run with Aspire
-dotnet run --project src/DgDevelopment.Identity.AppHost
+aspire run
 
 # EF Core Migrations
 dotnet ef migrations add <Name> --project src/DgDevelopment.Identity.Infrastructure --startup-project src/DgDevelopment.Identity.Server
