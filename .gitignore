@@ -1,0 +1,73 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+*.cache
+*.dotCover
+
+## Visual Studio
+.vs/
+*.rsuser
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Bb]uild/
+_ReSharper*/
+*.sln.iml
+*.DotSettings.user
+.idea/
+
+## VS Code
+.vscode/
+
+## Aspire
+**/.aspire/
+
+## NuGet
+**/packages/*
+!**/packages/build/
+*.nupkg
+**/[Pp]ackages/[Rr]epository[Aa]ssembly[Ee]xception/*
+nuget.exe
+
+## EF Core Migrations (keep the folder but ignore generated designer files sometimes)
+# *.Designer.cs
+
+## Certificates
+*.pfx
+*.pem
+*.key
+*.crt
+*.cer
+
+## Docker
+docker-compose.override.yml
+
+## OS
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+## Environment
+*.env
+*.env.*
+!.env.example
+appsettings.*.local.json
+appsettings.Development.json
+
+## Test Results
+TestResults/
+*.trx
+*.coverage
+coverage/
+.coverage/
+
+## Logs
+*.log
+logs/
