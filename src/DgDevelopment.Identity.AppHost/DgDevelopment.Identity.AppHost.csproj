@@ -1,6 +1,8 @@
-<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
+﻿<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
 
   <ItemGroup>
+    <ProjectReference Include="..\DgDevelopment.Identity.AdminUi\DgDevelopment.Identity.AdminUi.Client\DgDevelopment.Identity.AdminUi.Client.csproj" />
+    <ProjectReference Include="..\DgDevelopment.Identity.AdminUi\DgDevelopment.Identity.AdminUi\DgDevelopment.Identity.AdminUi.csproj" />
     <ProjectReference Include="..\DgDevelopment.Identity.Server\DgDevelopment.Identity.Server.csproj" />
   </ItemGroup>
 
