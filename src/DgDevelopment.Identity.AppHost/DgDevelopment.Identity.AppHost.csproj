@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\DgDevelopment.Identity.Server\DgDevelopment.Identity.Server.csproj" />
     <ProjectReference Include="..\DgDevelopment.Identity.AdminUi\DgDevelopment.Identity.AdminUi.csproj" />
+    <ProjectReference Include="..\DgDevelopment.Identity.AdminUi\DgDevelopment.Identity.AdminUi\DgDevelopment.Identity.AdminUi.csproj" />
   </ItemGroup>
 
   <ItemGroup>

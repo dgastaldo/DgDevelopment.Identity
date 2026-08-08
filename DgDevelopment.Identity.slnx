@@ -18,6 +18,7 @@
   </Folder>
   <Folder Name="/src/DgDevelopment.Identity.AdminUi/">
     <Project Path="src/DgDevelopment.Identity.AdminUi/DgDevelopment.Identity.AdminUi.Client/DgDevelopment.Identity.AdminUi.Client.csproj" />
+    <Project Path="src/DgDevelopment.Identity.AdminUi/DgDevelopment.Identity.AdminUi/DgDevelopment.Identity.AdminUi.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/DgDevelopment.Identity.IntegrationTests/DgDevelopment.Identity.IntegrationTests.csproj" />

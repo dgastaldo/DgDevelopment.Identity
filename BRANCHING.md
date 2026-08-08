@@ -87,22 +87,24 @@ git checkout develop
 git pull
 git checkout -b feature/oauth-authorize-endpoint
 
-# 2. Push the branch immediately (before any code changes)
-git push -u origin feature/oauth-authorize-endpoint
+# 2. Make an initial commit (scaffold, TODO, or first change)
+git add .
+git commit -m "feat: scaffold authorize endpoint"
 
-# 3. Create PR on GitHub targeting develop (use Draft PR if work not started)
+# 3. Push and create PR immediately (use Draft if work is in progress)
+git push -u origin feature/oauth-authorize-endpoint
 gh pr create --base develop --head feature/oauth-authorize-endpoint --title "feat: add authorize endpoint" --body "..." --draft
 
-# 4. Now start developing and committing
+# 4. Continue developing and committing
 git add .
-git commit -m "feat: add authorize endpoint"
+git commit -m "feat: implement authorization code validation"
 git push
 
 # 5. Mark PR ready for review, get 1 approval, squash merge
 # GitHub auto-deletes branch after merge
 ```
 
-> **Important**: The branch must be pushed and the PR created **before** writing any code.
+> **Important**: The first commit and PR must be created **as soon as possible** (ideally within minutes of branch creation). Use Draft PR if the work is not complete.
 
 ### Promotion to Upper Branches
 
