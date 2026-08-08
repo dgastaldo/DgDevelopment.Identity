@@ -18,16 +18,17 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
+app.UseSwagger();
+app.UseSwaggerUI(options =>
+{
+    options.SwaggerEndpoint("/swagger/v1/swagger.json", "DgDevelopment Identity API v1");
+    options.RoutePrefix = "docs";
+});
+
+app.MapGet("/", () => "DgDevelopment Identity API is running.");
+
 app.MapHealthChecks("/health");
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI(options =>
-    {
-        options.SwaggerEndpoint("/swagger/v1/swagger.json", "DgDevelopment Identity API v1");
-        options.RoutePrefix = "docs";
-    });
-}
+app.Logger.LogInformation("DgDevelopment Identity Server starting on {Urls}", string.Join(", ", app.Urls));
 
 app.Run();

@@ -4,8 +4,7 @@ var sqlServer = builder.AddConnectionString("IdentityDb");
 
 var server = builder
     .AddProject<Projects.DgDevelopment_Identity_Server>("identity-server")
-    .WithReference(sqlServer)
-    .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development");
+    .WithReference(sqlServer);
 
 builder
     .AddProject<Projects.DgDevelopment_Identity_AdminUi>("admin-ui")
