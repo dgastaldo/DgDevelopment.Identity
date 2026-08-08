@@ -8,6 +8,10 @@
     <ProjectReference Include="..\DgDevelopment.Identity.ServiceDefaults\DgDevelopment.Identity.ServiceDefaults.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>

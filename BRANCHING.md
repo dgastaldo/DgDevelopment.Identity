@@ -76,6 +76,7 @@ chore: update EF Core to 10.0
 - **1 approval** required from a reviewer.
 - Squash merge only — single clean commit per feature.
 - Branch deleted after merge.
+- When work is complete, mark the PR as **ready for review** (`gh pr ready`). Do not leave it as Draft.
 
 ## Workflows
 
@@ -100,11 +101,14 @@ git add .
 git commit -m "feat: implement authorization code validation"
 git push
 
-# 5. Mark PR ready for review, get 1 approval, squash merge
+# 5. Mark PR as ready for review
+gh pr ready
+
+# 6. When approved, squash merge to develop
 # GitHub auto-deletes branch after merge
 ```
 
-> **Important**: The first commit and PR must be created **as soon as possible** (ideally within minutes of branch creation). Use Draft PR if the work is not complete.
+> **Important**: The first commit and PR must be created **as soon as possible** (ideally within minutes of branch creation). Create as Draft if work is incomplete. When all work is done, run `gh pr ready` to mark it ready for review.
 
 ### Promotion to Upper Branches
 
