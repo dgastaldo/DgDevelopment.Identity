@@ -6,7 +6,8 @@
     <Project Path="clients/DgDevelopment.Identity.Client.Wpf/DgDevelopment.Identity.Client.Wpf.csproj" />
   </Folder>
   <Folder Name="/src/">
-    <Project Path="src/DgDevelopment.Identity.AdminUi/DgDevelopment.Identity.AdminUi.csproj" />
+    <Project Path="src/DgDevelopment.Identity.AdminUi/DgDevelopment.Identity.AdminUi.Client/DgDevelopment.Identity.AdminUi.Client.csproj" />
+    <Project Path="src/DgDevelopment.Identity.AdminUi/DgDevelopment.Identity.AdminUi/DgDevelopment.Identity.AdminUi.csproj" />
     <Project Path="src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj" />
     <Project Path="src/DgDevelopment.Identity.Application/DgDevelopment.Identity.Application.csproj" />
     <Project Path="src/DgDevelopment.Identity.Domain/DgDevelopment.Identity.Domain.csproj" />
@@ -15,10 +16,6 @@
     <Project Path="src/DgDevelopment.Identity.Saml/DgDevelopment.Identity.Saml.csproj" />
     <Project Path="src/DgDevelopment.Identity.Server/DgDevelopment.Identity.Server.csproj" />
     <Project Path="src/DgDevelopment.Identity.ServiceDefaults/DgDevelopment.Identity.ServiceDefaults.csproj" />
-  </Folder>
-  <Folder Name="/src/DgDevelopment.Identity.AdminUi/">
-    <Project Path="src/DgDevelopment.Identity.AdminUi/DgDevelopment.Identity.AdminUi.Client/DgDevelopment.Identity.AdminUi.Client.csproj" />
-    <Project Path="src/DgDevelopment.Identity.AdminUi/DgDevelopment.Identity.AdminUi/DgDevelopment.Identity.AdminUi.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/DgDevelopment.Identity.IntegrationTests/DgDevelopment.Identity.IntegrationTests.csproj" />
