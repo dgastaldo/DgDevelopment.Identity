@@ -1,32 +1,32 @@
 using DgDevelopment.Identity.ServiceDefaults;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.Services.AddHealthChecks();
 
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(options =>
+builder.Services.AddOpenApi(options =>
 {
-    options.SwaggerDoc("v1", new()
+    options.AddDocumentTransformer((document, context, ct) =>
     {
-        Title = "DgDevelopment Identity API",
-        Version = "v1",
-        Description = "Identity Provider API for authentication, authorization, and user management."
+        document.Info.Title = "DgDevelopment Identity API";
+        document.Info.Version = "v1";
+        document.Info.Description = "Identity Provider API for authentication, authorization, and user management.";
+        return Task.CompletedTask;
     });
 });
 
 var app = builder.Build();
 
-app.UseSwagger();
-app.UseSwaggerUI(options =>
+app.MapOpenApi();
+app.MapScalarApiReference(options =>
 {
-    options.SwaggerEndpoint("/swagger/v1/swagger.json", "DgDevelopment Identity API v1");
-    options.RoutePrefix = "docs";
+    options.Title = "DgDevelopment Identity API";
+    options.Theme = ScalarTheme.Purple;
 });
 
 app.MapGet("/", () => "DgDevelopment Identity API is running.");
-
 app.MapHealthChecks("/health");
 
 app.Logger.LogInformation("DgDevelopment Identity Server starting on {Urls}", string.Join(", ", app.Urls));
