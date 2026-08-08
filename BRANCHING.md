@@ -87,17 +87,19 @@ git checkout develop
 git pull
 git checkout -b feature/oauth-authorize-endpoint
 
-# 2. Develop and commit
+# 2. Push and create PR immediately (even if empty — draft PR)
+git push -u origin feature/oauth-authorize-endpoint
+# Create PR on GitHub targeting develop (use draft if work not started)
+
+# 3. Develop and commit
 git add .
 git commit -m "feat: add authorize endpoint"
 
-# 3. Push and create PR
-git push -u origin feature/oauth-authorize-endpoint
-# Create PR on GitHub targeting develop
-# Get 1 approval, squash merge
-
-# 4. Delete feature branch (GitHub auto-deletes after merge)
+# 4. Get 1 approval, squash merge
+# GitHub auto-deletes branch after merge
 ```
+
+> **Important**: Open the Pull Request as soon as the branch is pushed, even if the work is incomplete (use Draft PR). This ensures visibility and enables early feedback.
 
 ### Promotion to Upper Branches
 
