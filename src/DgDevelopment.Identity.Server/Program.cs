@@ -20,15 +20,9 @@ builder.Services.AddOpenApi(options =>
 var app = builder.Build();
 
 app.MapOpenApi();
-app.MapScalarApiReference(options =>
-{
-    options.Title = "DgDevelopment Identity API";
-    options.Theme = ScalarTheme.Purple;
-});
+app.MapScalarApiReference();
 
 app.MapGet("/", () => "DgDevelopment Identity API is running.");
 app.MapHealthChecks("/health");
-
-app.Logger.LogInformation("DgDevelopment Identity Server starting on {Urls}", string.Join(", ", app.Urls));
 
 app.Run();
