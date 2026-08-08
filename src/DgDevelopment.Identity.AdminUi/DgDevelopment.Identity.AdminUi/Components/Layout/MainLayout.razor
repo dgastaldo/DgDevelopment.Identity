@@ -1,26 +1,26 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
-
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+<div class="layout-wrapper">
+    <div class="page">
+        <div class="sidebar">
+            <NavMenu />
         </div>
 
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
-</div>
+        <main>
+            <div class="top-row px-4">
+                <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+            </div>
 
-<footer class="footer">
-    <div class="container">
-        <span>DgDevelopment.Identity by <a href="https://github.com/dgastaldo" target="_blank">dgastaldo</a></span>
+            <article class="content px-4">
+                @Body
+            </article>
+        </main>
     </div>
-</footer>
+
+    <footer class="footer">
+        <span>DgDevelopment.Identity by <a href="https://github.com/dgastaldo" target="_blank">dgastaldo</a></span>
+    </footer>
+</div>
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
