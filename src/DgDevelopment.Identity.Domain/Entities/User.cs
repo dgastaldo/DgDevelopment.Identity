@@ -1,0 +1,206 @@
+using DgDevelopment.Identity.Domain.ValueObjects;
+
+namespace DgDevelopment.Identity.Domain.Entities;
+
+public sealed class User
+{
+    public Guid Id { get; private set; }
+    public string Username { get; private set; }
+    public string PasswordHash { get; private set; }
+    public bool IsActive { get; private set; }
+    public bool IsLocked { get; private set; }
+    public DateTime? LockoutEnd { get; private set; }
+    public int FailedLoginAttempts { get; private set; }
+    public DateTime CreatedAt { get; private set; }
+    public DateTime UpdatedAt { get; private set; }
+
+    private readonly List<UserEmail> _emails = [];
+    private readonly List<UserClaim> _claims = [];
+    private readonly List<UserLogin> _logins = [];
+    private readonly List<UserRole> _roles = [];
+    private readonly List<UserPermission> _permissions = [];
+    private readonly List<UserGroup> _groups = [];
+
+    public IReadOnlyCollection<UserEmail> Emails => _emails.AsReadOnly();
+    public IReadOnlyCollection<UserClaim> Claims => _claims.AsReadOnly();
+    public IReadOnlyCollection<UserLogin> Logins => _logins.AsReadOnly();
+    public IReadOnlyCollection<UserRole> Roles => _roles.AsReadOnly();
+    public IReadOnlyCollection<UserPermission> Permissions => _permissions.AsReadOnly();
+    public IReadOnlyCollection<UserGroup> Groups => _groups.AsReadOnly();
+
+    public EmailAddress? PrimaryEmail => _emails.FirstOrDefault(e => e.IsPrimary)?.Email;
+
+    private User() { }
+
+    public User(string username, string passwordHash, EmailAddress primaryEmail)
+    {
+        Id = Guid.NewGuid();
+        Username = username;
+        PasswordHash = passwordHash;
+        IsActive = true;
+        IsLocked = false;
+        FailedLoginAttempts = 0;
+        CreatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTime.UtcNow;
+
+        _emails.Add(new UserEmail(Id, primaryEmail, isPrimary: true));
+    }
+
+    public void AddEmail(EmailAddress email, bool isPrimary = false)
+    {
+        if (_emails.Any(e => e.Email.Value == email.Value))
+            throw new InvalidOperationException($"Email {email.Value} is already associated with this user.");
+
+        var userEmail = new UserEmail(Id, email, isPrimary);
+
+        if (isPrimary)
+        {
+            foreach (var existing in _emails.Where(e => e.IsPrimary))
+                existing.SetPrimary(false);
+        }
+
+        _emails.Add(userEmail);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void SetPrimaryEmail(EmailAddress email)
+    {
+        var existing = _emails.FirstOrDefault(e => e.Email.Value == email.Value)
+            ?? throw new InvalidOperationException($"Email {email.Value} is not associated with this user.");
+
+        foreach (var e in _emails.Where(e => e.IsPrimary))
+            e.SetPrimary(false);
+
+        existing.SetPrimary(true);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void RemoveEmail(EmailAddress email)
+    {
+        var existing = _emails.FirstOrDefault(e => e.Email.Value == email.Value)
+            ?? throw new InvalidOperationException($"Email {email.Value} is not associated with this user.");
+
+        if (existing.IsPrimary && _emails.Count(e => !e.IsPrimary) == 0)
+            throw new InvalidOperationException("Cannot remove the primary email when no other email exists.");
+
+        _emails.Remove(existing);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void VerifyEmail(EmailAddress email)
+    {
+        var existing = _emails.FirstOrDefault(e => e.Email.Value == email.Value)
+            ?? throw new InvalidOperationException($"Email {email.Value} is not associated with this user.");
+
+        existing.Verify();
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void AddClaim(string type, string value)
+    {
+        _claims.Add(new UserClaim(Id, type, value));
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void RemoveClaim(string type)
+    {
+        _claims.RemoveAll(c => c.Type == type);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void AddLogin(string provider, string providerKey, string? displayName = null)
+    {
+        _logins.Add(new UserLogin(Id, provider, providerKey, displayName));
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void RemoveLogin(string provider, string providerKey)
+    {
+        _logins.RemoveAll(l => l.Provider == provider && l.ProviderKey == providerKey);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void SetPassword(string passwordHash)
+    {
+        PasswordHash = passwordHash;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void Lock(DateTime? lockoutEnd = null)
+    {
+        IsLocked = true;
+        LockoutEnd = lockoutEnd ?? DateTime.UtcNow.AddMinutes(15);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void Unlock()
+    {
+        IsLocked = false;
+        LockoutEnd = null;
+        FailedLoginAttempts = 0;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void RecordFailedLogin()
+    {
+        FailedLoginAttempts++;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void Deactivate()
+    {
+        IsActive = false;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void Activate()
+    {
+        IsActive = true;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void AssignRole(Role role, string? scopeType = null, string? scopeValue = null)
+    {
+        if (_roles.Any(r => r.RoleId == role.Id))
+            return;
+
+        _roles.Add(new UserRole(Id, role.Id, scopeType, scopeValue));
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void RemoveRole(Guid roleId)
+    {
+        _roles.RemoveAll(r => r.RoleId == roleId);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void GrantPermission(Permission permission, string? scopeType = null, string? scopeValue = null)
+    {
+        if (_permissions.Any(p => p.PermissionId == permission.Id))
+            return;
+
+        _permissions.Add(new UserPermission(Id, permission.Id, scopeType, scopeValue));
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void RevokePermission(Guid permissionId)
+    {
+        _permissions.RemoveAll(p => p.PermissionId == permissionId);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void AddToGroup(Group group)
+    {
+        if (_groups.Any(g => g.GroupId == group.Id))
+            return;
+
+        _groups.Add(new UserGroup(Id, group.Id));
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void RemoveFromGroup(Guid groupId)
+    {
+        _groups.RemoveAll(g => g.GroupId == groupId);
+        UpdatedAt = DateTime.UtcNow;
+    }
+}
