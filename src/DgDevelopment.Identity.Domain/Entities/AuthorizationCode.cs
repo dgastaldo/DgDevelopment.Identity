@@ -1,3 +1,5 @@
+using System;
+
 namespace DgDevelopment.Identity.Domain.Entities;
 
 public sealed class AuthorizationCode
@@ -6,7 +8,7 @@ public sealed class AuthorizationCode
     public string CodeHash { get; private set; }
     public Guid ClientId { get; private set; }
     public Guid UserId { get; private set; }
-    public string RedirectUri { get; private set; }
+    public Uri RedirectUri { get; private set; }
     public string Scopes { get; private set; }
     public string? CodeChallengeHash { get; private set; }
     public string? CodeChallengeMethod { get; private set; }
@@ -16,9 +18,10 @@ public sealed class AuthorizationCode
 
     private AuthorizationCode() { }
 
-    public AuthorizationCode(string codeHash, Guid clientId, Guid userId, string redirectUri, string[] scopes,
+    public AuthorizationCode(string codeHash, Guid clientId, Guid userId, Uri redirectUri, string[] scopes,
         string? codeChallengeHash = null, string? codeChallengeMethod = null, int lifetimeSeconds = 300)
     {
+        ArgumentNullException.ThrowIfNull(redirectUri);
         Id = Guid.NewGuid();
         CodeHash = codeHash;
         ClientId = clientId;

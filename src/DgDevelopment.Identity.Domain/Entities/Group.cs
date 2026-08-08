@@ -22,6 +22,7 @@ public sealed class Group
 
     public void AddRole(Role role, string? scopeType = null, string? scopeValue = null)
     {
+        ArgumentNullException.ThrowIfNull(role);
         if (_roles.Any(r => r.RoleId == role.Id))
             return;
 

@@ -21,7 +21,7 @@ public sealed record CodeChallenge
     public bool Verify(string verifier)
     {
         var hash = SHA256.HashData(System.Text.Encoding.ASCII.GetBytes(verifier));
-        var base64Hash = Convert.ToBase64String(hash).Replace("+", "-").Replace("/", "_").TrimEnd('=');
+        var base64Hash = Convert.ToBase64String(hash).Replace("+", "-", StringComparison.Ordinal).Replace("/", "_", StringComparison.Ordinal).TrimEnd('=');
         return Hash == base64Hash;
     }
 }

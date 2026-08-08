@@ -13,7 +13,7 @@ public sealed record EmailAddress
         if (!IsValid(value))
             throw new ArgumentException($"Invalid email address: {value}", nameof(value));
 
-        Value = value.ToLowerInvariant().Trim();
+        Value = value.ToUpperInvariant().Trim();
     }
 
     public static bool IsValid(string email)
@@ -24,6 +24,7 @@ public sealed record EmailAddress
 
     public override string ToString() => Value;
 
-    public static implicit operator string(EmailAddress email) => email.Value;
     public static explicit operator EmailAddress(string value) => new(value);
+
+    public static EmailAddress FromString(string value) => new(value);
 }

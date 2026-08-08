@@ -1,3 +1,5 @@
+using System;
+
 namespace DgDevelopment.Identity.Domain.Entities;
 
 public enum ClientType
@@ -71,8 +73,9 @@ public sealed class Client
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public void AddRedirectUri(string uri)
+    public void AddRedirectUri(Uri uri)
     {
+        ArgumentNullException.ThrowIfNull(uri);
         if (_redirectUris.Any(r => r.RedirectUri == uri))
             return;
 
@@ -80,8 +83,9 @@ public sealed class Client
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public void AddPostLogoutRedirectUri(string uri)
+    public void AddPostLogoutRedirectUri(Uri uri)
     {
+        ArgumentNullException.ThrowIfNull(uri);
         if (_postLogoutRedirectUris.Any(r => r.RedirectUri == uri))
             return;
 

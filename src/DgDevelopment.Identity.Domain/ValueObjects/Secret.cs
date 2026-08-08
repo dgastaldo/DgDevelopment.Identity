@@ -16,7 +16,7 @@ public sealed record Secret
     public static string Generate(int length = 64)
     {
         var bytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(length);
-        return Convert.ToBase64String(bytes).Replace("+", "-").Replace("/", "_").TrimEnd('=');
+        return Convert.ToBase64String(bytes).Replace("+", "-", StringComparison.Ordinal).Replace("/", "_", StringComparison.Ordinal).TrimEnd('=');
     }
 
     public override string ToString() => Value;

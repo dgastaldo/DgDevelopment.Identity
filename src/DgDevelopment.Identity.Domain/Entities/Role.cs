@@ -20,6 +20,7 @@ public sealed class Role
 
     public void AddPermission(Permission permission, string? scopeType = null, string? scopeValue = null)
     {
+        ArgumentNullException.ThrowIfNull(permission);
         if (_permissions.Any(p => p.PermissionId == permission.Id))
             return;
 

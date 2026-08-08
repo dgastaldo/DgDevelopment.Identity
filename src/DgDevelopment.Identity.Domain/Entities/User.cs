@@ -48,6 +48,7 @@ public sealed class User
 
     public void AddEmail(EmailAddress email, bool isPrimary = false)
     {
+        ArgumentNullException.ThrowIfNull(email);
         if (_emails.Any(e => e.Email.Value == email.Value))
             throw new InvalidOperationException($"Email {email.Value} is already associated with this user.");
 
@@ -65,6 +66,7 @@ public sealed class User
 
     public void SetPrimaryEmail(EmailAddress email)
     {
+        ArgumentNullException.ThrowIfNull(email);
         var existing = _emails.FirstOrDefault(e => e.Email.Value == email.Value)
             ?? throw new InvalidOperationException($"Email {email.Value} is not associated with this user.");
 
@@ -77,10 +79,11 @@ public sealed class User
 
     public void RemoveEmail(EmailAddress email)
     {
+        ArgumentNullException.ThrowIfNull(email);
         var existing = _emails.FirstOrDefault(e => e.Email.Value == email.Value)
             ?? throw new InvalidOperationException($"Email {email.Value} is not associated with this user.");
 
-        if (existing.IsPrimary && _emails.Count(e => !e.IsPrimary) == 0)
+        if (existing.IsPrimary && !_emails.Any(e => !e.IsPrimary))
             throw new InvalidOperationException("Cannot remove the primary email when no other email exists.");
 
         _emails.Remove(existing);
@@ -89,6 +92,7 @@ public sealed class User
 
     public void VerifyEmail(EmailAddress email)
     {
+        ArgumentNullException.ThrowIfNull(email);
         var existing = _emails.FirstOrDefault(e => e.Email.Value == email.Value)
             ?? throw new InvalidOperationException($"Email {email.Value} is not associated with this user.");
 
@@ -161,6 +165,7 @@ public sealed class User
 
     public void AssignRole(Role role, string? scopeType = null, string? scopeValue = null)
     {
+        ArgumentNullException.ThrowIfNull(role);
         if (_roles.Any(r => r.RoleId == role.Id))
             return;
 
@@ -176,6 +181,7 @@ public sealed class User
 
     public void GrantPermission(Permission permission, string? scopeType = null, string? scopeValue = null)
     {
+        ArgumentNullException.ThrowIfNull(permission);
         if (_permissions.Any(p => p.PermissionId == permission.Id))
             return;
 
@@ -191,6 +197,7 @@ public sealed class User
 
     public void AddToGroup(Group group)
     {
+        ArgumentNullException.ThrowIfNull(group);
         if (_groups.Any(g => g.GroupId == group.Id))
             return;
 

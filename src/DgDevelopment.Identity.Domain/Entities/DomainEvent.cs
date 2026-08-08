@@ -1,6 +1,6 @@
 namespace DgDevelopment.Identity.Domain.Entities;
 
-public sealed class Event
+public sealed class DomainEvent
 {
     public Guid Id { get; private set; }
     public Guid AggregateId { get; private set; }
@@ -10,9 +10,9 @@ public sealed class Event
     public int Version { get; private set; }
     public DateTime Timestamp { get; private set; }
 
-    private Event() { }
+    private DomainEvent() { }
 
-    public Event(Guid aggregateId, string aggregateType, string eventType, object data, int version)
+    public DomainEvent(Guid aggregateId, string aggregateType, string eventType, object data, int version)
     {
         Id = Guid.NewGuid();
         AggregateId = aggregateId;
