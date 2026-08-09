@@ -9,6 +9,7 @@ public sealed class User
     public string PasswordHash { get; private set; }
     public bool IsActive { get; private set; }
     public bool IsLocked { get; private set; }
+    public bool IsSystemAccount { get; private set; }
     public DateTime? LockoutEnd { get; private set; }
     public int FailedLoginAttempts { get; private set; }
     public DateTime CreatedAt { get; private set; }
@@ -32,13 +33,14 @@ public sealed class User
 
     private User() { }
 
-    public User(string username, string passwordHash, EmailAddress primaryEmail)
+    public User(string username, string passwordHash, EmailAddress primaryEmail, bool isSystemAccount = false)
     {
         Id = Guid.NewGuid();
         Username = username;
         PasswordHash = passwordHash;
         IsActive = true;
         IsLocked = false;
+        IsSystemAccount = isSystemAccount;
         FailedLoginAttempts = 0;
         CreatedAt = DateTime.UtcNow;
         UpdatedAt = DateTime.UtcNow;

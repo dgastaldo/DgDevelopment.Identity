@@ -1,5 +1,6 @@
 using DgDevelopment.Identity.Infrastructure.Data;
 using DgDevelopment.Identity.OAuth.Services;
+using DgDevelopment.Identity.Server.Data;
 using DgDevelopment.Identity.Server.Services;
 using DgDevelopment.Identity.ServiceDefaults;
 using Scalar.AspNetCore;
@@ -15,6 +16,7 @@ var connectionString = builder.Configuration.GetConnectionString("IdentityDb")
 builder.Services.AddInfrastructure(connectionString);
 builder.Services.AddOAuthEngine();
 builder.Services.AddScoped<IUserInteractionService, UserInteractionService>();
+builder.Services.AddScoped<DbSeeder>();
 
 builder.Services.AddAuthentication("Cookies")
     .AddCookie("Cookies", options =>
@@ -43,6 +45,12 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var seeder = scope.ServiceProvider.GetRequiredService<DbSeeder>();
+    await seeder.SeedAsync().ConfigureAwait(false);
+}
+
 app.MapOpenApi();
 
 if (app.Environment.IsDevelopment())
@@ -63,10 +71,11 @@ app.MapGet("/", () => Results.Content(System.IO.File.ReadAllText(
     Path.Combine(app.Environment.ContentRootPath, "wwwroot", "index.html")), "text/html"));
 
 app.MapHealthChecks("/health");
-app.MapControllers();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapControllers();
 app.MapRazorPages();
 
 app.Run();
