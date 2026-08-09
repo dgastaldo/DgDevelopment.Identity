@@ -135,6 +135,8 @@ public sealed class DbSeeder
         client.AddScope("email");
         client.AddRedirectUri(new Uri("https://localhost:7157/signin-oidc"));
         client.AddRedirectUri(new Uri("http://localhost:5281/signin-oidc"));
+        client.AddRedirectUri(new Uri("https://localhost:7157/callback"));
+        client.AddRedirectUri(new Uri("http://localhost:5281/callback"));
         client.AddPostLogoutRedirectUri(new Uri("https://localhost:7157/signout-callback-oidc"));
 
         db.Clients.Add(client);

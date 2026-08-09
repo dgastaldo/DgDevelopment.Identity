@@ -1,0 +1,22 @@
+@page "/callback"
+@inject NavigationManager Navigation
+
+<h3>Logging in...</h3>
+<p>If you are not redirected, <a href="/">click here</a>.</p>
+
+@code {
+    [SupplyParameterFromQuery] public string? Code { get; set; }
+    [SupplyParameterFromQuery] public string? State { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (!string.IsNullOrWhiteSpace(Code))
+        {
+            Navigation.NavigateTo("/", forceLoad: true);
+        }
+        else
+        {
+            Navigation.NavigateTo("/");
+        }
+    }
+}

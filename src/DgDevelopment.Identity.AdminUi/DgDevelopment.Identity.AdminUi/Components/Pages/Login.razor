@@ -1,0 +1,30 @@
+@page "/login"
+@using System.Security.Cryptography
+@using System.Text
+@inject NavigationManager Navigation
+@inject IConfiguration Configuration
+
+@code {
+    protected override void OnInitialized()
+    {
+        var baseUrl = Configuration.GetValue<string>("IdentityBaseUrl") ?? "https://localhost:7157";
+        var clientId = "admin-ui";
+        var redirectUri = Navigation.BaseUri + "callback";
+
+        var bytes = RandomNumberGenerator.GetBytes(32);
+        var verifier = Convert.ToBase64String(bytes).Replace("+", "-").Replace("/", "_").TrimEnd('=');
+        var challengeBytes = SHA256.HashData(Encoding.ASCII.GetBytes(verifier));
+        var challenge = Convert.ToBase64String(challengeBytes).Replace("+", "-").Replace("/", "_").TrimEnd('=');
+
+        var url = $"{baseUrl}/connect/authorize" +
+                  $"?client_id={Uri.EscapeDataString(clientId)}" +
+                  $"&redirect_uri={Uri.EscapeDataString(redirectUri)}" +
+                  $"&response_type=code" +
+                  $"&scope=openid+profile+email" +
+                  $"&code_challenge={Uri.EscapeDataString(challenge)}" +
+                  $"&code_challenge_method=S256" +
+                  $"&nonce={Uri.EscapeDataString(Guid.NewGuid().ToString("N"))}";
+
+        Navigation.NavigateTo(url, forceLoad: true);
+    }
+}

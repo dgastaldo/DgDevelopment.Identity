@@ -2,6 +2,7 @@ namespace DgDevelopment.Identity.Server.Controllers;
 
 using DgDevelopment.Identity.Domain.Repositories;
 using DgDevelopment.Identity.OAuth.Services;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 
 [Route("connect")]
@@ -14,6 +15,7 @@ public sealed class ConnectController : Controller
     private readonly IKeyMaterialService _keyMaterialService;
     private readonly IUserInteractionService _userInteraction;
     private readonly IUserRepository _userRepository;
+    private readonly IJwtService _jwtService;
 
     public ConnectController(
         IAuthorizationService authorizationService,
@@ -21,7 +23,8 @@ public sealed class ConnectController : Controller
         IClientValidator clientValidator,
         IKeyMaterialService keyMaterialService,
         IUserInteractionService userInteraction,
-        IUserRepository userRepository)
+        IUserRepository userRepository,
+        IJwtService jwtService)
     {
         _authorizationService = authorizationService;
         _tokenService = tokenService;
@@ -29,6 +32,7 @@ public sealed class ConnectController : Controller
         _keyMaterialService = keyMaterialService;
         _userInteraction = userInteraction;
         _userRepository = userRepository;
+        _jwtService = jwtService;
     }
 
     [HttpGet("authorize")]
@@ -117,8 +121,7 @@ public sealed class ConnectController : Controller
         return Ok(jwks);
     }
 
-    [HttpGet(".well-known/openid-configuration")]
-    [Route(".well-known/openid-configuration")]
+    [HttpGet("/.well-known/openid-configuration")]
     public IActionResult Discovery()
     {
         var baseUrl = $"{Request.Scheme}://{Request.Host}";
@@ -138,5 +141,55 @@ public sealed class ConnectController : Controller
             code_challenge_methods_supported = new[] { "S256" },
             id_token_signing_alg_values_supported = new[] { "RS256" }
         });
+    }
+
+    [HttpGet("userinfo")]
+    [HttpPost("userinfo")]
+    public async Task<IActionResult> UserInfo()
+    {
+        var authHeader = Request.Headers.Authorization.FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            return Unauthorized();
+
+        var token = authHeader["Bearer ".Length..];
+        var keys = await _keyMaterialService.GetJwksDocumentAsync();
+        var parameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+        {
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            IssuerSigningKeys = keys.Keys
+        };
+
+        var principal = await _jwtService.ValidateTokenAsync(token, parameters);
+        var sub = principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (sub == null || !Guid.TryParse(sub, out var userId))
+            return Unauthorized();
+
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user == null) return Unauthorized();
+
+        var claims = new Dictionary<string, object>
+        {
+            ["sub"] = user.Id.ToString(),
+            ["name"] = user.Username
+        };
+
+        if (user.PrimaryEmail != null)
+        {
+            claims["email"] = user.PrimaryEmail.Value;
+            claims["email_verified"] = "true";
+        }
+
+        return Ok(claims);
+    }
+
+    [HttpGet("endsession")]
+    public async Task<IActionResult> EndSession([FromQuery] string? post_logout_redirect_uri = null)
+    {
+        await HttpContext.SignOutAsync();
+        if (!string.IsNullOrWhiteSpace(post_logout_redirect_uri))
+            return Redirect(post_logout_redirect_uri);
+        return Ok();
     }
 }

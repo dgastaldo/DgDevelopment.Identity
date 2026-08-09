@@ -11,6 +11,8 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddHealthChecks();
 
+var identityBaseUrl = builder.Configuration.GetValue<string>("IdentityBaseUrl") ?? "https://localhost:7157";
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
