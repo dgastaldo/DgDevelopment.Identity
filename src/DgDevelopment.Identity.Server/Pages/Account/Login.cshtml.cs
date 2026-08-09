@@ -1,5 +1,7 @@
 namespace DgDevelopment.Identity.Server.Pages.Account;
 
+using DgDevelopment.Identity.Application.Services;
+using DgDevelopment.Identity.Domain.Repositories;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
@@ -8,10 +10,17 @@ using System.Security.Claims;
 
 public sealed class LoginModel : PageModel
 {
-    [BindProperty]
-    public string Username { get; set; } = string.Empty;
-    [BindProperty]
-    public string Password { get; set; } = string.Empty;
+    private readonly IUserAuthenticationService _authService;
+    private readonly IUserSessionRepository _sessionRepo;
+
+    public LoginModel(IUserAuthenticationService authService, IUserSessionRepository sessionRepo)
+    {
+        _authService = authService;
+        _sessionRepo = sessionRepo;
+    }
+
+    [BindProperty] public string Username { get; set; } = string.Empty;
+    [BindProperty] public string Password { get; set; } = string.Empty;
 
     public async Task<IActionResult> OnPostAsync(string? returnUrl = null)
     {
@@ -21,10 +30,24 @@ public sealed class LoginModel : PageModel
             return Page();
         }
 
+        var user = await _authService.ValidateCredentialsAsync(Username, Password);
+        if (user == null)
+        {
+            ModelState.AddModelError(string.Empty, "Invalid username or password.");
+            return Page();
+        }
+
+        await _authService.RecordSuccessfulLoginAsync(user);
+
+        var sessionId = Guid.NewGuid().ToString("N");
+        var session = new DgDevelopment.Identity.Domain.Entities.UserSession(user.Id, sessionId, DateTime.UtcNow.AddHours(8), ["pwd"]);
+        await _sessionRepo.AddAsync(session);
+
         var claims = new List<Claim>
         {
-            new(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
-            new(ClaimTypes.Name, Username),
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new(ClaimTypes.Name, user.Username),
+            new("session_id", sessionId),
         };
 
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
@@ -32,9 +55,7 @@ public sealed class LoginModel : PageModel
 
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
 
-        if (!string.IsNullOrWhiteSpace(returnUrl))
-            return LocalRedirect(returnUrl);
-
+        if (!string.IsNullOrWhiteSpace(returnUrl)) return LocalRedirect(returnUrl);
         return RedirectToPage("/Index");
     }
 }

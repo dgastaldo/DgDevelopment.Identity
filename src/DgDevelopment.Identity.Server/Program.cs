@@ -1,3 +1,4 @@
+using DgDevelopment.Identity.Application.Services;
 using DgDevelopment.Identity.Infrastructure.Data;
 using DgDevelopment.Identity.OAuth.Services;
 using DgDevelopment.Identity.Server.Data;
@@ -14,6 +15,7 @@ var connectionString = builder.Configuration.GetConnectionString("IdentityDb")
     ?? throw new InvalidOperationException("Connection string 'IdentityDb' not found.");
 
 builder.Services.AddInfrastructure(connectionString);
+builder.Services.AddScoped<IUserAuthenticationService, UserAuthenticationService>();
 builder.Services.AddOAuthEngine();
 builder.Services.AddScoped<IUserInteractionService, UserInteractionService>();
 builder.Services.AddScoped<DbSeeder>();

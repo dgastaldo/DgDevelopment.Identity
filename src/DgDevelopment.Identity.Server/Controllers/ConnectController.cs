@@ -1,5 +1,6 @@
 namespace DgDevelopment.Identity.Server.Controllers;
 
+using DgDevelopment.Identity.Domain.Repositories;
 using DgDevelopment.Identity.OAuth.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,19 +13,22 @@ public sealed class ConnectController : Controller
     private readonly IClientValidator _clientValidator;
     private readonly IKeyMaterialService _keyMaterialService;
     private readonly IUserInteractionService _userInteraction;
+    private readonly IUserRepository _userRepository;
 
     public ConnectController(
         IAuthorizationService authorizationService,
         ITokenService tokenService,
         IClientValidator clientValidator,
         IKeyMaterialService keyMaterialService,
-        IUserInteractionService userInteraction)
+        IUserInteractionService userInteraction,
+        IUserRepository userRepository)
     {
         _authorizationService = authorizationService;
         _tokenService = tokenService;
         _clientValidator = clientValidator;
         _keyMaterialService = keyMaterialService;
         _userInteraction = userInteraction;
+        _userRepository = userRepository;
     }
 
     [HttpGet("authorize")]
@@ -50,11 +54,11 @@ public sealed class ConnectController : Controller
             return Redirect(_userInteraction.GetLoginUrl(Url.ActionLink()!));
 
         var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value;
+        var user = await _userRepository.GetByIdAsync(Guid.Parse(userId));
+        if (user == null) return Redirect(_userInteraction.GetErrorUrl("invalid_user", "User not found."));
         var scopes = scope.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var code = await _authorizationService.CreateAuthorizationCodeAsync(
-            result.Client!, new DgDevelopment.Identity.Domain.Entities.User("tmp", "",
-            DgDevelopment.Identity.Domain.ValueObjects.EmailAddress.FromString("tmp@tmp.com"))
-            , scopes, redirect_uri, code_challenge, code_challenge_method);
+            result.Client!, user, scopes, redirect_uri, code_challenge, code_challenge_method);
 
         var redirect = $"{redirect_uri}?code={Uri.EscapeDataString(code)}";
         if (state != null)

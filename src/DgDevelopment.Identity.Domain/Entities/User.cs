@@ -11,7 +11,7 @@ public sealed class User
     public bool IsLocked { get; private set; }
     public bool IsSystemAccount { get; private set; }
     public DateTime? LockoutEnd { get; private set; }
-    public int FailedLoginAttempts { get; private set; }
+    public int FailedLoginAttempts { get; set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 

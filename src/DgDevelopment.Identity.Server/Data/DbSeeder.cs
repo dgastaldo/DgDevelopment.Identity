@@ -1,4 +1,5 @@
 using DgDevelopment.Identity.Domain.Entities;
+using DgDevelopment.Identity.Domain.Services;
 using DgDevelopment.Identity.Domain.ValueObjects;
 using DgDevelopment.Identity.Infrastructure.Data;
 using DgDevelopment.Identity.OAuth.Services;
@@ -30,7 +31,8 @@ public sealed class DbSeeder
         await SeedGroupsAsync(db).ConfigureAwait(false);
         await SeedPlatformsAsync(db).ConfigureAwait(false);
         clientSecret ??= await SeedClientsAsync(db).ConfigureAwait(false);
-        var superadminPassword = await SeedUsersAsync(db).ConfigureAwait(false);
+        var hasher = scope.ServiceProvider.GetRequiredService<Domain.Services.IPasswordHasher>();
+        var superadminPassword = await SeedUsersAsync(db, hasher).ConfigureAwait(false);
 
         if (superadminPassword != null)
             WriteSuperadminCredentials(contentRoot, superadminPassword);
@@ -142,12 +144,12 @@ public sealed class DbSeeder
         return clientSecret;
     }
 
-    private static async Task<string?> SeedUsersAsync(IdentityDbContext db)
+    private static async Task<string?> SeedUsersAsync(IdentityDbContext db, Domain.Services.IPasswordHasher hasher)
     {
         if (await db.Users.AnyAsync().ConfigureAwait(false)) return null;
 
         var password = Secret.Generate(16);
-        var passwordHash = Convert.ToBase64String(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(password)));
+        var passwordHash = hasher.HashPassword(password);
 
         var email = EmailAddress.FromString("identity.superadmin@dgdevelopment.it");
         var user = new User("identity.superadmin", passwordHash, email, isSystemAccount: true);

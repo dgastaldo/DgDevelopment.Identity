@@ -1,7 +1,9 @@
 namespace DgDevelopment.Identity.Infrastructure.Data;
 
 using DgDevelopment.Identity.Domain.Repositories;
+using DgDevelopment.Identity.Domain.Services;
 using DgDevelopment.Identity.Infrastructure.Repositories;
+using DgDevelopment.Identity.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -27,6 +29,8 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IRoleRepository, RoleRepository>();
         services.AddScoped<IGroupRepository, GroupRepository>();
         services.AddScoped<IPlatformRepository, PlatformRepository>();
+
+        services.AddSingleton<IPasswordHasher, Argon2PasswordHasher>();
 
         return services;
     }
