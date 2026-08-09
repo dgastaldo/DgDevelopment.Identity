@@ -17,10 +17,28 @@ builder.Services.AddOpenApi(options =>
     });
 });
 
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
 var app = builder.Build();
 
 app.MapOpenApi();
-app.MapScalarApiReference();
+
+if (app.Environment.IsDevelopment())
+{
+    // 4. Configura Scalar (punta al JSON di Microsoft)
+    app.MapScalarApiReference(options =>
+    {
+        options.WithOpenApiRoutePattern("/openapi/v1.json");
+    });
+
+    // 5. Configura Swagger UI (puntandolo allo STESSO JSON di Microsoft)
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/openapi/v1.json", "DgDevelopment Identity API v1");
+        options.RoutePrefix = "swagger"; // Sarà raggiungibile a /swagger
+    });
+}
 
 app.MapGet("/", () => "DgDevelopment Identity API is running.");
 app.MapHealthChecks("/health");
