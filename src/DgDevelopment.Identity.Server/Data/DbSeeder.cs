@@ -4,6 +4,7 @@ using DgDevelopment.Identity.Infrastructure.Data;
 using DgDevelopment.Identity.OAuth.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using System.Security.Cryptography;
 
 namespace DgDevelopment.Identity.Server.Data;
@@ -21,18 +22,26 @@ public sealed class DbSeeder
     {
         await using var scope = _serviceProvider.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        var env = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
+        var contentRoot = env.ContentRootPath;
 
-        await SeedPermissionsAsync(db);
-        await SeedRolesAsync(db);
-        await SeedGroupsAsync(db);
-        await SeedPlatformsAsync(db);
-        await SeedClientsAsync(db);
-        await SeedUsersAsync(db, scope.ServiceProvider);
+        var clientSecret = await SeedPermissionsAsync(db).ConfigureAwait(false);
+        await SeedRolesAsync(db).ConfigureAwait(false);
+        await SeedGroupsAsync(db).ConfigureAwait(false);
+        await SeedPlatformsAsync(db).ConfigureAwait(false);
+        clientSecret ??= await SeedClientsAsync(db).ConfigureAwait(false);
+        var superadminPassword = await SeedUsersAsync(db).ConfigureAwait(false);
+
+        if (superadminPassword != null)
+            WriteSuperadminCredentials(contentRoot, superadminPassword);
+
+        if (clientSecret != null)
+            WriteClientCredentials(contentRoot, clientSecret);
     }
 
-    private static async Task SeedPermissionsAsync(IdentityDbContext db)
+    private static async Task<string?> SeedPermissionsAsync(IdentityDbContext db)
     {
-        if (await db.Permissions.AnyAsync().ConfigureAwait(false)) return;
+        if (await db.Permissions.AnyAsync().ConfigureAwait(false)) return null;
 
         var permissions = new[]
         {
@@ -67,6 +76,7 @@ public sealed class DbSeeder
 
         db.Permissions.AddRange(permissions);
         await db.SaveChangesAsync().ConfigureAwait(false);
+        return null;
     }
 
     private static async Task SeedRolesAsync(IdentityDbContext db)
@@ -106,9 +116,9 @@ public sealed class DbSeeder
         await db.SaveChangesAsync().ConfigureAwait(false);
     }
 
-    private static async Task SeedClientsAsync(IdentityDbContext db)
+    private static async Task<string?> SeedClientsAsync(IdentityDbContext db)
     {
-        if (await db.Clients.AnyAsync().ConfigureAwait(false)) return;
+        if (await db.Clients.AnyAsync().ConfigureAwait(false)) return null;
 
         var platform = await db.Platforms.FirstAsync(p => p.Name == "IdentityAdmin").ConfigureAwait(false);
         var clientSecret = Secret.Generate(32);
@@ -129,11 +139,12 @@ public sealed class DbSeeder
         await db.SaveChangesAsync().ConfigureAwait(false);
 
         Console.WriteLine($"--- Admin UI Client Secret: {clientSecret} ---");
+        return clientSecret;
     }
 
-    private static async Task SeedUsersAsync(IdentityDbContext db, IServiceProvider sp)
+    private static async Task<string?> SeedUsersAsync(IdentityDbContext db)
     {
-        if (await db.Users.AnyAsync().ConfigureAwait(false)) return;
+        if (await db.Users.AnyAsync().ConfigureAwait(false)) return null;
 
         var password = Secret.Generate(16);
         var passwordHash = Convert.ToBase64String(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(password)));
@@ -154,5 +165,46 @@ public sealed class DbSeeder
         Console.WriteLine($"  Password: {password}");
         Console.WriteLine("  Email:    identity.superadmin@dgdevelopment.it");
         Console.WriteLine("==============================================");
+
+        return password;
+    }
+
+    private static void WriteSuperadminCredentials(string contentRoot, string password)
+    {
+        var path = Path.Combine(contentRoot, "superadmin-credentials.txt");
+        var content = $"""
+        ==============================================
+          DgDevelopment Identity - SuperAdmin Credentials
+        ==============================================
+          Username: identity.superadmin
+          Password: {password}
+          Email:    identity.superadmin@dgdevelopment.it
+        ==============================================
+          Store this file in a secure location.
+          Do not commit to version control.
+        ==============================================
+        """;
+
+        File.WriteAllText(path, content);
+        Console.WriteLine($"SuperAdmin credentials saved to: {path}");
+    }
+
+    private static void WriteClientCredentials(string contentRoot, string clientSecret)
+    {
+        var path = Path.Combine(contentRoot, "admin-client-credentials.txt");
+        var content = $"""
+        ==============================================
+          DgDevelopment Identity - Admin Client Credentials
+        ==============================================
+          Client ID: admin-ui
+          Client Secret: {clientSecret}
+        ==============================================
+          Store this file in a secure location.
+          Do not commit to version control.
+        ==============================================
+        """;
+
+        File.WriteAllText(path, content);
+        Console.WriteLine($"Admin client credentials saved to: {path}");
     }
 }
