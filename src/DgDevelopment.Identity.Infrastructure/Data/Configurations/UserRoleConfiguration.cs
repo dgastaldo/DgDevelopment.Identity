@@ -8,6 +8,7 @@ public sealed class UserRoleConfiguration : IEntityTypeConfiguration<UserRole>
 {
     public void Configure(EntityTypeBuilder<UserRole> builder)
     {
+        System.ArgumentNullException.ThrowIfNull(builder);
         builder.HasKey(x => new { x.UserId, x.RoleId });
 
         builder.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);

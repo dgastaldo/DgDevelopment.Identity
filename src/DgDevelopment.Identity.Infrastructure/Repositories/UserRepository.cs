@@ -24,7 +24,7 @@ public sealed class UserRepository : IUserRepository
             .Include(u => u.Roles)
             .Include(u => u.Permissions)
             .Include(u => u.Groups)
-            .FirstOrDefaultAsync(u => u.Id == id, ct);
+            .FirstOrDefaultAsync(u => u.Id == id, ct).ConfigureAwait(false);
     }
 
     public async Task<User?> GetByUsernameAsync(string username, CancellationToken ct = default)
@@ -37,7 +37,7 @@ public sealed class UserRepository : IUserRepository
             .Include(u => u.Roles)
             .Include(u => u.Permissions)
             .Include(u => u.Groups)
-            .FirstOrDefaultAsync(u => u.Username == username, ct);
+            .FirstOrDefaultAsync(u => u.Username == username, ct).ConfigureAwait(false);
     }
 
     public async Task<User?> GetByEmailAsync(string email, CancellationToken ct = default)
@@ -51,7 +51,7 @@ public sealed class UserRepository : IUserRepository
             .Include(u => u.Permissions)
             .Include(u => u.Groups)
             .Where(u => u.Emails.Any(e => EF.Property<string>(e, "Email_Value") == email))
-            .FirstOrDefaultAsync(ct);
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
     }
 
     public async Task<User?> GetByLoginAsync(string provider, string providerKey, CancellationToken ct = default)
@@ -65,28 +65,28 @@ public sealed class UserRepository : IUserRepository
             .Include(u => u.Permissions)
             .Include(u => u.Groups)
             .Where(u => u.Logins.Any(l => l.Provider == provider && l.ProviderKey == providerKey))
-            .FirstOrDefaultAsync(ct);
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
     }
 
     public async Task AddAsync(User user, CancellationToken ct = default)
     {
-        await _context.Users.AddAsync(user, ct);
-        await _context.SaveChangesAsync(ct);
+        await _context.Users.AddAsync(user, ct).ConfigureAwait(false);
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     public async Task UpdateAsync(User user, CancellationToken ct = default)
     {
         _context.Users.Update(user);
-        await _context.SaveChangesAsync(ct);
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        var user = await _context.Users.FindAsync([id], ct);
+        var user = await _context.Users.FindAsync([id], ct).ConfigureAwait(false);
         if (user is not null)
         {
             _context.Users.Remove(user);
-            await _context.SaveChangesAsync(ct);
+            await _context.SaveChangesAsync(ct).ConfigureAwait(false);
         }
     }
 }

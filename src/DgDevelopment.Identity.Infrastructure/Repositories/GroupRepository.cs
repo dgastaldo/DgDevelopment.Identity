@@ -19,7 +19,7 @@ public sealed class GroupRepository : IGroupRepository
         return await _context.Groups
             .AsNoTracking()
             .Include(g => g.Roles)
-            .FirstOrDefaultAsync(g => g.Id == id, ct);
+            .FirstOrDefaultAsync(g => g.Id == id, ct).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyCollection<Group>> GetAllAsync(CancellationToken ct = default)
@@ -28,7 +28,7 @@ public sealed class GroupRepository : IGroupRepository
             .AsNoTracking()
             .Include(g => g.Roles)
             .OrderBy(g => g.Name)
-            .ToListAsync(ct);
+            .ToListAsync(ct).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyCollection<Group>> GetChildrenAsync(Guid parentGroupId, CancellationToken ct = default)
@@ -38,28 +38,28 @@ public sealed class GroupRepository : IGroupRepository
             .Include(g => g.Roles)
             .Where(g => g.ParentGroupId == parentGroupId)
             .OrderBy(g => g.Name)
-            .ToListAsync(ct);
+            .ToListAsync(ct).ConfigureAwait(false);
     }
 
     public async Task AddAsync(Group group, CancellationToken ct = default)
     {
-        await _context.Groups.AddAsync(group, ct);
-        await _context.SaveChangesAsync(ct);
+        await _context.Groups.AddAsync(group, ct).ConfigureAwait(false);
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     public async Task UpdateAsync(Group group, CancellationToken ct = default)
     {
         _context.Groups.Update(group);
-        await _context.SaveChangesAsync(ct);
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        var group = await _context.Groups.FindAsync([id], ct);
+        var group = await _context.Groups.FindAsync([id], ct).ConfigureAwait(false);
         if (group is not null)
         {
             _context.Groups.Remove(group);
-            await _context.SaveChangesAsync(ct);
+            await _context.SaveChangesAsync(ct).ConfigureAwait(false);
         }
     }
 }

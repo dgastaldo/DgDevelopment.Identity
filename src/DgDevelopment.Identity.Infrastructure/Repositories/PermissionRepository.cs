@@ -18,14 +18,14 @@ public sealed class PermissionRepository : IPermissionRepository
     {
         return await _context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == id, ct);
+            .FirstOrDefaultAsync(p => p.Id == id, ct).ConfigureAwait(false);
     }
 
     public async Task<Permission?> GetByNameAsync(string name, CancellationToken ct = default)
     {
         return await _context.Permissions
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Name == name, ct);
+            .FirstOrDefaultAsync(p => p.Name == name, ct).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyCollection<Permission>> GetAllAsync(CancellationToken ct = default)
@@ -33,28 +33,28 @@ public sealed class PermissionRepository : IPermissionRepository
         return await _context.Permissions
             .AsNoTracking()
             .OrderBy(p => p.Name)
-            .ToListAsync(ct);
+            .ToListAsync(ct).ConfigureAwait(false);
     }
 
     public async Task AddAsync(Permission permission, CancellationToken ct = default)
     {
-        await _context.Permissions.AddAsync(permission, ct);
-        await _context.SaveChangesAsync(ct);
+        await _context.Permissions.AddAsync(permission, ct).ConfigureAwait(false);
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     public async Task UpdateAsync(Permission permission, CancellationToken ct = default)
     {
         _context.Permissions.Update(permission);
-        await _context.SaveChangesAsync(ct);
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        var permission = await _context.Permissions.FindAsync([id], ct);
+        var permission = await _context.Permissions.FindAsync([id], ct).ConfigureAwait(false);
         if (permission is not null)
         {
             _context.Permissions.Remove(permission);
-            await _context.SaveChangesAsync(ct);
+            await _context.SaveChangesAsync(ct).ConfigureAwait(false);
         }
     }
 }

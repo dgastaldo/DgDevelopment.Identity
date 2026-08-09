@@ -18,29 +18,29 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
     {
         return await _context.RefreshTokens
             .AsNoTracking()
-            .FirstOrDefaultAsync(r => r.TokenHash == tokenHash, ct);
+            .FirstOrDefaultAsync(r => r.TokenHash == tokenHash, ct).ConfigureAwait(false);
     }
 
     public async Task AddAsync(RefreshToken token, CancellationToken ct = default)
     {
-        await _context.RefreshTokens.AddAsync(token, ct);
-        await _context.SaveChangesAsync(ct);
+        await _context.RefreshTokens.AddAsync(token, ct).ConfigureAwait(false);
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     public async Task RevokeAsync(Guid id, CancellationToken ct = default)
     {
-        var token = await _context.RefreshTokens.FindAsync([id], ct);
+        var token = await _context.RefreshTokens.FindAsync([id], ct).ConfigureAwait(false);
         if (token is not null)
         {
             token.Revoke();
-            await _context.SaveChangesAsync(ct);
+            await _context.SaveChangesAsync(ct).ConfigureAwait(false);
         }
     }
 
     public async Task RevokeChainAsync(string familyId, CancellationToken ct = default)
     {
         var token = await _context.RefreshTokens
-            .FirstOrDefaultAsync(r => r.TokenHash == familyId, ct);
+            .FirstOrDefaultAsync(r => r.TokenHash == familyId, ct).ConfigureAwait(false);
 
         if (token is null) return;
 
@@ -49,20 +49,20 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
 
         while (previousTokenId.HasValue)
         {
-            var previous = await _context.RefreshTokens.FindAsync([previousTokenId.Value], ct);
+            var previous = await _context.RefreshTokens.FindAsync([previousTokenId.Value], ct).ConfigureAwait(false);
             if (previous is null) break;
 
             previous.Revoke();
             previousTokenId = previous.PreviousTokenId;
         }
 
-        await _context.SaveChangesAsync(ct);
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     public async Task DeleteExpiredAsync(CancellationToken ct = default)
     {
         await _context.RefreshTokens
             .Where(r => r.ExpiresAt < DateTime.UtcNow)
-            .ExecuteDeleteAsync(ct);
+            .ExecuteDeleteAsync(ct).ConfigureAwait(false);
     }
 }

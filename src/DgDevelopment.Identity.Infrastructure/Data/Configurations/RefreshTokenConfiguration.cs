@@ -8,6 +8,7 @@ public sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refresh
 {
     public void Configure(EntityTypeBuilder<RefreshToken> builder)
     {
+        System.ArgumentNullException.ThrowIfNull(builder);
         builder.HasKey(x => x.Id);
 
         builder.HasIndex(x => x.TokenHash).IsUnique();

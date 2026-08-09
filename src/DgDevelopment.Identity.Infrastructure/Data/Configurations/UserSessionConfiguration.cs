@@ -8,6 +8,7 @@ public sealed class UserSessionConfiguration : IEntityTypeConfiguration<UserSess
 {
     public void Configure(EntityTypeBuilder<UserSession> builder)
     {
+        System.ArgumentNullException.ThrowIfNull(builder);
         builder.HasKey(x => x.Id);
 
         builder.HasIndex(x => x.SessionId).IsUnique();

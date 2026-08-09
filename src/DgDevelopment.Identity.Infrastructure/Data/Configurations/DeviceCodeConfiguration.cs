@@ -8,6 +8,7 @@ public sealed class DeviceCodeConfiguration : IEntityTypeConfiguration<DeviceCod
 {
     public void Configure(EntityTypeBuilder<DeviceCode> builder)
     {
+        System.ArgumentNullException.ThrowIfNull(builder);
         builder.HasKey(x => x.Id);
 
         builder.HasIndex(x => x.DeviceCodeHash).IsUnique();

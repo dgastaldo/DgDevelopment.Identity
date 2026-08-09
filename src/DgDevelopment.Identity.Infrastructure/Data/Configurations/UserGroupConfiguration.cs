@@ -8,6 +8,7 @@ public sealed class UserGroupConfiguration : IEntityTypeConfiguration<UserGroup>
 {
     public void Configure(EntityTypeBuilder<UserGroup> builder)
     {
+        System.ArgumentNullException.ThrowIfNull(builder);
         builder.HasKey(x => new { x.UserId, x.GroupId });
 
         builder.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);

@@ -19,30 +19,30 @@ public sealed class TotpSecretRepository : ITotpSecretRepository
         return await _context.TotpSecrets
             .AsNoTracking()
             .Include(t => t.BackupCodes)
-            .FirstOrDefaultAsync(t => t.UserId == userId, ct);
+            .FirstOrDefaultAsync(t => t.UserId == userId, ct).ConfigureAwait(false);
     }
 
     public async Task AddAsync(TotpSecret secret, CancellationToken ct = default)
     {
-        await _context.TotpSecrets.AddAsync(secret, ct);
-        await _context.SaveChangesAsync(ct);
+        await _context.TotpSecrets.AddAsync(secret, ct).ConfigureAwait(false);
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     public async Task UpdateAsync(TotpSecret secret, CancellationToken ct = default)
     {
         _context.TotpSecrets.Update(secret);
-        await _context.SaveChangesAsync(ct);
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     public async Task DeleteAsync(Guid userId, CancellationToken ct = default)
     {
         var secret = await _context.TotpSecrets
-            .FirstOrDefaultAsync(t => t.UserId == userId, ct);
+            .FirstOrDefaultAsync(t => t.UserId == userId, ct).ConfigureAwait(false);
 
         if (secret is not null)
         {
             _context.TotpSecrets.Remove(secret);
-            await _context.SaveChangesAsync(ct);
+            await _context.SaveChangesAsync(ct).ConfigureAwait(false);
         }
     }
 }

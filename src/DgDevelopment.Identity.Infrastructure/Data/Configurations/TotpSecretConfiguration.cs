@@ -8,6 +8,7 @@ public sealed class TotpSecretConfiguration : IEntityTypeConfiguration<TotpSecre
 {
     public void Configure(EntityTypeBuilder<TotpSecret> builder)
     {
+        System.ArgumentNullException.ThrowIfNull(builder);
         builder.HasKey(x => x.Id);
 
         builder.HasIndex(x => x.UserId).IsUnique();

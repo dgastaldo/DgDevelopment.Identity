@@ -8,6 +8,7 @@ public sealed class AuthorizationCodeConfiguration : IEntityTypeConfiguration<Au
 {
     public void Configure(EntityTypeBuilder<AuthorizationCode> builder)
     {
+        System.ArgumentNullException.ThrowIfNull(builder);
         builder.HasKey(x => x.Id);
 
         builder.HasIndex(x => x.CodeHash).IsUnique();

@@ -8,6 +8,7 @@ public sealed class SigningKeyConfiguration : IEntityTypeConfiguration<SigningKe
 {
     public void Configure(EntityTypeBuilder<SigningKey> builder)
     {
+        System.ArgumentNullException.ThrowIfNull(builder);
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.Id).HasMaxLength(100).ValueGeneratedNever();

@@ -8,6 +8,7 @@ public sealed class GroupRoleConfiguration : IEntityTypeConfiguration<GroupRole>
 {
     public void Configure(EntityTypeBuilder<GroupRole> builder)
     {
+        System.ArgumentNullException.ThrowIfNull(builder);
         builder.HasKey(x => new { x.GroupId, x.RoleId });
 
         builder.HasOne<Group>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);

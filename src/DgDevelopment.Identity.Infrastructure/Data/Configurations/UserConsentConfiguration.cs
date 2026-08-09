@@ -8,6 +8,7 @@ public sealed class UserConsentConfiguration : IEntityTypeConfiguration<UserCons
 {
     public void Configure(EntityTypeBuilder<UserConsent> builder)
     {
+        System.ArgumentNullException.ThrowIfNull(builder);
         builder.HasKey(x => x.Id);
 
         builder.HasIndex(x => new { x.UserId, x.ClientId }).IsUnique();

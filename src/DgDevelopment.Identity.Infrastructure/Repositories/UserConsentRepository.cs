@@ -18,7 +18,7 @@ public sealed class UserConsentRepository : IUserConsentRepository
     {
         return await _context.UserConsents
             .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.UserId == userId && c.ClientId == clientId, ct);
+            .FirstOrDefaultAsync(c => c.UserId == userId && c.ClientId == clientId, ct).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyCollection<UserConsent>> GetByUserAsync(Guid userId, CancellationToken ct = default)
@@ -26,13 +26,13 @@ public sealed class UserConsentRepository : IUserConsentRepository
         return await _context.UserConsents
             .AsNoTracking()
             .Where(c => c.UserId == userId)
-            .ToListAsync(ct);
+            .ToListAsync(ct).ConfigureAwait(false);
     }
 
     public async Task AddOrUpdateAsync(UserConsent consent, CancellationToken ct = default)
     {
         var existing = await _context.UserConsents
-            .FirstOrDefaultAsync(c => c.UserId == consent.UserId && c.ClientId == consent.ClientId, ct);
+            .FirstOrDefaultAsync(c => c.UserId == consent.UserId && c.ClientId == consent.ClientId, ct).ConfigureAwait(false);
 
         if (existing is not null)
         {
@@ -40,21 +40,21 @@ public sealed class UserConsentRepository : IUserConsentRepository
         }
         else
         {
-            await _context.UserConsents.AddAsync(consent, ct);
+            await _context.UserConsents.AddAsync(consent, ct).ConfigureAwait(false);
         }
 
-        await _context.SaveChangesAsync(ct);
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     public async Task RevokeAsync(Guid userId, Guid clientId, CancellationToken ct = default)
     {
         var consent = await _context.UserConsents
-            .FirstOrDefaultAsync(c => c.UserId == userId && c.ClientId == clientId, ct);
+            .FirstOrDefaultAsync(c => c.UserId == userId && c.ClientId == clientId, ct).ConfigureAwait(false);
 
         if (consent is not null)
         {
             _context.UserConsents.Remove(consent);
-            await _context.SaveChangesAsync(ct);
+            await _context.SaveChangesAsync(ct).ConfigureAwait(false);
         }
     }
 
@@ -62,6 +62,6 @@ public sealed class UserConsentRepository : IUserConsentRepository
     {
         await _context.UserConsents
             .Where(c => c.ExpiresAt.HasValue && c.ExpiresAt < DateTime.UtcNow)
-            .ExecuteDeleteAsync(ct);
+            .ExecuteDeleteAsync(ct).ConfigureAwait(false);
     }
 }

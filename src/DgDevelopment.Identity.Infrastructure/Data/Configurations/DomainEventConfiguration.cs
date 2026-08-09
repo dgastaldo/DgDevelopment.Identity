@@ -8,6 +8,7 @@ public sealed class DomainEventConfiguration : IEntityTypeConfiguration<DomainEv
 {
     public void Configure(EntityTypeBuilder<DomainEvent> builder)
     {
+        System.ArgumentNullException.ThrowIfNull(builder);
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.AggregateId);

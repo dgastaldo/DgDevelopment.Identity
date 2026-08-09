@@ -19,7 +19,7 @@ public sealed class RoleRepository : IRoleRepository
         return await _context.Roles
             .AsNoTracking()
             .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Id == id, ct);
+            .FirstOrDefaultAsync(r => r.Id == id, ct).ConfigureAwait(false);
     }
 
     public async Task<Role?> GetByNameAsync(string name, CancellationToken ct = default)
@@ -27,7 +27,7 @@ public sealed class RoleRepository : IRoleRepository
         return await _context.Roles
             .AsNoTracking()
             .Include(r => r.Permissions)
-            .FirstOrDefaultAsync(r => r.Name == name, ct);
+            .FirstOrDefaultAsync(r => r.Name == name, ct).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyCollection<Role>> GetAllAsync(CancellationToken ct = default)
@@ -36,28 +36,28 @@ public sealed class RoleRepository : IRoleRepository
             .AsNoTracking()
             .Include(r => r.Permissions)
             .OrderBy(r => r.Name)
-            .ToListAsync(ct);
+            .ToListAsync(ct).ConfigureAwait(false);
     }
 
     public async Task AddAsync(Role role, CancellationToken ct = default)
     {
-        await _context.Roles.AddAsync(role, ct);
-        await _context.SaveChangesAsync(ct);
+        await _context.Roles.AddAsync(role, ct).ConfigureAwait(false);
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     public async Task UpdateAsync(Role role, CancellationToken ct = default)
     {
         _context.Roles.Update(role);
-        await _context.SaveChangesAsync(ct);
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        var role = await _context.Roles.FindAsync([id], ct);
+        var role = await _context.Roles.FindAsync([id], ct).ConfigureAwait(false);
         if (role is not null)
         {
             _context.Roles.Remove(role);
-            await _context.SaveChangesAsync(ct);
+            await _context.SaveChangesAsync(ct).ConfigureAwait(false);
         }
     }
 }

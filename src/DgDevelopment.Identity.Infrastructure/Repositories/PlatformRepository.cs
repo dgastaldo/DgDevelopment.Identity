@@ -18,7 +18,7 @@ public sealed class PlatformRepository : IPlatformRepository
     {
         return await _context.Platforms
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == id, ct);
+            .FirstOrDefaultAsync(p => p.Id == id, ct).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyCollection<Platform>> GetAllAsync(CancellationToken ct = default)
@@ -26,28 +26,28 @@ public sealed class PlatformRepository : IPlatformRepository
         return await _context.Platforms
             .AsNoTracking()
             .OrderBy(p => p.Name)
-            .ToListAsync(ct);
+            .ToListAsync(ct).ConfigureAwait(false);
     }
 
     public async Task AddAsync(Platform platform, CancellationToken ct = default)
     {
-        await _context.Platforms.AddAsync(platform, ct);
-        await _context.SaveChangesAsync(ct);
+        await _context.Platforms.AddAsync(platform, ct).ConfigureAwait(false);
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     public async Task UpdateAsync(Platform platform, CancellationToken ct = default)
     {
         _context.Platforms.Update(platform);
-        await _context.SaveChangesAsync(ct);
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        var platform = await _context.Platforms.FindAsync([id], ct);
+        var platform = await _context.Platforms.FindAsync([id], ct).ConfigureAwait(false);
         if (platform is not null)
         {
             _context.Platforms.Remove(platform);
-            await _context.SaveChangesAsync(ct);
+            await _context.SaveChangesAsync(ct).ConfigureAwait(false);
         }
     }
 }

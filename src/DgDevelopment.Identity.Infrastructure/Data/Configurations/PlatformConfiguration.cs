@@ -8,6 +8,7 @@ public sealed class PlatformConfiguration : IEntityTypeConfiguration<Platform>
 {
     public void Configure(EntityTypeBuilder<Platform> builder)
     {
+        System.ArgumentNullException.ThrowIfNull(builder);
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.Name).HasMaxLength(200);

@@ -22,7 +22,7 @@ public sealed class ClientRepository : IClientRepository
             .Include(c => c.Scopes)
             .Include(c => c.RedirectUris)
             .Include(c => c.PostLogoutRedirectUris)
-            .FirstOrDefaultAsync(c => c.Id == id, ct);
+            .FirstOrDefaultAsync(c => c.Id == id, ct).ConfigureAwait(false);
     }
 
     public async Task<Client?> GetByClientIdAsync(string clientId, CancellationToken ct = default)
@@ -33,28 +33,28 @@ public sealed class ClientRepository : IClientRepository
             .Include(c => c.Scopes)
             .Include(c => c.RedirectUris)
             .Include(c => c.PostLogoutRedirectUris)
-            .FirstOrDefaultAsync(c => c.ClientId == clientId, ct);
+            .FirstOrDefaultAsync(c => c.ClientId == clientId, ct).ConfigureAwait(false);
     }
 
     public async Task AddAsync(Client client, CancellationToken ct = default)
     {
-        await _context.Clients.AddAsync(client, ct);
-        await _context.SaveChangesAsync(ct);
+        await _context.Clients.AddAsync(client, ct).ConfigureAwait(false);
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     public async Task UpdateAsync(Client client, CancellationToken ct = default)
     {
         _context.Clients.Update(client);
-        await _context.SaveChangesAsync(ct);
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        var client = await _context.Clients.FindAsync([id], ct);
+        var client = await _context.Clients.FindAsync([id], ct).ConfigureAwait(false);
         if (client is not null)
         {
             _context.Clients.Remove(client);
-            await _context.SaveChangesAsync(ct);
+            await _context.SaveChangesAsync(ct).ConfigureAwait(false);
         }
     }
 }

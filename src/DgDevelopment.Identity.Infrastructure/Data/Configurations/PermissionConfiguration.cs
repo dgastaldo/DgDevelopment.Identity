@@ -8,6 +8,7 @@ public sealed class PermissionConfiguration : IEntityTypeConfiguration<Permissio
 {
     public void Configure(EntityTypeBuilder<Permission> builder)
     {
+        System.ArgumentNullException.ThrowIfNull(builder);
         builder.HasKey(x => x.Id);
 
         builder.HasIndex(x => x.Name).IsUnique();

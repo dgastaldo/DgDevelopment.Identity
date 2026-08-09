@@ -16,8 +16,8 @@ public sealed class AuditLogRepository : IAuditLogRepository
 
     public async Task AddAsync(AuditLog entry, CancellationToken ct = default)
     {
-        await _context.AuditLogs.AddAsync(entry, ct);
-        await _context.SaveChangesAsync(ct);
+        await _context.AuditLogs.AddAsync(entry, ct).ConfigureAwait(false);
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyCollection<AuditLog>> GetAsync(string? actorType = null, Guid? actorId = null,
@@ -45,6 +45,6 @@ public sealed class AuditLogRepository : IAuditLogRepository
             .OrderByDescending(a => a.Timestamp)
             .Skip(skip)
             .Take(take)
-            .ToListAsync(ct);
+            .ToListAsync(ct).ConfigureAwait(false);
     }
 }

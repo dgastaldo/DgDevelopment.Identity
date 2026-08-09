@@ -18,29 +18,29 @@ public sealed class DeviceCodeRepository : IDeviceCodeRepository
     {
         return await _context.DeviceCodes
             .AsNoTracking()
-            .FirstOrDefaultAsync(d => d.UserCodeHash == userCodeHash, ct);
+            .FirstOrDefaultAsync(d => d.UserCodeHash == userCodeHash, ct).ConfigureAwait(false);
     }
 
     public async Task<DeviceCode?> GetByDeviceCodeHashAsync(string deviceCodeHash, CancellationToken ct = default)
     {
         return await _context.DeviceCodes
             .AsNoTracking()
-            .FirstOrDefaultAsync(d => d.DeviceCodeHash == deviceCodeHash, ct);
+            .FirstOrDefaultAsync(d => d.DeviceCodeHash == deviceCodeHash, ct).ConfigureAwait(false);
     }
 
     public async Task AddAsync(DeviceCode code, CancellationToken ct = default)
     {
-        await _context.DeviceCodes.AddAsync(code, ct);
-        await _context.SaveChangesAsync(ct);
+        await _context.DeviceCodes.AddAsync(code, ct).ConfigureAwait(false);
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     public async Task MarkAsUsedAsync(Guid id, CancellationToken ct = default)
     {
-        var code = await _context.DeviceCodes.FindAsync([id], ct);
+        var code = await _context.DeviceCodes.FindAsync([id], ct).ConfigureAwait(false);
         if (code is not null)
         {
             code.MarkUsed();
-            await _context.SaveChangesAsync(ct);
+            await _context.SaveChangesAsync(ct).ConfigureAwait(false);
         }
     }
 
@@ -48,6 +48,6 @@ public sealed class DeviceCodeRepository : IDeviceCodeRepository
     {
         await _context.DeviceCodes
             .Where(d => d.ExpiresAt < DateTime.UtcNow)
-            .ExecuteDeleteAsync(ct);
+            .ExecuteDeleteAsync(ct).ConfigureAwait(false);
     }
 }

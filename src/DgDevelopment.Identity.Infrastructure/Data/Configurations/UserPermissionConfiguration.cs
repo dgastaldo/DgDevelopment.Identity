@@ -8,6 +8,7 @@ public sealed class UserPermissionConfiguration : IEntityTypeConfiguration<UserP
 {
     public void Configure(EntityTypeBuilder<UserPermission> builder)
     {
+        System.ArgumentNullException.ThrowIfNull(builder);
         builder.HasKey(x => new { x.UserId, x.PermissionId });
 
         builder.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);

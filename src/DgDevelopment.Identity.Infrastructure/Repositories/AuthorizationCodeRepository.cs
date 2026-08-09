@@ -18,22 +18,22 @@ public sealed class AuthorizationCodeRepository : IAuthorizationCodeRepository
     {
         return await _context.AuthorizationCodes
             .AsNoTracking()
-            .FirstOrDefaultAsync(a => a.CodeHash == codeHash, ct);
+            .FirstOrDefaultAsync(a => a.CodeHash == codeHash, ct).ConfigureAwait(false);
     }
 
     public async Task AddAsync(AuthorizationCode code, CancellationToken ct = default)
     {
-        await _context.AuthorizationCodes.AddAsync(code, ct);
-        await _context.SaveChangesAsync(ct);
+        await _context.AuthorizationCodes.AddAsync(code, ct).ConfigureAwait(false);
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     public async Task MarkAsUsedAsync(Guid id, CancellationToken ct = default)
     {
-        var code = await _context.AuthorizationCodes.FindAsync([id], ct);
+        var code = await _context.AuthorizationCodes.FindAsync([id], ct).ConfigureAwait(false);
         if (code is not null)
         {
             code.MarkUsed();
-            await _context.SaveChangesAsync(ct);
+            await _context.SaveChangesAsync(ct).ConfigureAwait(false);
         }
     }
 
@@ -41,6 +41,6 @@ public sealed class AuthorizationCodeRepository : IAuthorizationCodeRepository
     {
         await _context.AuthorizationCodes
             .Where(a => a.ExpiresAt < DateTime.UtcNow)
-            .ExecuteDeleteAsync(ct);
+            .ExecuteDeleteAsync(ct).ConfigureAwait(false);
     }
 }
