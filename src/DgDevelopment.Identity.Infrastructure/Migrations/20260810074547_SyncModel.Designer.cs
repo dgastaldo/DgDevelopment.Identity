@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DgDevelopment.Identity.Infrastructure.Migrations
 {
     [DbContext(typeof(IdentityDbContext))]
-    [Migration("20260810073944_SyncModel")]
+    [Migration("20260810074547_SyncModel")]
     partial class SyncModel
     {
         /// <inheritdoc />
@@ -314,9 +314,6 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                     b.Property<Guid>("RoleId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid?>("GroupId1")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<string>("ScopeType")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -326,10 +323,6 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                         .HasColumnType("nvarchar(200)");
 
                     b.HasKey("GroupId", "RoleId");
-
-                    b.HasIndex("GroupId1");
-
-                    b.HasIndex("RoleId");
 
                     b.ToTable("GroupRoles");
                 });
@@ -473,9 +466,6 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                     b.Property<Guid>("PermissionId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid?>("RoleId1")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<string>("ScopeType")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -485,10 +475,6 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                         .HasColumnType("nvarchar(200)");
 
                     b.HasKey("RoleId", "PermissionId");
-
-                    b.HasIndex("PermissionId");
-
-                    b.HasIndex("RoleId1");
 
                     b.ToTable("RolePermissions");
                 });
@@ -636,14 +622,7 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                     b.Property<Guid>("GroupId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid?>("UserId1")
-                        .HasColumnType("uniqueidentifier");
-
                     b.HasKey("UserId", "GroupId");
-
-                    b.HasIndex("GroupId");
-
-                    b.HasIndex("UserId1");
 
                     b.ToTable("UserGroups");
                 });
@@ -664,14 +643,7 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
-                    b.Property<Guid?>("UserId1")
-                        .HasColumnType("uniqueidentifier");
-
                     b.HasKey("UserId", "PermissionId");
-
-                    b.HasIndex("PermissionId");
-
-                    b.HasIndex("UserId1");
 
                     b.ToTable("UserPermissions");
                 });
@@ -692,14 +664,7 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
-                    b.Property<Guid?>("UserId1")
-                        .HasColumnType("uniqueidentifier");
-
                     b.HasKey("UserId", "RoleId");
-
-                    b.HasIndex("RoleId");
-
-                    b.HasIndex("UserId1");
 
                     b.ToTable("UserRoles");
                 });
@@ -865,18 +830,8 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
             modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.GroupRole", b =>
                 {
                     b.HasOne("DgDevelopment.Identity.Domain.Entities.Group", null)
-                        .WithMany()
-                        .HasForeignKey("GroupId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("DgDevelopment.Identity.Domain.Entities.Group", null)
                         .WithMany("Roles")
-                        .HasForeignKey("GroupId1");
-
-                    b.HasOne("DgDevelopment.Identity.Domain.Entities.Role", null)
-                        .WithMany()
-                        .HasForeignKey("RoleId")
+                        .HasForeignKey("GroupId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -909,21 +864,11 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
 
             modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.RolePermission", b =>
                 {
-                    b.HasOne("DgDevelopment.Identity.Domain.Entities.Permission", null)
-                        .WithMany()
-                        .HasForeignKey("PermissionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("DgDevelopment.Identity.Domain.Entities.Role", null)
-                        .WithMany()
+                        .WithMany("Permissions")
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.HasOne("DgDevelopment.Identity.Domain.Entities.Role", null)
-                        .WithMany("Permissions")
-                        .HasForeignKey("RoleId1");
                 });
 
             modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.TotpSecret", b =>
@@ -1098,59 +1043,29 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
 
             modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.UserGroup", b =>
                 {
-                    b.HasOne("DgDevelopment.Identity.Domain.Entities.Group", null)
-                        .WithMany()
-                        .HasForeignKey("GroupId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("DgDevelopment.Identity.Domain.Entities.User", null)
-                        .WithMany()
+                        .WithMany("Groups")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.HasOne("DgDevelopment.Identity.Domain.Entities.User", null)
-                        .WithMany("Groups")
-                        .HasForeignKey("UserId1");
                 });
 
             modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.UserPermission", b =>
                 {
-                    b.HasOne("DgDevelopment.Identity.Domain.Entities.Permission", null)
-                        .WithMany()
-                        .HasForeignKey("PermissionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("DgDevelopment.Identity.Domain.Entities.User", null)
-                        .WithMany()
+                        .WithMany("Permissions")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.HasOne("DgDevelopment.Identity.Domain.Entities.User", null)
-                        .WithMany("Permissions")
-                        .HasForeignKey("UserId1");
                 });
 
             modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.UserRole", b =>
                 {
-                    b.HasOne("DgDevelopment.Identity.Domain.Entities.Role", null)
-                        .WithMany()
-                        .HasForeignKey("RoleId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("DgDevelopment.Identity.Domain.Entities.User", null)
-                        .WithMany()
+                        .WithMany("Roles")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.HasOne("DgDevelopment.Identity.Domain.Entities.User", null)
-                        .WithMany("Roles")
-                        .HasForeignKey("UserId1");
                 });
 
             modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.UserSession", b =>

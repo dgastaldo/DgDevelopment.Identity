@@ -10,10 +10,6 @@ public sealed class GroupRoleConfiguration : IEntityTypeConfiguration<GroupRole>
     {
         System.ArgumentNullException.ThrowIfNull(builder);
         builder.HasKey(x => new { x.GroupId, x.RoleId });
-
-        builder.HasOne<Group>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<Role>().WithMany().HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Restrict);
-
         builder.Property(x => x.ScopeType).HasMaxLength(100);
         builder.Property(x => x.ScopeValue).HasMaxLength(200);
     }
