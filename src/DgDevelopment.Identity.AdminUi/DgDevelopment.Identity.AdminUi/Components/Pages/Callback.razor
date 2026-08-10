@@ -1,5 +1,10 @@
 @page "/callback"
+@using DgDevelopment.Identity.Client.Core
+@using DgDevelopment.Identity.Client.Blazor
 @inject NavigationManager Navigation
+@inject IdentityClient IdentityClient
+@inject ITokenStore TokenStore
+@inject IHttpContextAccessor HttpContextAccessor
 
 <h3>Logging in...</h3>
 <p>If you are not redirected, <a href="/">click here</a>.</p>
@@ -8,15 +13,32 @@
     [SupplyParameterFromQuery] public string? Code { get; set; }
     [SupplyParameterFromQuery] public string? State { get; set; }
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        if (!string.IsNullOrWhiteSpace(Code))
+        if (string.IsNullOrWhiteSpace(Code))
         {
             Navigation.NavigateTo("/", forceLoad: true);
+            return;
         }
-        else
+
+        var verifier = HttpContextAccessor.HttpContext!.Request.Cookies["pkce_verifier"];
+        HttpContextAccessor.HttpContext.Response.Cookies.Delete("pkce_verifier");
+
+        if (string.IsNullOrEmpty(verifier))
         {
-            Navigation.NavigateTo("/");
+            Navigation.NavigateTo("/", forceLoad: true);
+            return;
         }
+
+        try
+        {
+            var tokens = await IdentityClient.ExchangeCodeAsync(Code, verifier);
+            await TokenStore.SaveTokensAsync(tokens);
+        }
+        catch
+        {
+        }
+
+        Navigation.NavigateTo("/", forceLoad: true);
     }
 }
