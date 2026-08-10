@@ -12,7 +12,11 @@ public static class InfrastructureServiceCollectionExtensions
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, string connectionString)
     {
         services.AddDbContext<IdentityDbContext>(options =>
-            options.UseSqlServer(connectionString));
+            options.UseSqlServer(connectionString,
+                sqlOptions => sqlOptions.EnableRetryOnFailure(
+                    maxRetryCount: 5,
+                    maxRetryDelay: TimeSpan.FromSeconds(30),
+                    errorNumbersToAdd: null)));
 
         services.AddScoped<IClientRepository, ClientRepository>();
         services.AddScoped<IAuthorizationCodeRepository, AuthorizationCodeRepository>();
