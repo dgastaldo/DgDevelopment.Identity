@@ -17,7 +17,7 @@ public sealed class CookieTokenStore : ITokenStore
 
     public Task<TokenResponse?> GetTokensAsync()
     {
-        var httpContext = _httpContextAccessor.HttpContext;
+        var httpContext = httpContextAccessor.HttpContext;
         if (httpContext?.Request.Cookies.TryGetValue(CookieName, out var json) == true && json != null)
         {
             var tokens = JsonSerializer.Deserialize<TokenResponse>(json);
@@ -29,7 +29,7 @@ public sealed class CookieTokenStore : ITokenStore
 
     public Task SaveTokensAsync(TokenResponse tokens)
     {
-        var httpContext = _httpContextAccessor.HttpContext;
+        var httpContext = httpContextAccessor.HttpContext;
         var json = JsonSerializer.Serialize(tokens);
 
         httpContext?.Response.Cookies.Append(CookieName, json, new CookieOptions
@@ -46,7 +46,7 @@ public sealed class CookieTokenStore : ITokenStore
 
     public Task ClearTokensAsync()
     {
-        var httpContext = _httpContextAccessor.HttpContext;
+        var httpContext = httpContextAccessor.HttpContext;
         httpContext?.Response.Cookies.Delete(CookieName);
         return Task.CompletedTask;
     }

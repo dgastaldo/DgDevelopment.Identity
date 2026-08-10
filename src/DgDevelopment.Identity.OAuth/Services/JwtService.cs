@@ -1,31 +1,26 @@
 namespace DgDevelopment.Identity.OAuth.Services;
 
+using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.IdentityModel.Tokens;
 
-public sealed class JwtService : IJwtService
+public sealed class JwtService(IKeyMaterialService keyMaterial) : IJwtService
 {
-    private readonly IKeyMaterialService _keyMaterial;
-
-    public JwtService(IKeyMaterialService keyMaterial)
-    {
-        _keyMaterial = keyMaterial;
-    }
 
     public async Task<string> CreateIdTokenAsync(IdTokenRequest request, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var credentials = await _keyMaterial.GetSigningCredentialsAsync(ct).ConfigureAwait(false);
+        var credentials = await keyMaterial.GetSigningCredentialsAsync(ct).ConfigureAwait(false);
         var now = DateTime.UtcNow;
         var claims = new List<Claim>
         {
-            new(JwtRegisteredClaimNames.Sub, request.User.Id.ToString()),
+            new(JwtRegisteredClaimNames.Sub, request.User.Id.ToString(CultureInfo.InvariantCulture)),
             new(JwtRegisteredClaimNames.Iss, "https://identity.dgdevelopment.local"),
             new(JwtRegisteredClaimNames.Aud, request.Client.ClientId),
-            new(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString()),
-            new(JwtRegisteredClaimNames.Exp, EpochTime.GetIntDate(now.AddMinutes(5)).ToString()),
-            new(JwtRegisteredClaimNames.AuthTime, EpochTime.GetIntDate(now).ToString()),
+            new(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString(CultureInfo.InvariantCulture)),
+            new(JwtRegisteredClaimNames.Exp, EpochTime.GetIntDate(now.AddMinutes(5)).ToString(CultureInfo.InvariantCulture)),
+            new(JwtRegisteredClaimNames.AuthTime, EpochTime.GetIntDate(now).ToString(CultureInfo.InvariantCulture)),
             new("sid", request.SessionId)
         };
 
@@ -58,15 +53,15 @@ public sealed class JwtService : IJwtService
     public async Task<string> CreateAccessTokenAsync(AccessTokenRequest request, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var credentials = await _keyMaterial.GetSigningCredentialsAsync(ct).ConfigureAwait(false);
+        var credentials = await keyMaterial.GetSigningCredentialsAsync(ct).ConfigureAwait(false);
         var now = DateTime.UtcNow;
         var claims = new List<Claim>
         {
-            new(JwtRegisteredClaimNames.Sub, request.User.Id.ToString()),
+            new(JwtRegisteredClaimNames.Sub, request.User.Id.ToString(CultureInfo.InvariantCulture)),
             new(JwtRegisteredClaimNames.Iss, "https://identity.dgdevelopment.local"),
             new("client_id", request.Client.ClientId),
-            new(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString()),
-            new(JwtRegisteredClaimNames.Exp, EpochTime.GetIntDate(now.AddSeconds(request.LifetimeSeconds)).ToString()),
+            new(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString(CultureInfo.InvariantCulture)),
+            new(JwtRegisteredClaimNames.Exp, EpochTime.GetIntDate(now.AddSeconds(request.LifetimeSeconds)).ToString(CultureInfo.InvariantCulture)),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
             new("scope", string.Join(' ', request.Scopes))
         };

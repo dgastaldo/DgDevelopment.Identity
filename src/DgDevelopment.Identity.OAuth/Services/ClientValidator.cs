@@ -4,21 +4,15 @@ using System.Security.Cryptography;
 using System.Text;
 using DgDevelopment.Identity.Domain.Repositories;
 
-public sealed class ClientValidator : IClientValidator
+public sealed class ClientValidator(IClientRepository repository) : IClientValidator
 {
-    private readonly IClientRepository _repository;
-
-    public ClientValidator(IClientRepository repository)
-    {
-        _repository = repository;
-    }
 
     public async Task<ClientValidationResult> ValidateAsync(string? clientId, string? clientSecret, string grantType, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(clientId))
             return new(false, null, "Missing client_id.");
 
-        var client = await _repository.GetByClientIdAsync(clientId, ct).ConfigureAwait(false);
+        var client = await repository.GetByClientIdAsync(clientId, ct).ConfigureAwait(false);
         if (client == null)
             return new(false, null, "Invalid client_id.");
 

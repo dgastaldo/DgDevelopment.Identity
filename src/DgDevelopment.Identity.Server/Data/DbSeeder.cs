@@ -10,18 +10,12 @@ using System.Security.Cryptography;
 
 namespace DgDevelopment.Identity.Server.Data;
 
-public sealed class DbSeeder
+public sealed class DbSeeder(IServiceProvider serviceProvider)
 {
-    private readonly IServiceProvider _serviceProvider;
-
-    public DbSeeder(IServiceProvider serviceProvider)
-    {
-        _serviceProvider = serviceProvider;
-    }
 
     public async Task SeedAsync()
     {
-        await using var scope = _serviceProvider.CreateAsyncScope().ConfigureAwait(false);
+        await using var scope = serviceProvider.CreateAsyncScope().ConfigureAwait(false);
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         var env = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
         var contentRoot = env.ContentRootPath;

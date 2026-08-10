@@ -6,16 +6,8 @@ using DgDevelopment.Identity.Domain.Entities;
 using DgDevelopment.Identity.Domain.Repositories;
 using DgDevelopment.Identity.Domain.ValueObjects;
 
-public sealed class AuthorizationService : IAuthorizationService
+public sealed class AuthorizationService(IClientRepository clientRepository, IAuthorizationCodeRepository codeRepository) : IAuthorizationService
 {
-    private readonly IClientRepository _clientRepository;
-    private readonly IAuthorizationCodeRepository _codeRepository;
-
-    public AuthorizationService(IClientRepository clientRepository, IAuthorizationCodeRepository codeRepository)
-    {
-        _clientRepository = clientRepository;
-        _codeRepository = codeRepository;
-    }
 
     public async Task<AuthorizationResult> ValidateAsync(AuthorizationRequest request, CancellationToken ct = default)
     {
@@ -23,7 +15,7 @@ public sealed class AuthorizationService : IAuthorizationService
         if (string.IsNullOrWhiteSpace(request.ClientId))
             return new(false, null, "invalid_request", "Missing client_id.", null);
 
-        var client = await _clientRepository.GetByClientIdAsync(request.ClientId, ct).ConfigureAwait(false);
+        var client = await clientRepository.GetByClientIdAsync(request.ClientId, ct).ConfigureAwait(false);
         if (client == null || !client.IsActive)
             return new(false, null, "invalid_client", "Invalid client.", null);
 
@@ -61,7 +53,7 @@ public sealed class AuthorizationService : IAuthorizationService
             : null;
 
         var authCode = new AuthorizationCode(codeHash, client.Id, user.Id, new Uri(redirectUri), scopes, codeChallengeHash, codeChallengeMethod);
-        await _codeRepository.AddAsync(authCode, ct).ConfigureAwait(false);
+        await codeRepository.AddAsync(authCode, ct).ConfigureAwait(false);
 
         return code;
     }
