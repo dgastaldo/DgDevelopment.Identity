@@ -17,6 +17,10 @@ public sealed class ConnectController(
     IUserRepository userRepository,
     IJwtService jwtService) : Controller
 {
+    private static readonly string[] SupportedScopes = ["openid", "profile", "email"];
+    private static readonly string[] SupportedGrantTypes = ["authorization_code", "client_credentials", "refresh_token", "device_code"];
+    private static readonly string[] SupportedCodeChallengeMethods = ["S256"];
+    private static readonly string[] SupportedSigningAlgs = ["RS256"];
 
     [HttpGet("authorize")]
     [HttpPost("authorize")]
@@ -121,10 +125,10 @@ public sealed class ConnectController(
             device_authorization_endpoint = $"{baseUrl}/connect/deviceauthorization",
             introspection_endpoint = $"{baseUrl}/connect/introspect",
             revocation_endpoint = $"{baseUrl}/connect/revoke",
-            scopes_supported = new[] { "openid", "profile", "email" },
-            grant_types_supported = new[] { "authorization_code", "client_credentials", "refresh_token", "device_code" },
-            code_challenge_methods_supported = new[] { "S256" },
-            id_token_signing_alg_values_supported = new[] { "RS256" }
+            scopes_supported = SupportedScopes,
+            grant_types_supported = SupportedGrantTypes,
+            code_challenge_methods_supported = SupportedCodeChallengeMethods,
+            id_token_signing_alg_values_supported = SupportedSigningAlgs
         });
     }
 
@@ -156,7 +160,7 @@ public sealed class ConnectController(
 
         var claims = new Dictionary<string, object>
         {
-            ["sub"] = user.Id.ToString(CultureInfo.InvariantCulture),
+            ["sub"] = user.Id.ToString(null, CultureInfo.InvariantCulture),
             ["name"] = user.Username
         };
 

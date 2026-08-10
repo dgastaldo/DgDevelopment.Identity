@@ -7,5 +7,5 @@ public sealed class OidcOptions
     public string ClientSecret { get; set; } = string.Empty;
     public string RedirectUri { get; set; } = string.Empty;
     public string PostLogoutRedirectUri { get; set; } = string.Empty;
-    public string[] Scopes { get; set; } = ["openid", "profile", "email"];
+    public IReadOnlyCollection<string> Scopes { get; set; } = ["openid", "profile", "email"];
 }

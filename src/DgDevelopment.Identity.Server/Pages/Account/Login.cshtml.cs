@@ -37,7 +37,7 @@ public sealed class LoginModel(IUserAuthenticationService authService, IUserSess
 
         var claims = new List<Claim>
         {
-            new(ClaimTypes.NameIdentifier, user.Id.ToString(CultureInfo.InvariantCulture)),
+            new(ClaimTypes.NameIdentifier, user.Id.ToString(null, CultureInfo.InvariantCulture)),
             new(ClaimTypes.Name, user.Username),
             new("session_id", sessionId),
         };

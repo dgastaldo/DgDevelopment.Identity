@@ -5,15 +5,9 @@ using Microsoft.AspNetCore.Http;
 
 namespace DgDevelopment.Identity.AdminUi;
 
-public sealed class CookieTokenStore : ITokenStore
+public sealed class CookieTokenStore(IHttpContextAccessor httpContextAccessor) : ITokenStore
 {
-    private readonly IHttpContextAccessor _httpContextAccessor;
     private const string CookieName = "identity_auth";
-
-    public CookieTokenStore(IHttpContextAccessor httpContextAccessor)
-    {
-        _httpContextAccessor = httpContextAccessor;
-    }
 
     public Task<TokenResponse?> GetTokensAsync()
     {

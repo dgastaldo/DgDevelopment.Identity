@@ -50,12 +50,12 @@ public sealed class TokenService(
         return await GenerateTokensAsync(client, user, scopes, null, ct).ConfigureAwait(false);
     }
 
-    public async Task<TokenResponse> ProcessClientCredentialsAsync(ClientValidationResult result, string[] scopes, CancellationToken ct = default)
+    public async Task<TokenResponse> ProcessClientCredentialsAsync(ClientValidationResult client, string[] scopes, CancellationToken ct = default)
     {
-        ArgumentNullException.ThrowIfNull(result);
+        ArgumentNullException.ThrowIfNull(client);
         var accessToken = await jwtService.CreateAccessTokenAsync(new(
             new User("system", "", DgDevelopment.Identity.Domain.ValueObjects.EmailAddress.FromString("system@localhost")),
-            result.Client!,
+            client.Client!,
             scopes,
             null,
             3600), ct).ConfigureAwait(false);

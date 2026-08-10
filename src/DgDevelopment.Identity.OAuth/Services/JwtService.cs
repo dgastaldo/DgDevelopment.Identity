@@ -15,7 +15,7 @@ public sealed class JwtService(IKeyMaterialService keyMaterial) : IJwtService
         var now = DateTime.UtcNow;
         var claims = new List<Claim>
         {
-            new(JwtRegisteredClaimNames.Sub, request.User.Id.ToString(CultureInfo.InvariantCulture)),
+            new(JwtRegisteredClaimNames.Sub, request.User.Id.ToString(null, CultureInfo.InvariantCulture)),
             new(JwtRegisteredClaimNames.Iss, "https://identity.dgdevelopment.local"),
             new(JwtRegisteredClaimNames.Aud, request.Client.ClientId),
             new(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString(CultureInfo.InvariantCulture)),
@@ -57,7 +57,7 @@ public sealed class JwtService(IKeyMaterialService keyMaterial) : IJwtService
         var now = DateTime.UtcNow;
         var claims = new List<Claim>
         {
-            new(JwtRegisteredClaimNames.Sub, request.User.Id.ToString(CultureInfo.InvariantCulture)),
+            new(JwtRegisteredClaimNames.Sub, request.User.Id.ToString(null, CultureInfo.InvariantCulture)),
             new(JwtRegisteredClaimNames.Iss, "https://identity.dgdevelopment.local"),
             new("client_id", request.Client.ClientId),
             new(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString(CultureInfo.InvariantCulture)),
@@ -66,7 +66,7 @@ public sealed class JwtService(IKeyMaterialService keyMaterial) : IJwtService
             new("scope", string.Join(' ', request.Scopes))
         };
 
-        if (request.Permissions is { Length: > 0 })
+        if (request.Permissions is { Count: > 0 })
             claims.Add(new("permission", string.Join(' ', request.Permissions)));
 
         var token = new JwtSecurityToken(
