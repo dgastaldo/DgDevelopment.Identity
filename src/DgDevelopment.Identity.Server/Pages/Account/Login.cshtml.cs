@@ -30,18 +30,18 @@ public sealed class LoginModel : PageModel
             return Page();
         }
 
-        var user = await _authService.ValidateCredentialsAsync(Username, Password);
+        var user = await _authService.ValidateCredentialsAsync(Username, Password).ConfigureAwait(false);
         if (user == null)
         {
             ModelState.AddModelError(string.Empty, "Invalid username or password.");
             return Page();
         }
 
-        await _authService.RecordSuccessfulLoginAsync(user);
+        await _authService.RecordSuccessfulLoginAsync(user).ConfigureAwait(false);
 
         var sessionId = Guid.NewGuid().ToString("N");
         var session = new DgDevelopment.Identity.Domain.Entities.UserSession(user.Id, sessionId, DateTime.UtcNow.AddHours(8), ["pwd"]);
-        await _sessionRepo.AddAsync(session);
+        await _sessionRepo.AddAsync(session).ConfigureAwait(false);
 
         var claims = new List<Claim>
         {
@@ -53,7 +53,7 @@ public sealed class LoginModel : PageModel
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         var principal = new ClaimsPrincipal(identity);
 
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal).ConfigureAwait(false);
 
         if (!string.IsNullOrWhiteSpace(returnUrl)) return LocalRedirect(returnUrl);
         return RedirectToPage("/Index");

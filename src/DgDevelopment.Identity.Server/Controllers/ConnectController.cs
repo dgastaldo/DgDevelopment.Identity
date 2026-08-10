@@ -50,7 +50,7 @@ public sealed class ConnectController : Controller
         ArgumentNullException.ThrowIfNull(scope);
         var result = await _authorizationService.ValidateAsync(new(
             client_id, redirect_uri, response_type, scope, state, nonce,
-            code_challenge, code_challenge_method));
+            code_challenge, code_challenge_method)).ConfigureAwait(false);
 
         if (!result.IsValid)
             return Redirect(_userInteraction.GetErrorUrl(result.Error!, result.ErrorDescription));
@@ -59,11 +59,11 @@ public sealed class ConnectController : Controller
             return Redirect(_userInteraction.GetLoginUrl(Url.ActionLink()!));
 
         var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value;
-        var user = await _userRepository.GetByIdAsync(Guid.Parse(userId));
+        var user = await _userRepository.GetByIdAsync(Guid.Parse(userId)).ConfigureAwait(false);
         if (user == null) return Redirect(_userInteraction.GetErrorUrl("invalid_user", "User not found."));
         var scopes = scope.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var code = await _authorizationService.CreateAuthorizationCodeAsync(
-            result.Client!, user, scopes, redirect_uri, code_challenge, code_challenge_method);
+            result.Client!, user, scopes, redirect_uri, code_challenge, code_challenge_method).ConfigureAwait(false);
 
         var redirect = $"{redirect_uri}?code={Uri.EscapeDataString(code)}";
         if (state != null)
@@ -81,12 +81,12 @@ public sealed class ConnectController : Controller
             TokenResponse response = request.GrantType switch
             {
                 "authorization_code" => await _tokenService.ProcessAuthorizationCodeAsync(
-                    request.Code!, request.CodeVerifier!, request.ClientId!, new Uri(request.RedirectUri!)),
-                "client_credentials" => await ProcessClientCredentialsAsync(request),
+                    request.Code!, request.CodeVerifier!, request.ClientId!, new Uri(request.RedirectUri!)).ConfigureAwait(false),
+                "client_credentials" => await ProcessClientCredentialsAsync(request).ConfigureAwait(false),
                 "refresh_token" => await _tokenService.ProcessRefreshTokenAsync(
-                    request.RefreshToken!, request.ClientId!),
+                    request.RefreshToken!, request.ClientId!).ConfigureAwait(false),
                 "device_code" => await _tokenService.ProcessDeviceCodeAsync(
-                    request.DeviceCode!, request.ClientId!),
+                    request.DeviceCode!, request.ClientId!).ConfigureAwait(false),
                 _ => throw new InvalidOperationException($"Unsupported grant_type: {request.GrantType}")
             };
 
@@ -108,18 +108,18 @@ public sealed class ConnectController : Controller
 
     private async Task<TokenResponse> ProcessClientCredentialsAsync(TokenRequest request)
     {
-        var validation = await _clientValidator.ValidateAsync(request.ClientId, request.ClientSecret, "client_credentials");
+        var validation = await _clientValidator.ValidateAsync(request.ClientId, request.ClientSecret, "client_credentials").ConfigureAwait(false);
         if (!validation.IsValid)
             throw new InvalidOperationException(validation.ErrorDescription!);
 
         var scopes = request.Scope?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? ["openid"];
-        return await _tokenService.ProcessClientCredentialsAsync(validation, scopes);
+        return await _tokenService.ProcessClientCredentialsAsync(validation, scopes).ConfigureAwait(false);
     }
 
     [HttpGet("jwks")]
     public async Task<IActionResult> Jwks()
     {
-        var jwks = await _keyMaterialService.GetJwksDocumentAsync();
+        var jwks = await _keyMaterialService.GetJwksDocumentAsync().ConfigureAwait(false);
         return Ok(jwks);
     }
 
@@ -154,7 +154,7 @@ public sealed class ConnectController : Controller
             return Unauthorized();
 
         var token = authHeader["Bearer ".Length..];
-        var keys = await _keyMaterialService.GetJwksDocumentAsync();
+        var keys = await _keyMaterialService.GetJwksDocumentAsync().ConfigureAwait(false);
         var parameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
         {
             ValidateIssuer = false,
@@ -163,12 +163,12 @@ public sealed class ConnectController : Controller
             IssuerSigningKeys = keys.Keys
         };
 
-        var principal = await _jwtService.ValidateTokenAsync(token, parameters);
+        var principal = await _jwtService.ValidateTokenAsync(token, parameters).ConfigureAwait(false);
         var sub = principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         if (sub == null || !Guid.TryParse(sub, out var userId))
             return Unauthorized();
 
-        var user = await _userRepository.GetByIdAsync(userId);
+        var user = await _userRepository.GetByIdAsync(userId).ConfigureAwait(false);
         if (user == null) return Unauthorized();
 
         var claims = new Dictionary<string, object>
@@ -189,7 +189,7 @@ public sealed class ConnectController : Controller
     [HttpGet("endsession")]
     public async Task<IActionResult> EndSession([FromQuery] string? post_logout_redirect_uri = null)
     {
-        await HttpContext.SignOutAsync();
+        await HttpContext.SignOutAsync().ConfigureAwait(false);
         if (!string.IsNullOrWhiteSpace(post_logout_redirect_uri))
             return Redirect(post_logout_redirect_uri);
         return Ok();
