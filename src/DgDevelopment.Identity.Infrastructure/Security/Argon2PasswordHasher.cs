@@ -16,7 +16,7 @@ public sealed class Argon2PasswordHasher : IPasswordHasher
     public string HashPassword(string password)
     {
         var salt = RandomNumberGenerator.GetBytes(SaltSize);
-        var argon2 = new Argon2id(Encoding.UTF8.GetBytes(password))
+        using var argon2 = new Argon2id(Encoding.UTF8.GetBytes(password))
         {
             Salt = salt,
             DegreeOfParallelism = DegreeOfParallelism,
@@ -38,7 +38,7 @@ public sealed class Argon2PasswordHasher : IPasswordHasher
         var salt = new byte[SaltSize];
         Buffer.BlockCopy(hashBytes, 0, salt, 0, SaltSize);
 
-        var argon2 = new Argon2id(Encoding.UTF8.GetBytes(password))
+        using var argon2 = new Argon2id(Encoding.UTF8.GetBytes(password))
         {
             Salt = salt,
             DegreeOfParallelism = DegreeOfParallelism,
