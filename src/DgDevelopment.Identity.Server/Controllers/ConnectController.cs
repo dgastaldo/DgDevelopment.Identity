@@ -15,7 +15,8 @@ public sealed class ConnectController(
     IKeyMaterialService keyMaterialService,
     IUserInteractionService userInteraction,
     IUserRepository userRepository,
-    IJwtService jwtService) : Controller
+    IJwtService jwtService,
+    IClientIdCache clientIdCache) : Controller
 {
     private static readonly string[] SupportedScopes = ["openid", "profile", "email"];
     private static readonly string[] SupportedGrantTypes = ["authorization_code", "client_credentials", "refresh_token", "device_code"];
@@ -142,12 +143,23 @@ public sealed class ConnectController(
 
         var token = authHeader["Bearer ".Length..];
         var keys = await keyMaterialService.GetJwksDocumentAsync().ConfigureAwait(false);
+        var issuer = $"{Request.Scheme}://{Request.Host}";
         var parameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
         {
-            ValidateIssuer = false,
-            ValidateAudience = false,
+            ValidIssuer = issuer,
+            ValidateIssuer = true,
+            ValidateAudience = true,
             ValidateLifetime = true,
-            IssuerSigningKeys = keys.Keys
+            IssuerSigningKeys = keys.Keys,
+            AudienceValidator = (audiences, _, _) =>
+            {
+                foreach (var aud in audiences)
+                {
+                    if (clientIdCache.IsValidClientId(aud))
+                        return true;
+                }
+                return false;
+            }
         };
 
         var principal = await jwtService.ValidateTokenAsync(token, parameters).ConfigureAwait(false);
