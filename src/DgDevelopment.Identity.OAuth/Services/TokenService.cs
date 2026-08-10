@@ -70,6 +70,7 @@ public sealed class TokenService : ITokenService
 
     public async Task<TokenResponse> ProcessClientCredentialsAsync(ClientValidationResult result, string[] scopes, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(result);
         var accessToken = await _jwtService.CreateAccessTokenAsync(new(
             new User("system", "", DgDevelopment.Identity.Domain.ValueObjects.EmailAddress.FromString("system@localhost")),
             result.Client!,

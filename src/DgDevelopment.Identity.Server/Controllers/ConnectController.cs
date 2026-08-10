@@ -47,6 +47,7 @@ public sealed class ConnectController : Controller
         [FromQuery] string? code_challenge = null,
         [FromQuery] string? code_challenge_method = null)
     {
+        ArgumentNullException.ThrowIfNull(scope);
         var result = await _authorizationService.ValidateAsync(new(
             client_id, redirect_uri, response_type, scope, state, nonce,
             code_challenge, code_challenge_method));
@@ -74,6 +75,7 @@ public sealed class ConnectController : Controller
     [HttpPost("token")]
     public async Task<IActionResult> Token([FromForm] TokenRequest request)
     {
+        ArgumentNullException.ThrowIfNull(request);
         try
         {
             TokenResponse response = request.GrantType switch

@@ -5,7 +5,7 @@ using DgDevelopment.Identity.Domain.Entities;
 using DgDevelopment.Identity.Domain.Repositories;
 using Microsoft.IdentityModel.Tokens;
 
-public sealed class KeyMaterialService : IKeyMaterialService
+public sealed class KeyMaterialService : IKeyMaterialService, IDisposable
 {
     private readonly ISigningKeyRepository _repository;
     private readonly SemaphoreSlim _lock = new(1, 1);
@@ -14,6 +14,8 @@ public sealed class KeyMaterialService : IKeyMaterialService
     {
         _repository = repository;
     }
+
+    public void Dispose() => _lock.Dispose();
 
     public async Task<SigningCredentials> GetSigningCredentialsAsync(CancellationToken ct = default)
     {
@@ -37,7 +39,7 @@ public sealed class KeyMaterialService : IKeyMaterialService
 
         foreach (var key in keys.Where(k => k.IsActive && !k.IsExpired()))
         {
-            var rsa = RSA.Create();
+            using var rsa = RSA.Create();
             rsa.ImportFromPem(key.PublicKeyData);
             var jwk = JsonWebKeyConverter.ConvertFromRSASecurityKey(new RsaSecurityKey(rsa));
             jwk.KeyId = key.Id;
@@ -53,7 +55,7 @@ public sealed class KeyMaterialService : IKeyMaterialService
         await _lock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            var rsa = RSA.Create(2048);
+            using var rsa = RSA.Create(2048);
             var privateKey = rsa.ExportRSAPrivateKeyPem();
             var publicKey = rsa.ExportRSAPublicKeyPem();
             var kid = Guid.NewGuid().ToString("N")[..8];

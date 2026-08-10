@@ -19,6 +19,7 @@ public sealed class AuthorizationService : IAuthorizationService
 
     public async Task<AuthorizationResult> ValidateAsync(AuthorizationRequest request, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(request);
         if (string.IsNullOrWhiteSpace(request.ClientId))
             return new(false, null, "invalid_request", "Missing client_id.", null);
 
@@ -51,6 +52,8 @@ public sealed class AuthorizationService : IAuthorizationService
 
     public async Task<string> CreateAuthorizationCodeAsync(Client client, User user, string[] scopes, string redirectUri, string? codeChallenge, string? codeChallengeMethod, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(client);
+        ArgumentNullException.ThrowIfNull(user);
         var code = Secret.Generate(32);
         var codeHash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(code)));
         var codeChallengeHash = codeChallenge != null

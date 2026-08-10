@@ -15,6 +15,7 @@ public sealed class JwtService : IJwtService
 
     public async Task<string> CreateIdTokenAsync(IdTokenRequest request, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(request);
         var credentials = await _keyMaterial.GetSigningCredentialsAsync(ct).ConfigureAwait(false);
         var now = DateTime.UtcNow;
         var claims = new List<Claim>
@@ -56,6 +57,7 @@ public sealed class JwtService : IJwtService
 
     public async Task<string> CreateAccessTokenAsync(AccessTokenRequest request, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(request);
         var credentials = await _keyMaterial.GetSigningCredentialsAsync(ct).ConfigureAwait(false);
         var now = DateTime.UtcNow;
         var claims = new List<Claim>
