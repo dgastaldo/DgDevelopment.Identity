@@ -1,7 +1,7 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
 var sqlServer = builder.AddConnectionString("IdentityDb");
-var redis = builder.AddConnectionString("Redis");
+var redis = builder.AddRedis("Redis");
 
 var server = builder
     .AddProject<Projects.DgDevelopment_Identity_Server>("identity-server")
