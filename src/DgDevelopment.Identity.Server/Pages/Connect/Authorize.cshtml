@@ -1,0 +1,33 @@
+@page "/connect/authorize"
+@model DgDevelopment.Identity.Server.Pages.Connect.AuthorizeModel
+@{
+    ViewData["Title"] = "Login";
+}
+
+@if (!Model.IsAuthenticated)
+{
+    <h2>Login</h2>
+    <form method="post" action="/connect/authorize">
+        <input type="hidden" name="client_id" value="@Model.ClientId" />
+        <input type="hidden" name="redirect_uri" value="@Model.RedirectUri" />
+        <input type="hidden" name="response_type" value="@Model.ResponseType" />
+        <input type="hidden" name="scope" value="@Model.Scope" />
+        <input type="hidden" name="state" value="@Model.State" />
+        <input type="hidden" name="nonce" value="@Model.Nonce" />
+        <input type="hidden" name="code_challenge" value="@Model.CodeChallenge" />
+        <input type="hidden" name="code_challenge_method" value="@Model.CodeChallengeMethod" />
+        <div>
+            <label>Username</label>
+            <input name="Username" type="text" required />
+        </div>
+        <div>
+            <label>Password</label>
+            <input name="Password" type="password" required />
+        </div>
+        <button type="submit">Login</button>
+    </form>
+    @if (Model.Error != null)
+    {
+        <div style="color:red">@Model.Error</div>
+    }
+}
