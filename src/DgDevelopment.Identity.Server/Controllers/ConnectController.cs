@@ -43,7 +43,10 @@ public sealed class ConnectController(
             return Redirect(userInteraction.GetErrorUrl(result.Error!, result.ErrorDescription));
 
         if (!User.Identity!.IsAuthenticated)
-            return Redirect(userInteraction.GetLoginUrl(Url.ActionLink()!));
+        {
+            var returnUrl = HttpContext.Request.GetEncodedUrl();
+            return Redirect(userInteraction.GetLoginUrl(returnUrl));
+        }
 
         var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value;
         var user = await userRepository.GetByIdAsync(Guid.Parse(userId)).ConfigureAwait(false);
