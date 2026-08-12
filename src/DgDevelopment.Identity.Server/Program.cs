@@ -84,4 +84,4 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapRazorPages();
 
-app.Run();
+await app.RunAsync();

@@ -3,23 +3,19 @@ using DgDevelopment.Identity.OAuth.Services;
 
 namespace DgDevelopment.Identity.Server.Services;
 
-public sealed class ClientIdCache : IClientIdCache, IDisposable
+internal sealed class ClientIdCache(IClientRepository clientRepository) : IClientIdCache, IDisposable
 {
-    private readonly IClientRepository _clientRepository;
-    private readonly PeriodicTimer _refreshTimer;
+    private readonly PeriodicTimer _refreshTimer = new(TimeSpan.FromMinutes(5));
     private HashSet<string> _clientIds = [];
     private readonly ReaderWriterLockSlim _lock = new();
-
-    public ClientIdCache(IClientRepository clientRepository)
-    {
-        _clientRepository = clientRepository;
-        _refreshTimer = new PeriodicTimer(TimeSpan.FromMinutes(5));
-    }
 
     public async Task InitializeAsync(CancellationToken ct = default)
     {
         await RefreshCacheAsync(ct).ConfigureAwait(false);
-        _ = Task.Run(() => RefreshLoopAsync());
+        _ = Task.Run(() =>
+        {
+            return RefreshLoopAsync(ct);
+        }, ct);
     }
 
     public bool IsValidClientId(string clientId)
@@ -35,13 +31,13 @@ public sealed class ClientIdCache : IClientIdCache, IDisposable
         }
     }
 
-    private async Task RefreshLoopAsync()
+    private async Task RefreshLoopAsync(CancellationToken ct = default)
     {
-        while (await _refreshTimer.WaitForNextTickAsync().ConfigureAwait(false))
+        while (await _refreshTimer.WaitForNextTickAsync(ct).ConfigureAwait(false))
         {
             try
             {
-                await RefreshCacheAsync().ConfigureAwait(false);
+                await RefreshCacheAsync(ct).ConfigureAwait(false);
             }
             catch
             {
@@ -51,7 +47,7 @@ public sealed class ClientIdCache : IClientIdCache, IDisposable
 
     private async Task RefreshCacheAsync(CancellationToken ct = default)
     {
-        var clientIds = await _clientRepository.GetAllActiveClientIdsAsync(ct).ConfigureAwait(false);
+        var clientIds = await clientRepository.GetAllActiveClientIdsAsync(ct).ConfigureAwait(false);
         var set = new HashSet<string>(clientIds, StringComparer.Ordinal);
 
         _lock.EnterWriteLock();

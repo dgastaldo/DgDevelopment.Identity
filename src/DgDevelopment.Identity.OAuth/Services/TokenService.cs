@@ -11,8 +11,9 @@ public sealed class TokenService(
     IDeviceCodeRepository deviceCodeRepo,
     IClientRepository clientRepo,
     IUserRepository userRepo,
-    IJwtService jwtService,
-    ISigningKeyRepository signingKeyRepo) : ITokenService
+    IJwtService jwtService
+    //,ISigningKeyRepository signingKeyRepo
+    ) : ITokenService
 {
 
     public async Task<TokenResponse> ProcessAuthorizationCodeAsync(string code, string codeVerifier, string clientId, Uri redirectUri, CancellationToken ct = default)

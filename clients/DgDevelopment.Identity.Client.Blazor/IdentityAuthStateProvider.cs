@@ -6,27 +6,19 @@ using Microsoft.AspNetCore.Components.Authorization;
 
 namespace DgDevelopment.Identity.Client.Blazor;
 
-public sealed class IdentityAuthStateProvider : AuthenticationStateProvider
+public sealed class IdentityAuthStateProvider(IdentityClient client, ITokenStore tokenStore
+    //, OidcOptions options
+    ) : AuthenticationStateProvider
 {
-    private readonly IdentityClient _client;
-    private readonly ITokenStore _tokenStore;
-    private readonly OidcOptions _options;
     private TokenResponse? _tokens;
     private ClaimsPrincipal? _currentUser;
-
-    public IdentityAuthStateProvider(IdentityClient client, ITokenStore tokenStore, OidcOptions options)
-    {
-        _client = client;
-        _tokenStore = tokenStore;
-        _options = options;
-    }
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
         if (_currentUser?.Identity?.IsAuthenticated == true)
             return new AuthenticationState(_currentUser);
 
-        _tokens = await _tokenStore.GetTokensAsync().ConfigureAwait(false);
+        _tokens = await tokenStore.GetTokensAsync().ConfigureAwait(false);
 
         if (_tokens == null)
             return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
@@ -35,12 +27,12 @@ public sealed class IdentityAuthStateProvider : AuthenticationStateProvider
         {
             try
             {
-                _tokens = await _client.RefreshTokenAsync(_tokens.RefreshToken).ConfigureAwait(false);
-                await _tokenStore.SaveTokensAsync(_tokens).ConfigureAwait(false);
+                _tokens = await client.RefreshTokenAsync(_tokens.RefreshToken).ConfigureAwait(false);
+                await tokenStore.SaveTokensAsync(_tokens).ConfigureAwait(false);
             }
             catch
             {
-                await _tokenStore.ClearTokensAsync().ConfigureAwait(false);
+                await tokenStore.ClearTokensAsync().ConfigureAwait(false);
                 _tokens = null;
                 return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
             }
@@ -56,22 +48,22 @@ public sealed class IdentityAuthStateProvider : AuthenticationStateProvider
         return new AuthenticationState(_currentUser);
     }
 
-    public string GetLoginUrl()
+    public Uri GetLoginUrl()
     {
-        return _client.GetAuthorizeUrl() + "&nonce=" + Guid.NewGuid().ToString("N");
+        return new Uri(client.GetAuthorizeUrl() + "&nonce=" + Guid.NewGuid().ToString("N"));
     }
 
     public async Task CompleteLoginAsync(string code, string codeVerifier)
     {
-        _tokens = await _client.ExchangeCodeAsync(code, codeVerifier).ConfigureAwait(false);
-        await _tokenStore.SaveTokensAsync(_tokens).ConfigureAwait(false);
+        _tokens = await client.ExchangeCodeAsync(code, codeVerifier).ConfigureAwait(false);
+        await tokenStore.SaveTokensAsync(_tokens).ConfigureAwait(false);
         _currentUser = null;
         NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
     }
 
     public async Task LogoutAsync()
     {
-        await _tokenStore.ClearTokensAsync().ConfigureAwait(false);
+        await tokenStore.ClearTokensAsync().ConfigureAwait(false);
         _tokens = null;
         _currentUser = null;
         NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()))));

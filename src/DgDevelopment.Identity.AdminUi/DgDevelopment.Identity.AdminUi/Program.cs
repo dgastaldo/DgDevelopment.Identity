@@ -15,16 +15,16 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddHealthChecks();
 
-var identityBaseUrl = builder.Configuration.GetValue<string>("IdentityBaseUrl") ?? "https://localhost:7157";
-var adminClientSecret = builder.Configuration.GetValue<string>("Identity:AdminClientSecret") ?? "";
+string identityBaseUriString = builder.Configuration.GetValue<string>("IdentityBaseUrl") ?? "https://localhost:7157";
+string adminClientSecret = builder.Configuration.GetValue<string>("Identity:AdminClientSecret") ?? "";
 
 builder.Services.AddSingleton(new OidcOptions
 {
-    Authority = identityBaseUrl,
+    Authority = identityBaseUriString,
     ClientId = "admin-ui",
     ClientSecret = adminClientSecret,
-    RedirectUri = identityBaseUrl + "/callback",
-    PostLogoutRedirectUri = identityBaseUrl + "/",
+    RedirectUri = new Uri(identityBaseUriString + "/callback"),
+    PostLogoutRedirectUri = new Uri(identityBaseUriString + "/"),
     Scopes = ["openid", "profile", "email"]
 });
 

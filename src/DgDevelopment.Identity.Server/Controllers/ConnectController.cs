@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 
 [Route("connect")]
-[ApiExplorerSettings(IgnoreApi = true)]
 public sealed class ConnectController(
     IAuthorizationService authorizationService,
     ITokenService tokenService,

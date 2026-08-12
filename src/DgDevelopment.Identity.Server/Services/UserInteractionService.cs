@@ -2,7 +2,7 @@ namespace DgDevelopment.Identity.Server.Services;
 
 using DgDevelopment.Identity.OAuth.Services;
 
-public sealed class UserInteractionService : IUserInteractionService
+internal sealed class UserInteractionService : IUserInteractionService
 {
     public string GetLoginUrl(string returnUrl)
         => $"/account/login?returnUrl={Uri.EscapeDataString(returnUrl)}";
