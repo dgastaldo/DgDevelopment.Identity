@@ -9,7 +9,6 @@ using Microsoft.AspNetCore.Mvc;
 [Route("connect")]
 public sealed class ConnectController : Controller
 {
-    private readonly IAuthorizationService _authorizationService;
     private readonly ITokenService _tokenService;
     private readonly IClientValidator _clientValidator;
     private readonly IKeyMaterialService _keyMaterialService;
@@ -23,7 +22,6 @@ public sealed class ConnectController : Controller
     private static readonly string[] _supportedSigningAlgs = ["RS256"];
 
     public ConnectController(
-        IAuthorizationService authorizationService,
         ITokenService tokenService,
         IClientValidator clientValidator,
         IKeyMaterialService keyMaterialService,
@@ -31,51 +29,12 @@ public sealed class ConnectController : Controller
         IJwtService jwtService,
         IClientIdCache clientIdCache)
     {
-        _authorizationService = authorizationService;
         _tokenService = tokenService;
         _clientValidator = clientValidator;
         _keyMaterialService = keyMaterialService;
         _userRepository = userRepository;
         _jwtService = jwtService;
         _clientIdCache = clientIdCache;
-    }
-
-    [HttpPost("authorize")]
-    public async Task<IActionResult> Authorize(
-        [FromForm] string client_id,
-        [FromForm] string redirect_uri,
-        [FromForm] string response_type,
-        [FromForm] string scope,
-        [FromForm] string? state = null,
-        [FromForm] string? nonce = null,
-        [FromForm] string? code_challenge = null,
-        [FromForm] string? code_challenge_method = null)
-    {
-        ArgumentNullException.ThrowIfNull(scope);
-        var result = await _authorizationService.ValidateAsync(new(
-            client_id, redirect_uri, response_type, scope, state, nonce,
-            code_challenge, code_challenge_method)).ConfigureAwait(false);
-
-        if (!result.IsValid)
-            return RedirectToPage("/Error", new { errorCode = result.Error, errorDescription = result.ErrorDescription });
-
-        if (!User.Identity!.IsAuthenticated)
-            return RedirectToPage("/Error", new { errorCode = "unauthorized", errorDescription = "User not authenticated." });
-
-        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value;
-        var user = await _userRepository.GetByIdAsync(Guid.Parse(userId)).ConfigureAwait(false);
-        if (user == null)
-            return RedirectToPage("/Error", new { errorCode = "invalid_user", errorDescription = "User not found." });
-
-        var scopes = scope.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var code = await _authorizationService.CreateAuthorizationCodeAsync(
-            result.Client!, user, scopes, redirect_uri, code_challenge, code_challenge_method).ConfigureAwait(false);
-
-        var redirect = $"{redirect_uri}?code={Uri.EscapeDataString(code)}";
-        if (state != null)
-            redirect += $"&state={Uri.EscapeDataString(state)}";
-
-        return Redirect(redirect);
     }
 
     [HttpPost("token")]
