@@ -1,21 +1,25 @@
 using DgDevelopment.Identity.Domain.Repositories;
 using DgDevelopment.Identity.OAuth.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DgDevelopment.Identity.Server.Services;
 
-internal sealed class ClientIdCache(IClientRepository clientRepository) : IClientIdCache, IDisposable
+internal sealed class ClientIdCache : IClientIdCache, IDisposable
 {
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly PeriodicTimer _refreshTimer = new(TimeSpan.FromMinutes(5));
     private HashSet<string> _clientIds = [];
     private readonly ReaderWriterLockSlim _lock = new();
 
+    public ClientIdCache(IServiceScopeFactory scopeFactory)
+    {
+        _scopeFactory = scopeFactory;
+    }
+
     public async Task InitializeAsync(CancellationToken ct = default)
     {
         await RefreshCacheAsync(ct).ConfigureAwait(false);
-        _ = Task.Run(() =>
-        {
-            return RefreshLoopAsync(ct);
-        }, ct);
+        _ = Task.Run(() => RefreshLoopAsync(ct), ct);
     }
 
     public bool IsValidClientId(string clientId)
@@ -47,7 +51,9 @@ internal sealed class ClientIdCache(IClientRepository clientRepository) : IClien
 
     private async Task RefreshCacheAsync(CancellationToken ct = default)
     {
-        var clientIds = await clientRepository.GetAllActiveClientIdsAsync(ct).ConfigureAwait(false);
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IClientRepository>();
+        var clientIds = await repository.GetAllActiveClientIdsAsync(ct).ConfigureAwait(false);
         var set = new HashSet<string>(clientIds, StringComparer.Ordinal);
 
         _lock.EnterWriteLock();
