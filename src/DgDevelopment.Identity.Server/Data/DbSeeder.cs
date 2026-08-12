@@ -20,6 +20,9 @@ internal sealed class DbSeeder(IServiceProvider serviceProvider)
         var env = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
         var contentRoot = env.ContentRootPath;
 
+        if (env.IsDevelopment())
+            await db.Database.EnsureDeletedAsync().ConfigureAwait(false);
+
         await db.Database.MigrateAsync().ConfigureAwait(false);
 
         var clientSecret = await SeedPermissionsAsync(db).ConfigureAwait(false);
