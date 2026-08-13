@@ -11,8 +11,9 @@ public sealed class IdentityAuthStateProvider(IdentityClient client, ITokenStore
     //, OidcOptions options
     ) : AuthenticationStateProvider
 {
-    private TokenResponse? _tokens;
+private TokenResponse? _tokens;
     private ClaimsPrincipal? _currentUser;
+    private UserInfo? _userInfo;
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
@@ -45,10 +46,37 @@ if (_tokens.IsExpired() && _tokens.RefreshToken != null)
             }
         }
 
-        if (_tokens == null || _tokens.IsExpired())
+if (_tokens == null || _tokens.IsExpired())
             return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
 
-        var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, _tokens.AccessToken) };
+        if (_userInfo == null)
+        {
+            try
+            {
+                _userInfo = await client.GetUserInfoAsync(_tokens.AccessToken).ConfigureAwait(false);
+            }
+            catch (HttpRequestException)
+            {
+                return await ClearTokensAndReturnAnonymousAsync().ConfigureAwait(false);
+            }
+            catch (TaskCanceledException)
+            {
+                return await ClearTokensAndReturnAnonymousAsync().ConfigureAwait(false);
+            }
+            catch (JsonException)
+            {
+                return await ClearTokensAndReturnAnonymousAsync().ConfigureAwait(false);
+            }
+        }
+
+        var claims = new List<Claim>();
+        if (!string.IsNullOrEmpty(_userInfo?.Sub))
+            claims.Add(new Claim(ClaimTypes.NameIdentifier, _userInfo.Sub));
+        if (!string.IsNullOrEmpty(_userInfo?.Name))
+            claims.Add(new Claim(ClaimTypes.Name, _userInfo.Name));
+        if (!string.IsNullOrEmpty(_userInfo?.Email))
+            claims.Add(new Claim(ClaimTypes.Email, _userInfo.Email));
+
         _currentUser = new ClaimsPrincipal(new ClaimsIdentity(claims, "oidc"));
 
 NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(_currentUser)));
@@ -60,6 +88,7 @@ NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(_curren
         await tokenStore.ClearTokensAsync().ConfigureAwait(false);
         _tokens = null;
         _currentUser = null;
+        _userInfo = null;
         return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
     }
 
