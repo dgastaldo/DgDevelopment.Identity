@@ -52,6 +52,7 @@ On first run, the seeder creates:
 - `admin-client-credentials.txt` — admin client ID and secret
 
 > These files are `.gitignore`d and should be stored securely.
+> In Development the database is **not reset** on startup: migrations apply **up-only** and seeding runs **once**, so credentials stay stable between runs. Stale IDP session cookies (e.g. after a manual re-seed) are signed out automatically.
 
 ## Solution Structure
 
@@ -108,8 +109,10 @@ DgDevelopment.Identity/
 | OAuth/OIDC Engine (6 services: key, JWT, client, authorize, token, user interaction) | ✅ Done |
 | Server integration (ConnectController, Razor Pages, DI) | ✅ Done |
 | AdminUi Blazor Hybrid (navbar, footer, login flow) | ✅ Done |
+| OAuth login cycle (authorize → login → code → token → userinfo) | ✅ Done |
 | Password hashing (Argon2id) + authentication service | ✅ Done |
 | DB seeding (30 permissions, SuperAdmin, SuperAdmins, superadmin user, admin client) | ✅ Done |
 | API documentation (OpenAPI + Scalar + Swagger) | ✅ Done |
 | Client SDK (.NET Core + Blazor) | ✅ Done |
+| OIDC consent screen | ⬜ Planned |
 | TOTP MFA | ⬜ Planned |
