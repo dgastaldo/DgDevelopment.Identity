@@ -17,7 +17,7 @@ var adminUi = builder
     .WithEndpoint("https", endpoint => endpoint.IsProxied = false)
     .WithEndpoint("http", endpoint => endpoint.IsProxied = false)
     .WithReference(server)
-    .WithEnvironment("IdentityBaseUrl", "https://localhost:7157")
+    .WithEnvironment("IdentityBaseUrl", server.GetEndpoint("https"))
     .WithEnvironment("Identity__AdminClientSecret", adminClientSecret);
 
 adminUi.WithEnvironment("AdminBaseUrl", adminUi.GetEndpoint("https"));
