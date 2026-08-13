@@ -80,6 +80,13 @@ public sealed class AuthorizeModel : PageModel
         if (!Guid.TryParse(userIdValue, out var userId))
             return RedirectToPage("/Error", new { errorCode = "invalid_user", errorDescription = "User not found." });
 
+        if (await _userRepo.GetByIdAsync(userId).ConfigureAwait(false) == null)
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme).ConfigureAwait(false);
+            IsAuthenticated = false;
+            return Page();
+        }
+
         return await IssueCodeAsync(result.Client!, userId).ConfigureAwait(false);
     }
 
