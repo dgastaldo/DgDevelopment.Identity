@@ -5,15 +5,18 @@ var redis = builder.AddRedis("Redis");
 
 var server = builder
     .AddProject<Projects.DgDevelopment_Identity_Server>("identity-server", launchProfileName: "https")
+    .WithEndpoint("https", endpoint => endpoint.IsProxied = false)
+    .WithEndpoint("http", endpoint => endpoint.IsProxied = false)
     .WithReference(sqlServer)
     .WithReference(redis);
 
 var adminClientSecret = builder.Configuration["Identity:AdminClientSecret"] ?? "";
 
-builder
+var adminUi = builder
     .AddProject<Projects.DgDevelopment_Identity_AdminUi>("admin-ui", launchProfileName: "https")
+    .WithEndpoint("https", endpoint => endpoint.IsProxied = false)
+    .WithEndpoint("http", endpoint => endpoint.IsProxied = false)
     .WithReference(server)
     .WithEnvironment("IdentityBaseUrl", "https://localhost:7157")
     .WithEnvironment("Identity__AdminClientSecret", adminClientSecret);
-
-builder.Build().Run();
+adminUi.WithEnvironment("AdminBaseUrl", adminUi.GetEndpoint("https"));
