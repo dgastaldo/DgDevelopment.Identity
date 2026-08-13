@@ -42,6 +42,7 @@ public sealed class UserRepository : IUserRepository
 
     public async Task<User?> GetByEmailAsync(string email, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(email);
         var normalizedEmail = email.ToUpperInvariant();
         return await _context.Users
             .AsNoTracking()

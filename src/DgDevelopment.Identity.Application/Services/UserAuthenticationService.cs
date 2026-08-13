@@ -42,6 +42,7 @@ public sealed class UserAuthenticationService : IUserAuthenticationService
 
     public Task RecordFailedLoginAsync(User user, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(user);
         user.RecordFailedLogin();
         if (user.FailedLoginAttempts >= MaxFailedAttempts)
             user.Lock();
@@ -51,6 +52,7 @@ public sealed class UserAuthenticationService : IUserAuthenticationService
 
     public Task RecordSuccessfulLoginAsync(User user, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(user);
         if (user.IsLocked)
             user.Unlock();
         else
