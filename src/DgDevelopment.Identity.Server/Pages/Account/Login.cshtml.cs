@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using System.Security.Claims;
 
-internal sealed class LoginModel(IUserAuthenticationService authService, IUserSessionRepository sessionRepo) : PageModel
+public sealed class LoginModel(IUserAuthenticationService authService, IUserSessionRepository sessionRepo) : PageModel
 {
     [BindProperty] public string Username { get; set; } = string.Empty;
     [BindProperty] public string Password { get; set; } = string.Empty;

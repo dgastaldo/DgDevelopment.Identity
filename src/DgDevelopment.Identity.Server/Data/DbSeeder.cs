@@ -10,7 +10,7 @@ using System.Security.Cryptography;
 
 namespace DgDevelopment.Identity.Server.Data;
 
-internal sealed class DbSeeder(IServiceProvider serviceProvider)
+public sealed class DbSeeder(IServiceProvider serviceProvider)
 {
 
     public async Task SeedAsync()
