@@ -1,19 +1,23 @@
 using DgDevelopment.Identity.Domain.Repositories;
 using DgDevelopment.Identity.OAuth.Services;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using System.Data.Common;
 
 namespace DgDevelopment.Identity.Server.Services;
 
-internal sealed class ClientIdCache : IClientIdCache, IDisposable
+public sealed partial class ClientIdCache : IClientIdCache, IDisposable
 {
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ILogger<ClientIdCache> _logger;
     private readonly PeriodicTimer _refreshTimer = new(TimeSpan.FromMinutes(5));
     private HashSet<string> _clientIds = [];
     private readonly ReaderWriterLockSlim _lock = new();
 
-    public ClientIdCache(IServiceScopeFactory scopeFactory)
+    public ClientIdCache(IServiceScopeFactory scopeFactory, ILogger<ClientIdCache> logger)
     {
         _scopeFactory = scopeFactory;
+        _logger = logger;
     }
 
     public async Task InitializeAsync(CancellationToken ct = default)
@@ -39,33 +43,51 @@ internal sealed class ClientIdCache : IClientIdCache, IDisposable
     {
         while (await _refreshTimer.WaitForNextTickAsync(ct).ConfigureAwait(false))
         {
-            try
-            {
-                await RefreshCacheAsync(ct).ConfigureAwait(false);
-            }
-            catch
-            {
-            }
+            await RefreshCacheAsync(ct).ConfigureAwait(false);
         }
     }
 
     private async Task RefreshCacheAsync(CancellationToken ct = default)
     {
-        await using var scope = _scopeFactory.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IClientRepository>();
-        var clientIds = await repository.GetAllActiveClientIdsAsync(ct).ConfigureAwait(false);
-        var set = new HashSet<string>(clientIds, StringComparer.Ordinal);
-
-        _lock.EnterWriteLock();
         try
         {
-            _clientIds = set;
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var repository = scope.ServiceProvider.GetRequiredService<IClientRepository>();
+            var clientIds = await repository.GetAllActiveClientIdsAsync(ct).ConfigureAwait(false);
+            var set = new HashSet<string>(clientIds, StringComparer.Ordinal);
+
+            _lock.EnterWriteLock();
+            try
+            {
+                _clientIds = set;
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
+            }
         }
-        finally
+        catch (DbException ex)
         {
-            _lock.ExitWriteLock();
+            LogRefreshFailed(ex);
+        }
+        catch (TimeoutException ex)
+        {
+            LogRefreshTimedOut(ex);
+        }
+        catch (OperationCanceledException)
+        {
+            LogRefreshCancelled();
         }
     }
+
+    [LoggerMessage(EventId = 1000, Level = LogLevel.Warning, Message = "Failed to refresh client id cache from data source.")]
+    private partial void LogRefreshFailed(Exception exception);
+
+    [LoggerMessage(EventId = 1001, Level = LogLevel.Warning, Message = "Timed out while refreshing client id cache from data source.")]
+    private partial void LogRefreshTimedOut(Exception exception);
+
+    [LoggerMessage(EventId = 1002, Level = LogLevel.Information, Message = "Client id cache refresh cancelled.")]
+    private partial void LogRefreshCancelled();
 
     public void Dispose()
     {
