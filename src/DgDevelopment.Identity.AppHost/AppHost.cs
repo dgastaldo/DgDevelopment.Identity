@@ -19,4 +19,9 @@ var adminUi = builder
     .WithReference(server)
     .WithEnvironment("IdentityBaseUrl", "https://localhost:7157")
     .WithEnvironment("Identity__AdminClientSecret", adminClientSecret);
+
 adminUi.WithEnvironment("AdminBaseUrl", adminUi.GetEndpoint("https"));
+
+var app = builder.Build();
+
+await app.RunAsync().ConfigureAwait(false);
