@@ -7,56 +7,34 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 
 [Route("connect")]
-public sealed class ConnectController(
-    IAuthorizationService authorizationService,
-    ITokenService tokenService,
-    IClientValidator clientValidator,
-    IKeyMaterialService keyMaterialService,
-    IUserInteractionService userInteraction,
-    IUserRepository userRepository,
-    IJwtService jwtService,
-    IClientIdCache clientIdCache) : Controller
+public sealed class ConnectController : Controller
 {
-    private static readonly string[] SupportedScopes = ["openid", "profile", "email"];
-    private static readonly string[] SupportedGrantTypes = ["authorization_code", "client_credentials", "refresh_token", "device_code"];
-    private static readonly string[] SupportedCodeChallengeMethods = ["S256"];
-    private static readonly string[] SupportedSigningAlgs = ["RS256"];
+    private readonly ITokenService _tokenService;
+    private readonly IClientValidator _clientValidator;
+    private readonly IKeyMaterialService _keyMaterialService;
+    private readonly IUserRepository _userRepository;
+    private readonly IJwtService _jwtService;
+    private readonly IClientIdCache _clientIdCache;
 
-    [HttpGet("authorize")]
-    [HttpPost("authorize")]
-    public async Task<IActionResult> Authorize(
-        [FromQuery] string client_id,
-        [FromQuery] string redirect_uri,
-        [FromQuery] string response_type,
-        [FromQuery] string scope,
-        [FromQuery] string? state = null,
-        [FromQuery] string? nonce = null,
-        [FromQuery] string? code_challenge = null,
-        [FromQuery] string? code_challenge_method = null)
+    private static readonly string[] _supportedScopes = ["openid", "profile", "email"];
+    private static readonly string[] _supportedGrantTypes = ["authorization_code", "client_credentials", "refresh_token", "device_code"];
+    private static readonly string[] _supportedCodeChallengeMethods = ["S256"];
+    private static readonly string[] _supportedSigningAlgs = ["RS256"];
+
+    public ConnectController(
+        ITokenService tokenService,
+        IClientValidator clientValidator,
+        IKeyMaterialService keyMaterialService,
+        IUserRepository userRepository,
+        IJwtService jwtService,
+        IClientIdCache clientIdCache)
     {
-        ArgumentNullException.ThrowIfNull(scope);
-        var result = await authorizationService.ValidateAsync(new(
-            client_id, redirect_uri, response_type, scope, state, nonce,
-            code_challenge, code_challenge_method)).ConfigureAwait(false);
-
-        if (!result.IsValid)
-            return Redirect(userInteraction.GetErrorUrl(result.Error!, result.ErrorDescription));
-
-        if (!User.Identity!.IsAuthenticated)
-            return Redirect(userInteraction.GetLoginUrl(Url.ActionLink()!));
-
-        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value;
-        var user = await userRepository.GetByIdAsync(Guid.Parse(userId)).ConfigureAwait(false);
-        if (user == null) return Redirect(userInteraction.GetErrorUrl("invalid_user", "User not found."));
-        var scopes = scope.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var code = await authorizationService.CreateAuthorizationCodeAsync(
-            result.Client!, user, scopes, redirect_uri, code_challenge, code_challenge_method).ConfigureAwait(false);
-
-        var redirect = $"{redirect_uri}?code={Uri.EscapeDataString(code)}";
-        if (state != null)
-            redirect += $"&state={Uri.EscapeDataString(state)}";
-
-        return Redirect(redirect);
+        _tokenService = tokenService;
+        _clientValidator = clientValidator;
+        _keyMaterialService = keyMaterialService;
+        _userRepository = userRepository;
+        _jwtService = jwtService;
+        _clientIdCache = clientIdCache;
     }
 
     [HttpPost("token")]
@@ -67,12 +45,12 @@ public sealed class ConnectController(
         {
             TokenResponse response = request.GrantType switch
             {
-                "authorization_code" => await tokenService.ProcessAuthorizationCodeAsync(
+                "authorization_code" => await _tokenService.ProcessAuthorizationCodeAsync(
                     request.Code!, request.CodeVerifier!, request.ClientId!, new Uri(request.RedirectUri!)).ConfigureAwait(false),
                 "client_credentials" => await ProcessClientCredentialsAsync(request).ConfigureAwait(false),
-                "refresh_token" => await tokenService.ProcessRefreshTokenAsync(
+                "refresh_token" => await _tokenService.ProcessRefreshTokenAsync(
                     request.RefreshToken!, request.ClientId!).ConfigureAwait(false),
-                "device_code" => await tokenService.ProcessDeviceCodeAsync(
+                "device_code" => await _tokenService.ProcessDeviceCodeAsync(
                     request.DeviceCode!, request.ClientId!).ConfigureAwait(false),
                 _ => throw new InvalidOperationException($"Unsupported grant_type: {request.GrantType}")
             };
@@ -95,18 +73,18 @@ public sealed class ConnectController(
 
     private async Task<TokenResponse> ProcessClientCredentialsAsync(TokenRequest request)
     {
-        var validation = await clientValidator.ValidateAsync(request.ClientId, request.ClientSecret, "client_credentials").ConfigureAwait(false);
+        var validation = await _clientValidator.ValidateAsync(request.ClientId, request.ClientSecret, "client_credentials").ConfigureAwait(false);
         if (!validation.IsValid)
             throw new InvalidOperationException(validation.ErrorDescription!);
 
         var scopes = request.Scope?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? ["openid"];
-        return await tokenService.ProcessClientCredentialsAsync(validation, scopes).ConfigureAwait(false);
+        return await _tokenService.ProcessClientCredentialsAsync(validation, scopes).ConfigureAwait(false);
     }
 
     [HttpGet("jwks")]
     public async Task<IActionResult> Jwks()
     {
-        var jwks = await keyMaterialService.GetJwksDocumentAsync().ConfigureAwait(false);
+        var jwks = await _keyMaterialService.GetJwksDocumentAsync().ConfigureAwait(false);
         return Ok(jwks);
     }
 
@@ -125,10 +103,10 @@ public sealed class ConnectController(
             device_authorization_endpoint = $"{baseUrl}/connect/deviceauthorization",
             introspection_endpoint = $"{baseUrl}/connect/introspect",
             revocation_endpoint = $"{baseUrl}/connect/revoke",
-            scopes_supported = SupportedScopes,
-            grant_types_supported = SupportedGrantTypes,
-            code_challenge_methods_supported = SupportedCodeChallengeMethods,
-            id_token_signing_alg_values_supported = SupportedSigningAlgs
+            scopes_supported = _supportedScopes,
+            grant_types_supported = _supportedGrantTypes,
+            code_challenge_methods_supported = _supportedCodeChallengeMethods,
+            id_token_signing_alg_values_supported = _supportedSigningAlgs
         });
     }
 
@@ -141,7 +119,7 @@ public sealed class ConnectController(
             return Unauthorized();
 
         var token = authHeader["Bearer ".Length..];
-        var keys = await keyMaterialService.GetJwksDocumentAsync().ConfigureAwait(false);
+        var keys = await _keyMaterialService.GetJwksDocumentAsync().ConfigureAwait(false);
         var issuer = $"{Request.Scheme}://{Request.Host}";
         var parameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
         {
@@ -154,19 +132,19 @@ public sealed class ConnectController(
             {
                 foreach (var aud in audiences)
                 {
-                    if (clientIdCache.IsValidClientId(aud))
+                    if (_clientIdCache.IsValidClientId(aud))
                         return true;
                 }
                 return false;
             }
         };
 
-        var principal = await jwtService.ValidateTokenAsync(token, parameters).ConfigureAwait(false);
+        var principal = await _jwtService.ValidateTokenAsync(token, parameters).ConfigureAwait(false);
         var sub = principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         if (sub == null || !Guid.TryParse(sub, out var userId))
             return Unauthorized();
 
-        var user = await userRepository.GetByIdAsync(userId).ConfigureAwait(false);
+        var user = await _userRepository.GetByIdAsync(userId).ConfigureAwait(false);
         if (user == null) return Unauthorized();
 
         var claims = new Dictionary<string, object>

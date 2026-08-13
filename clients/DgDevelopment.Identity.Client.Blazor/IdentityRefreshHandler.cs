@@ -13,6 +13,7 @@ public sealed class IdentityRefreshHandler : DelegatingHandler
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(request);
         var tokens = await _tokenStore.GetTokensAsync().ConfigureAwait(false);
 
         if (tokens != null && !string.IsNullOrEmpty(tokens.AccessToken))

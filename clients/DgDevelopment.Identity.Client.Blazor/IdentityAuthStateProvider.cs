@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using DgDevelopment.Identity.Client.Core;
 using Microsoft.AspNetCore.Components.Authorization;
 
@@ -10,8 +11,9 @@ public sealed class IdentityAuthStateProvider(IdentityClient client, ITokenStore
     //, OidcOptions options
     ) : AuthenticationStateProvider
 {
-    private TokenResponse? _tokens;
+private TokenResponse? _tokens;
     private ClaimsPrincipal? _currentUser;
+    private UserInfo? _userInfo;
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
@@ -23,29 +25,71 @@ public sealed class IdentityAuthStateProvider(IdentityClient client, ITokenStore
         if (_tokens == null)
             return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
 
-        if (_tokens.IsExpired() && _tokens.RefreshToken != null)
+if (_tokens.IsExpired() && _tokens.RefreshToken != null)
         {
             try
             {
                 _tokens = await client.RefreshTokenAsync(_tokens.RefreshToken).ConfigureAwait(false);
                 await tokenStore.SaveTokensAsync(_tokens).ConfigureAwait(false);
             }
-            catch
+            catch (HttpRequestException)
             {
-                await tokenStore.ClearTokensAsync().ConfigureAwait(false);
-                _tokens = null;
-                return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+                return await ClearTokensAndReturnAnonymousAsync().ConfigureAwait(false);
+            }
+            catch (TaskCanceledException)
+            {
+                return await ClearTokensAndReturnAnonymousAsync().ConfigureAwait(false);
+            }
+            catch (JsonException)
+            {
+                return await ClearTokensAndReturnAnonymousAsync().ConfigureAwait(false);
             }
         }
 
-        if (_tokens == null || _tokens.IsExpired())
+if (_tokens == null || _tokens.IsExpired())
             return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
 
-        var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, _tokens.AccessToken) };
+        if (_userInfo == null)
+        {
+            try
+            {
+                _userInfo = await client.GetUserInfoAsync(_tokens.AccessToken).ConfigureAwait(false);
+            }
+            catch (HttpRequestException)
+            {
+                return await ClearTokensAndReturnAnonymousAsync().ConfigureAwait(false);
+            }
+            catch (TaskCanceledException)
+            {
+                return await ClearTokensAndReturnAnonymousAsync().ConfigureAwait(false);
+            }
+            catch (JsonException)
+            {
+                return await ClearTokensAndReturnAnonymousAsync().ConfigureAwait(false);
+            }
+        }
+
+        var claims = new List<Claim>();
+        if (!string.IsNullOrEmpty(_userInfo?.Sub))
+            claims.Add(new Claim(ClaimTypes.NameIdentifier, _userInfo.Sub));
+        if (!string.IsNullOrEmpty(_userInfo?.Name))
+            claims.Add(new Claim(ClaimTypes.Name, _userInfo.Name));
+        if (!string.IsNullOrEmpty(_userInfo?.Email))
+            claims.Add(new Claim(ClaimTypes.Email, _userInfo.Email));
+
         _currentUser = new ClaimsPrincipal(new ClaimsIdentity(claims, "oidc"));
 
-        NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(_currentUser)));
+NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(_currentUser)));
         return new AuthenticationState(_currentUser);
+    }
+
+    private async Task<AuthenticationState> ClearTokensAndReturnAnonymousAsync()
+    {
+        await tokenStore.ClearTokensAsync().ConfigureAwait(false);
+        _tokens = null;
+        _currentUser = null;
+        _userInfo = null;
+        return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
     }
 
     public Uri GetLoginUrl()
@@ -53,9 +97,9 @@ public sealed class IdentityAuthStateProvider(IdentityClient client, ITokenStore
         return new Uri(client.GetAuthorizeUrl() + "&nonce=" + Guid.NewGuid().ToString("N"));
     }
 
-    public async Task CompleteLoginAsync(string code, string codeVerifier)
+    public async Task CompleteLoginAsync(string code, string codeVerifier, Uri? redirectUri = null)
     {
-        _tokens = await client.ExchangeCodeAsync(code, codeVerifier).ConfigureAwait(false);
+        _tokens = await client.ExchangeCodeAsync(code, codeVerifier, redirectUri).ConfigureAwait(false);
         await tokenStore.SaveTokensAsync(_tokens).ConfigureAwait(false);
         _currentUser = null;
         NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());

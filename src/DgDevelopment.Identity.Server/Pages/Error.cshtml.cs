@@ -3,7 +3,7 @@ namespace DgDevelopment.Identity.Server.Pages;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
-internal sealed class ErrorModel : PageModel
+public sealed class ErrorModel : PageModel
 {
     [FromQuery]
     public string? ErrorCode { get; set; }
