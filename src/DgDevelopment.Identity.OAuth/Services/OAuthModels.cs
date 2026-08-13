@@ -46,16 +46,16 @@ public sealed record ClientValidationResult(
 public sealed record IdTokenRequest(
     User User,
     Client Client,
-    string[] Scopes,
+    IReadOnlyCollection<string> Scopes,
     string? Nonce,
-    string[] AuthMethods,
+    IReadOnlyCollection<string> AuthMethods,
     string SessionId);
 
 public sealed record AccessTokenRequest(
     User User,
     Client Client,
-    string[] Scopes,
-    string[]? Permissions,
+    IReadOnlyCollection<string> Scopes,
+    IReadOnlyCollection<string>? Permissions,
     int LifetimeSeconds = 3600);
 
 public sealed record DiscoveryDocument(
@@ -68,6 +68,6 @@ public sealed record DiscoveryDocument(
     string DeviceAuthorizationEndpoint,
     string IntrospectionEndpoint,
     string RevocationEndpoint,
-    string[] ScopesSupported,
-    string[] GrantTypesSupported,
-    string[] CodeChallengeMethodsSupported);
+    IReadOnlyCollection<string> ScopesSupported,
+    IReadOnlyCollection<string> GrantTypesSupported,
+    IReadOnlyCollection<string> CodeChallengeMethodsSupported);

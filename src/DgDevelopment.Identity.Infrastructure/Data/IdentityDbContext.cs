@@ -3,9 +3,8 @@ namespace DgDevelopment.Identity.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using DgDevelopment.Identity.Domain.Entities;
 
-public sealed class IdentityDbContext : DbContext
+public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> options) : DbContext(options)
 {
-    public IdentityDbContext(DbContextOptions<IdentityDbContext> options) : base(options) { }
 
     public DbSet<User> Users => Set<User>();
     public DbSet<UserEmail> UserEmails => Set<UserEmail>();

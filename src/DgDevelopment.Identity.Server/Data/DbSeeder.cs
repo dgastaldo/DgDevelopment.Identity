@@ -10,21 +10,16 @@ using System.Security.Cryptography;
 
 namespace DgDevelopment.Identity.Server.Data;
 
-public sealed class DbSeeder
+public sealed class DbSeeder(IServiceProvider serviceProvider)
 {
-    private readonly IServiceProvider _serviceProvider;
-
-    public DbSeeder(IServiceProvider serviceProvider)
-    {
-        _serviceProvider = serviceProvider;
-    }
 
     public async Task SeedAsync()
     {
-        await using var scope = _serviceProvider.CreateAsyncScope();
+        await using var scope = serviceProvider.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        var env = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
-        var contentRoot = env.ContentRootPath;
+        var contentRoot = scope.ServiceProvider.GetRequiredService<IHostEnvironment>().ContentRootPath;
+
+        await db.Database.MigrateAsync().ConfigureAwait(false);
 
         var clientSecret = await SeedPermissionsAsync(db).ConfigureAwait(false);
         await SeedRolesAsync(db).ConfigureAwait(false);
@@ -133,11 +128,9 @@ public sealed class DbSeeder
         client.AddScope("openid");
         client.AddScope("profile");
         client.AddScope("email");
-        client.AddRedirectUri(new Uri("https://localhost:7157/signin-oidc"));
-        client.AddRedirectUri(new Uri("http://localhost:5281/signin-oidc"));
-        client.AddRedirectUri(new Uri("https://localhost:7157/callback"));
-        client.AddRedirectUri(new Uri("http://localhost:5281/callback"));
-        client.AddPostLogoutRedirectUri(new Uri("https://localhost:7157/signout-callback-oidc"));
+        client.AddRedirectUri(new Uri("https://localhost:7018/callback"));
+        client.AddRedirectUri(new Uri("http://localhost:5133/callback"));
+        client.AddPostLogoutRedirectUri(new Uri("https://localhost:7018/"));
 
         db.Clients.Add(client);
         await db.SaveChangesAsync().ConfigureAwait(false);

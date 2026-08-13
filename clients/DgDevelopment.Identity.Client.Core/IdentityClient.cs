@@ -3,24 +3,15 @@ using System.Text.Json.Serialization;
 
 namespace DgDevelopment.Identity.Client.Core;
 
-public sealed class IdentityClient
+public sealed class IdentityClient(HttpClient http, OidcOptions options)
 {
-    private readonly HttpClient _http;
-    private readonly OidcOptions _options;
-
-    public IdentityClient(HttpClient http, OidcOptions options)
+    public Uri GetAuthorizeUrl(string? state = null, string? codeChallenge = null)
     {
-        _http = http;
-        _options = options;
-    }
-
-    public string GetAuthorizeUrl(string? state = null, string? codeChallenge = null)
-    {
-        var url = $"{_options.Authority}/connect/authorize" +
-                  $"?client_id={Uri.EscapeDataString(_options.ClientId)}" +
-                  $"&redirect_uri={Uri.EscapeDataString(_options.RedirectUri)}" +
+        var url = $"{options.Authority}/connect/authorize" +
+                  $"?client_id={Uri.EscapeDataString(options.ClientId)}" +
+                  $"&redirect_uri={Uri.EscapeDataString(options.RedirectUri!.ToString())}" +
                   $"&response_type=code" +
-                  $"&scope={Uri.EscapeDataString(string.Join(' ', _options.Scopes))}";
+                  $"&scope={Uri.EscapeDataString(string.Join(' ', options.Scopes))}";
 
         if (state != null)
             url += $"&state={Uri.EscapeDataString(state)}";
@@ -28,33 +19,33 @@ public sealed class IdentityClient
         if (codeChallenge != null)
             url += $"&code_challenge={Uri.EscapeDataString(codeChallenge)}&code_challenge_method=S256";
 
-        return url;
+        return new Uri(url);
     }
 
-    public string GetLogoutUrl(string? idTokenHint = null)
+    public Uri GetLogoutUrl(string? idTokenHint = null)
     {
-        var url = $"{_options.Authority}/connect/endsession" +
-                  $"?post_logout_redirect_uri={Uri.EscapeDataString(_options.PostLogoutRedirectUri)}";
+        var url = $"{options.Authority}/connect/endsession" +
+                  $"?post_logout_redirect_uri={Uri.EscapeDataString(options.PostLogoutRedirectUri!.ToString())}";
 
         if (idTokenHint != null)
             url += $"&id_token_hint={Uri.EscapeDataString(idTokenHint)}";
 
-        return url;
+        return new Uri(url);
     }
 
-    public async Task<TokenResponse> ExchangeCodeAsync(string code, string codeVerifier, CancellationToken ct = default)
+    public async Task<TokenResponse> ExchangeCodeAsync(string code, string codeVerifier, Uri? redirectUri = null, CancellationToken ct = default)
     {
         var content = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["grant_type"] = "authorization_code",
             ["code"] = code,
-            ["redirect_uri"] = _options.RedirectUri,
-            ["client_id"] = _options.ClientId,
-            ["client_secret"] = _options.ClientSecret,
+            ["redirect_uri"] = (redirectUri ?? options.RedirectUri!).ToString(),
+            ["client_id"] = options.ClientId,
+            ["client_secret"] = options.ClientSecret,
             ["code_verifier"] = codeVerifier
         });
 
-        var response = await _http.PostAsync($"{_options.Authority}/connect/token", content, ct).ConfigureAwait(false);
+        var response = await http.PostAsync(new Uri($"{options.Authority}/connect/token"), content, ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         var result = await response.Content.ReadFromJsonAsync(TokenResponseJsonContext.Default.TokenResponse, ct).ConfigureAwait(false);
@@ -67,11 +58,11 @@ public sealed class IdentityClient
         {
             ["grant_type"] = "refresh_token",
             ["refresh_token"] = refreshTokenValue,
-            ["client_id"] = _options.ClientId,
-            ["client_secret"] = _options.ClientSecret
+            ["client_id"] = options.ClientId,
+            ["client_secret"] = options.ClientSecret
         });
 
-        var response = await _http.PostAsync($"{_options.Authority}/connect/token", content, ct).ConfigureAwait(false);
+        var response = await http.PostAsync(new Uri($"{options.Authority}/connect/token"), content, ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         var result = await response.Content.ReadFromJsonAsync(TokenResponseJsonContext.Default.TokenResponse, ct).ConfigureAwait(false);
@@ -80,10 +71,10 @@ public sealed class IdentityClient
 
     public async Task<UserInfo?> GetUserInfoAsync(string accessToken, CancellationToken ct = default)
     {
-        var request = new HttpRequestMessage(HttpMethod.Get, $"{_options.Authority}/connect/userinfo");
+        var request = new HttpRequestMessage(HttpMethod.Get, $"{options.Authority}/connect/userinfo");
         request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
 
-        var response = await _http.SendAsync(request, ct).ConfigureAwait(false);
+        var response = await http.SendAsync(request, ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         return await response.Content.ReadFromJsonAsync(UserInfoJsonContext.Default.UserInfo, ct).ConfigureAwait(false);

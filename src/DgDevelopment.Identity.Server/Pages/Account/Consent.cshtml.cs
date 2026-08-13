@@ -10,6 +10,7 @@ public sealed class ConsentModel : PageModel
 
     public IActionResult OnPost(string action)
     {
+        ArgumentNullException.ThrowIfNull(action);
         if (action == "approve" && !string.IsNullOrWhiteSpace(ReturnUrl))
             return LocalRedirect(ReturnUrl);
 

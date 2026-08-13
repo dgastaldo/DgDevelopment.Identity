@@ -19,6 +19,7 @@ builder.Services.AddScoped<IUserAuthenticationService, UserAuthenticationService
 builder.Services.AddOAuthEngine();
 builder.Services.AddScoped<IUserInteractionService, UserInteractionService>();
 builder.Services.AddScoped<DbSeeder>();
+builder.Services.AddSingleton<IClientIdCache, ClientIdCache>();
 
 builder.Services.AddAuthentication("Cookies")
     .AddCookie("Cookies", options =>
@@ -53,6 +54,9 @@ using (var scope = app.Services.CreateScope())
     await seeder.SeedAsync().ConfigureAwait(false);
 }
 
+var clientIdCache = app.Services.GetRequiredService<IClientIdCache>();
+await clientIdCache.InitializeAsync().ConfigureAwait(false);
+
 app.MapOpenApi();
 
 if (app.Environment.IsDevelopment())
@@ -80,4 +84,4 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapRazorPages();
 
-app.Run();
+await app.RunAsync();

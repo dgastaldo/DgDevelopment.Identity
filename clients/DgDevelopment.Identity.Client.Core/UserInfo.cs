@@ -6,5 +6,5 @@ public sealed class UserInfo
     public string? Name { get; init; }
     public string? Email { get; init; }
     public bool EmailVerified { get; init; }
-    public string[]? Permissions { get; init; }
+    public IReadOnlyCollection<string>? Permissions { get; init; }
 }

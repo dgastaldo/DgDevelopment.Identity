@@ -6,23 +6,16 @@ using DgDevelopment.Identity.Domain.Entities;
 using DgDevelopment.Identity.Domain.Repositories;
 using DgDevelopment.Identity.Domain.ValueObjects;
 
-public sealed class AuthorizationService : IAuthorizationService
+public sealed class AuthorizationService(IClientRepository clientRepository, IAuthorizationCodeRepository codeRepository) : IAuthorizationService
 {
-    private readonly IClientRepository _clientRepository;
-    private readonly IAuthorizationCodeRepository _codeRepository;
-
-    public AuthorizationService(IClientRepository clientRepository, IAuthorizationCodeRepository codeRepository)
-    {
-        _clientRepository = clientRepository;
-        _codeRepository = codeRepository;
-    }
 
     public async Task<AuthorizationResult> ValidateAsync(AuthorizationRequest request, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(request);
         if (string.IsNullOrWhiteSpace(request.ClientId))
             return new(false, null, "invalid_request", "Missing client_id.", null);
 
-        var client = await _clientRepository.GetByClientIdAsync(request.ClientId, ct).ConfigureAwait(false);
+        var client = await clientRepository.GetByClientIdAsync(request.ClientId, ct).ConfigureAwait(false);
         if (client == null || !client.IsActive)
             return new(false, null, "invalid_client", "Invalid client.", null);
 
@@ -51,14 +44,13 @@ public sealed class AuthorizationService : IAuthorizationService
 
     public async Task<string> CreateAuthorizationCodeAsync(Client client, User user, string[] scopes, string redirectUri, string? codeChallenge, string? codeChallengeMethod, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(client);
+        ArgumentNullException.ThrowIfNull(user);
         var code = Secret.Generate(32);
         var codeHash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(code)));
-        var codeChallengeHash = codeChallenge != null
-            ? Convert.ToBase64String(SHA256.HashData(Encoding.ASCII.GetBytes(codeChallenge))).Replace("+", "-", StringComparison.Ordinal).Replace("/", "_", StringComparison.Ordinal).TrimEnd('=')
-            : null;
 
-        var authCode = new AuthorizationCode(codeHash, client.Id, user.Id, new Uri(redirectUri), scopes, codeChallengeHash, codeChallengeMethod);
-        await _codeRepository.AddAsync(authCode, ct).ConfigureAwait(false);
+        var authCode = new AuthorizationCode(codeHash, client.Id, user.Id, new Uri(redirectUri), scopes, codeChallenge, codeChallengeMethod);
+        await codeRepository.AddAsync(authCode, ct).ConfigureAwait(false);
 
         return code;
     }
