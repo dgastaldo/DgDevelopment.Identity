@@ -11,6 +11,7 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            ArgumentNullException.ThrowIfNull(migrationBuilder);
             migrationBuilder.DropForeignKey(
                 name: "FK_GroupRoles_Groups_GroupId1",
                 table: "GroupRoles");
@@ -122,6 +123,7 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            ArgumentNullException.ThrowIfNull(migrationBuilder);
             migrationBuilder.DropColumn(
                 name: "IsSystemAccount",
                 table: "Users");
