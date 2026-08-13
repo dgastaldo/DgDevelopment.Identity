@@ -76,7 +76,11 @@ public sealed class AuthorizeModel : PageModel
             return Page();
         }
 
-        return await IssueCodeAsync(result.Client!).ConfigureAwait(false);
+        var userIdValue = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!Guid.TryParse(userIdValue, out var userId))
+            return RedirectToPage("/Error", new { errorCode = "invalid_user", errorDescription = "User not found." });
+
+        return await IssueCodeAsync(result.Client!, userId).ConfigureAwait(false);
     }
 
     public async Task<IActionResult> OnPostAsync()
@@ -120,13 +124,12 @@ public sealed class AuthorizeModel : PageModel
         var principal = new ClaimsPrincipal(identity);
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal).ConfigureAwait(false);
 
-        return await IssueCodeAsync(result.Client!).ConfigureAwait(false);
+        return await IssueCodeAsync(result.Client!, user.Id).ConfigureAwait(false);
     }
 
-    private async Task<IActionResult> IssueCodeAsync(DgDevelopment.Identity.Domain.Entities.Client client)
+    private async Task<IActionResult> IssueCodeAsync(DgDevelopment.Identity.Domain.Entities.Client client, Guid userId)
     {
-        var userId = User.FindFirst(ClaimTypes.NameIdentifier)!.Value;
-        var user = await _userRepo.GetByIdAsync(Guid.Parse(userId)).ConfigureAwait(false);
+        var user = await _userRepo.GetByIdAsync(userId).ConfigureAwait(false);
         if (user == null)
             return RedirectToPage("/Error", new { errorCode = "invalid_user", errorDescription = "User not found." });
 
