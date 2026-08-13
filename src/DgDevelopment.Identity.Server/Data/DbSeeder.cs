@@ -17,11 +17,7 @@ public sealed class DbSeeder(IServiceProvider serviceProvider)
     {
         await using var scope = serviceProvider.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        var env = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
-        var contentRoot = env.ContentRootPath;
-
-        if (env.IsDevelopment())
-            await db.Database.EnsureDeletedAsync().ConfigureAwait(false);
+        var contentRoot = scope.ServiceProvider.GetRequiredService<IHostEnvironment>().ContentRootPath;
 
         await db.Database.MigrateAsync().ConfigureAwait(false);
 
