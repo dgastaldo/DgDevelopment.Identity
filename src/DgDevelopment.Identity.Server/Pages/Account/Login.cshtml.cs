@@ -1,53 +1,79 @@
 namespace DgDevelopment.Identity.Server.Pages.Account;
 
 using System.Globalization;
+using System.Security.Claims;
 using DgDevelopment.Identity.Application.Services;
-using DgDevelopment.Identity.Domain.Repositories;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using System.Security.Claims;
 
-public sealed class LoginModel(IUserAuthenticationService authService, IUserSessionRepository sessionRepo) : PageModel
+public sealed class LoginModel : PageModel
 {
-    [BindProperty] public string Username { get; set; } = string.Empty;
-    [BindProperty] public string Password { get; set; } = string.Empty;
+    private readonly IUserAuthenticationService _authService;
+    private readonly IServerSessionService _sessionService;
+
+    public LoginModel(IUserAuthenticationService authService, IServerSessionService sessionService)
+    {
+        _authService = authService;
+        _sessionService = sessionService;
+    }
+
+    [BindProperty] public string Identifier { get; set; } = string.Empty;
+    public string? LoginHint { get; set; }
+
+    public void OnGet([FromQuery] string? login_hint = null)
+    {
+        LoginHint = login_hint;
+        Identifier = login_hint ?? Identifier;
+    }
 
     public async Task<IActionResult> OnPostAsync(string? returnUrl = null)
     {
-        if (string.IsNullOrWhiteSpace(Username) || string.IsNullOrWhiteSpace(Password))
+        if (string.IsNullOrWhiteSpace(Identifier))
         {
-            ModelState.AddModelError(string.Empty, "Username and password are required.");
+            ModelState.AddModelError(string.Empty, "Enter your username or email.");
             return Page();
         }
 
-        var user = await authService.ValidateCredentialsAsync(Username, Password).ConfigureAwait(false);
-        if (user == null)
+        var user = await _authService.FindByIdentifierAsync(Identifier).ConfigureAwait(false);
+
+        if (user != null)
         {
-            ModelState.AddModelError(string.Empty, "Invalid username or password.");
-            return Page();
+            var activeSession = await _sessionService.FindActiveAsync(user.Id).ConfigureAwait(false);
+            if (activeSession != null)
+            {
+                await SignInAsync(user, activeSession.SessionId, rememberMe: false).ConfigureAwait(false);
+                return SafeRedirect(returnUrl);
+            }
         }
 
-        await authService.RecordSuccessfulLoginAsync(user).ConfigureAwait(false);
+        var loginHint = user?.Username ?? Identifier;
+        return RedirectToPage("/Account/Password", new { login_hint = loginHint, returnUrl });
+    }
 
-        var sessionId = Guid.NewGuid().ToString("N");
-        var session = new DgDevelopment.Identity.Domain.Entities.UserSession(user.Id, sessionId, DateTime.UtcNow.AddHours(8), ["pwd"]);
-        await sessionRepo.AddAsync(session).ConfigureAwait(false);
+    private async Task SignInAsync(DgDevelopment.Identity.Domain.Entities.User user, string sessionId, bool rememberMe)
+    {
+        var identity = new ClaimsIdentity(
+            [
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString(null, CultureInfo.InvariantCulture)),
+                new Claim(ClaimTypes.Name, user.Username),
+                new Claim("session_id", sessionId),
+            ],
+            CookieAuthenticationDefaults.AuthenticationScheme);
 
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, user.Id.ToString(null, CultureInfo.InvariantCulture)),
-            new(ClaimTypes.Name, user.Username),
-            new("session_id", sessionId),
-        };
+        var properties = new AuthenticationProperties { IsPersistent = rememberMe };
+        if (rememberMe)
+            properties.ExpiresUtc = DateTimeOffset.UtcNow.AddDays(14);
 
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        var principal = new ClaimsPrincipal(identity);
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), properties).ConfigureAwait(false);
+    }
 
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal).ConfigureAwait(false);
+    private IActionResult SafeRedirect(string? returnUrl)
+    {
+        if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+            return LocalRedirect(returnUrl);
 
-        if (!string.IsNullOrWhiteSpace(returnUrl)) return LocalRedirect(returnUrl);
         return RedirectToPage("/Index");
     }
 }
