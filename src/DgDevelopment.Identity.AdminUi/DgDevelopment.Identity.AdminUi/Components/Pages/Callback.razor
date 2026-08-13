@@ -32,7 +32,7 @@
 
         try
         {
-            var tokens = await IdentityClient.ExchangeCodeAsync(Code, verifier);
+            var tokens = await IdentityClient.ExchangeCodeAsync(Code, verifier, new Uri(Navigation.BaseUri + "callback"));
             await TokenStore.SaveTokensAsync(tokens);
         }
         catch

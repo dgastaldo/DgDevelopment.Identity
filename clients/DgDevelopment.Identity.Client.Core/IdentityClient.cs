@@ -9,7 +9,7 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
     {
         var url = $"{options.Authority}/connect/authorize" +
                   $"?client_id={Uri.EscapeDataString(options.ClientId)}" +
-                  $"&redirect_uri={Uri.EscapeDataString(options.RedirectUri.ToString())}" +
+                  $"&redirect_uri={Uri.EscapeDataString(options.RedirectUri!.ToString())}" +
                   $"&response_type=code" +
                   $"&scope={Uri.EscapeDataString(string.Join(' ', options.Scopes))}";
 
@@ -25,7 +25,7 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
     public Uri GetLogoutUrl(string? idTokenHint = null)
     {
         var url = $"{options.Authority}/connect/endsession" +
-                  $"?post_logout_redirect_uri={Uri.EscapeDataString(options.PostLogoutRedirectUri.ToString())}";
+                  $"?post_logout_redirect_uri={Uri.EscapeDataString(options.PostLogoutRedirectUri!.ToString())}";
 
         if (idTokenHint != null)
             url += $"&id_token_hint={Uri.EscapeDataString(idTokenHint)}";
@@ -33,13 +33,13 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
         return new Uri(url);
     }
 
-    public async Task<TokenResponse> ExchangeCodeAsync(string code, string codeVerifier, CancellationToken ct = default)
+    public async Task<TokenResponse> ExchangeCodeAsync(string code, string codeVerifier, Uri? redirectUri = null, CancellationToken ct = default)
     {
         var content = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["grant_type"] = "authorization_code",
             ["code"] = code,
-            ["redirect_uri"] = options.RedirectUri.ToString(),
+            ["redirect_uri"] = (redirectUri ?? options.RedirectUri!).ToString(),
             ["client_id"] = options.ClientId,
             ["client_secret"] = options.ClientSecret,
             ["code_verifier"] = codeVerifier

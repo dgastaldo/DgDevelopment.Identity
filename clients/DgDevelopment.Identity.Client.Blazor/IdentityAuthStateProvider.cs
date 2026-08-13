@@ -53,9 +53,9 @@ public sealed class IdentityAuthStateProvider(IdentityClient client, ITokenStore
         return new Uri(client.GetAuthorizeUrl() + "&nonce=" + Guid.NewGuid().ToString("N"));
     }
 
-    public async Task CompleteLoginAsync(string code, string codeVerifier)
+    public async Task CompleteLoginAsync(string code, string codeVerifier, Uri? redirectUri = null)
     {
-        _tokens = await client.ExchangeCodeAsync(code, codeVerifier).ConfigureAwait(false);
+        _tokens = await client.ExchangeCodeAsync(code, codeVerifier, redirectUri).ConfigureAwait(false);
         await tokenStore.SaveTokensAsync(_tokens).ConfigureAwait(false);
         _currentUser = null;
         NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
