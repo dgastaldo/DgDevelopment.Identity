@@ -1,13 +1,27 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
 var sqlServer = builder.AddConnectionString("IdentityDb");
+var redis = builder.AddRedis("Redis");
 
 var server = builder
-    .AddProject<Projects.DgDevelopment_Identity_Server>("identity-server")
-    .WithReference(sqlServer);
+    .AddProject<Projects.DgDevelopment_Identity_Server>("identity-server", launchProfileName: "https")
+    .WithEndpoint("https", endpoint => endpoint.IsProxied = false)
+    .WithEndpoint("http", endpoint => endpoint.IsProxied = false)
+    .WithReference(sqlServer)
+    .WithReference(redis);
 
-builder
-    .AddProject<Projects.DgDevelopment_Identity_AdminUi>("admin-ui")
-    .WithReference(server);
+var adminClientSecret = builder.Configuration["Identity:AdminClientSecret"] ?? "";
 
-builder.Build().Run();
+var adminUi = builder
+    .AddProject<Projects.DgDevelopment_Identity_AdminUi>("admin-ui", launchProfileName: "https")
+    .WithEndpoint("https", endpoint => endpoint.IsProxied = false)
+    .WithEndpoint("http", endpoint => endpoint.IsProxied = false)
+    .WithReference(server)
+    .WithEnvironment("IdentityBaseUrl", server.GetEndpoint("https"))
+    .WithEnvironment("Identity__AdminClientSecret", adminClientSecret);
+
+adminUi.WithEnvironment("AdminBaseUrl", adminUi.GetEndpoint("https"));
+
+var app = builder.Build();
+
+await app.RunAsync().ConfigureAwait(false);

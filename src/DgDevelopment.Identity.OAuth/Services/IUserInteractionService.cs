@@ -4,5 +4,5 @@ public interface IUserInteractionService
 {
     string GetLoginUrl(string returnUrl);
     string GetConsentUrl(string returnUrl);
-    string GetErrorUrl(string error, string? errorDescription);
+    string GetErrorUrl(string errorCode, string? errorDescription);
 }

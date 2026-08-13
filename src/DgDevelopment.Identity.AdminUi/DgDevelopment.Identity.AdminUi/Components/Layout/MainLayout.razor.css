@@ -44,6 +44,30 @@ main {
         text-overflow: ellipsis;
     }
 
+    .top-row .auth-area {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .top-row .username {
+        font-weight: 600;
+    }
+
+    .top-row .avatar {
+        width: 2rem;
+        height: 2rem;
+        border-radius: 50%;
+        background-color: #3a0647;
+        color: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+    }
+
 @media (max-width: 640.98px) {
     .top-row {
         justify-content: space-between;

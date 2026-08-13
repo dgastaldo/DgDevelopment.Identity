@@ -1,0 +1,12 @@
+@page "/account/consent"
+@model DgDevelopment.Identity.Server.Pages.Account.ConsentModel
+@{
+    ViewData["Title"] = "Consent";
+}
+
+<h2>Consent</h2>
+<p>You are about to grant access to your account.</p>
+<form method="post">
+    <button type="submit" name="action" value="approve">Approve</button>
+    <button type="submit" name="action" value="deny">Deny</button>
+</form>

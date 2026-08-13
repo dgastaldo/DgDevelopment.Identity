@@ -42,6 +42,8 @@ public sealed class UserRepository : IUserRepository
 
     public async Task<User?> GetByEmailAsync(string email, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(email);
+        var normalizedEmail = email.ToUpperInvariant();
         return await _context.Users
             .AsNoTracking()
             .Include(u => u.Emails)
@@ -50,7 +52,7 @@ public sealed class UserRepository : IUserRepository
             .Include(u => u.Roles)
             .Include(u => u.Permissions)
             .Include(u => u.Groups)
-            .Where(u => u.Emails.Any(e => EF.Property<string>(e, "Email_Value") == email))
+            .Where(u => u.Emails.Any(e => e.Email.Value == normalizedEmail))
             .FirstOrDefaultAsync(ct).ConfigureAwait(false);
     }
 

@@ -71,13 +71,53 @@ Client.[Platform] ──> Client.Core
 ### Key NuGet Dependencies
 
 | Project | Key Packages |
-|---|---|
+|---|---|---|
 | AppHost | `Aspire.Hosting.SqlServer` |
 | ServiceDefaults | `Microsoft.Extensions.ServiceDiscovery`, `Microsoft.Extensions.Http.Resilience` |
-| Infrastructure | EF Core (to be added in domain implementation) |
-| Server | ASP.NET Core (implicit via SDK) |
+| Domain | None (pure POCO) |
+| Application | None (references only Domain) |
+| Infrastructure | `Microsoft.EntityFrameworkCore.SqlServer`, `Konscious.Security.Cryptography.Argon2` |
+| OAuth | `Microsoft.IdentityModel.Tokens`, `System.IdentityModel.Tokens.Jwt` |
+| Server | `Microsoft.AspNetCore.OpenApi`, `Scalar.AspNetCore`, `Microsoft.EntityFrameworkCore.Design` |
+| AdminUi | `Microsoft.AspNetCore.Components.Web` (implicit), references `Client.Blazor` |
+| Client.Core | None (pure library) |
+| Client.Blazor | `Microsoft.AspNetCore.Components.Authorization`, `Microsoft.JSInterop` |
 
-## 3. Clean Architecture (Internal)
+## 3. AdminUi & Client Architecture
+
+```
+┌────────────────────────────────────────────────────────────┐
+│  AdminUi (Blazor Hybrid — Server + WASM)                   │
+│                                                             │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  Client.Blazor SDK                                    │  │
+│  │  ┌──────────────────┐  ┌──────────────────────────┐  │  │
+│  │  │ AuthStateProvider │  │ Token Store (sessionStorage)│  │
+│  │  ├──────────────────┤  ├──────────────────────────┤  │  │
+│  │  │ IdentityClient   │  │ RefreshHandler           │  │  │
+│  │  └────────┬─────────┘  └──────────────────────────┘  │  │
+│  │           │                                            │  │
+│  └───────────┼────────────────────────────────────────────┘  │
+│              │ references                                    │
+│  ┌───────────▼────────────────────────────────────────────┐  │
+│  │  Client.Core SDK                                        │  │
+│  │  ┌──────────────────────────────────────────────────┐  │  │
+│  │  │ IdentityClient (OIDC flows)                       │  │  │
+│  │  │ OidcOptions, TokenResponse, UserInfo              │  │  │
+│  │  └──────────────────────────────────────────────────┘  │  │
+│  └────────────────────────────────────────────────────────┘  │
+│                                                               │
+│  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─  │
+│             OAuth 2.0 / OIDC                                  │
+│                                                               │
+│  AdminUi ──(authorize)──> Server /connect/authorize           │
+│  AdminUi <──(code)────── Server                               │
+│  AdminUi ──(token)─────> Server /connect/token                │
+│  AdminUi <──(tokens)──── Server (access_token, id_token)      │
+└────────────────────────────────────────────────────────────┘
+```
+
+## 4. Clean Architecture (Internal)
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -114,9 +154,9 @@ Client.[Platform] ──> Client.Core
 
 Dependency rule: dependencies point inward. Outer layers depend on inner layers. Domain has zero external dependencies.
 
-## 4. Domain Model
+## 5. Domain Model
 
-### 4.1 Core Entities
+### 5.1 Core Entities
 
 ```
 User (Aggregate Root)
@@ -221,7 +261,7 @@ UserSession
 └── IsRevoked: bool
 ```
 
-### 4.2 Token Entities
+### 5.2 Token Entities
 
 ```
 AuthorizationCode
@@ -261,7 +301,7 @@ DeviceCode
 └── ExpiresAt: DateTime
 ```
 
-### 4.3 Audit & Event Store
+### 5.3 Audit & Event Store
 
 ```
 AuditLog
@@ -287,9 +327,9 @@ Event (Event Store)
 └── Timestamp: DateTime
 ```
 
-## 5. OAuth 2.0 / OIDC Flows
+## 6. OAuth 2.0 / OIDC Flows
 
-### 5.1 Authorization Code + PKCE
+### 6.1 Authorization Code + PKCE
 
 ```
 Client (SPA/Mobile)                Identity Server            User (Browser)
@@ -329,7 +369,7 @@ Client (SPA/Mobile)                Identity Server            User (Browser)
       │<─────────────────────────────────│                         │
 ```
 
-### 5.2 Device Code Flow
+### 6.2 Device Code Flow
 
 ```
 Device Client                     Identity Server            User (Browser)
@@ -355,7 +395,7 @@ Device Client                     Identity Server            User (Browser)
       │<─────────────────────────────────│                         │
 ```
 
-## 6. SAML 2.0 SSO Flow
+## 7. SAML 2.0 SSO Flow
 
 ```
 Service Provider (SP)            Identity Provider (IdP)         User (Browser)
@@ -380,9 +420,9 @@ Service Provider (SP)            Identity Provider (IdP)         User (Browser)
       │     User is authenticated        │                              │
 ```
 
-## 7. JWT Token Structure
+## 8. JWT Token Structure
 
-### 7.1 ID Token
+### 8.1 ID Token
 
 ```json
 {
@@ -400,7 +440,7 @@ Service Provider (SP)            Identity Provider (IdP)         User (Browser)
 }
 ```
 
-### 7.2 Access Token (IdentityManaged mode)
+### 8.2 Access Token (IdentityManaged mode)
 
 ```json
 {
@@ -419,7 +459,7 @@ Service Provider (SP)            Identity Provider (IdP)         User (Browser)
 }
 ```
 
-## 8. Effective Permissions Algorithm
+## 9. Effective Permissions Algorithm
 
 ```
 GetEffectivePermissions(userId):
@@ -458,7 +498,7 @@ GetEffectivePermissions(userId):
   return ResolvePermissionConflicts(permissions)
 ```
 
-## 9. Database Schema (SQL Server)
+## 10. Database Schema (SQL Server)
 
 ```
 ┌─────────────────────┐     ┌─────────────────────┐
@@ -589,9 +629,9 @@ GetEffectivePermissions(userId):
 └─────────────────────┘
 ```
 
-## 10. API Design
+## 11. API Design
 
-### 10.1 URL Convention
+### 11.1 URL Convention
 
 | Type | Pattern | Example |
 |---|---|---|
@@ -600,7 +640,7 @@ GetEffectivePermissions(userId):
 | Admin API | `/api/v1/{resource}` | `/api/v1/users` |
 | UI Pages | `/{page}` | `/login`, `/consent` |
 
-### 10.2 Error Responses (RFC 7807)
+### 11.2 Error Responses (RFC 7807)
 
 ```json
 {
@@ -613,7 +653,7 @@ GetEffectivePermissions(userId):
 }
 ```
 
-### 10.3 OAuth Error Responses
+### 11.3 OAuth Error Responses
 
 Per RFC 6749, errors from OAuth endpoints use the standard format:
 
@@ -624,7 +664,7 @@ Per RFC 6749, errors from OAuth endpoints use the standard format:
 }
 ```
 
-## 11. Key Rotation Strategy
+## 12. Key Rotation Strategy
 
 - Signing keys (RSA 2048-bit or ECDSA P-256) managed via JWKS
 - Active key + up to N previous keys for validation during rotation
@@ -632,7 +672,7 @@ Per RFC 6749, errors from OAuth endpoints use the standard format:
 - Keys never hardcoded; generated at startup and persisted securely
 - Certificate-based keys for SAML signing
 
-## 12. Security Considerations
+## 13. Security Considerations
 
 - **Passwords**: hashed with Argon2id
 - **Secrets**: client secrets hashed with HMAC-SHA256

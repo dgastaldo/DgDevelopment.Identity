@@ -10,10 +10,6 @@ public sealed class UserRoleConfiguration : IEntityTypeConfiguration<UserRole>
     {
         System.ArgumentNullException.ThrowIfNull(builder);
         builder.HasKey(x => new { x.UserId, x.RoleId });
-
-        builder.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<Role>().WithMany().HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Restrict);
-
         builder.Property(x => x.ScopeType).HasMaxLength(100);
         builder.Property(x => x.ScopeValue).HasMaxLength(200);
     }

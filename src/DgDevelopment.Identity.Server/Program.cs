@@ -1,3 +1,8 @@
+using DgDevelopment.Identity.Application.Services;
+using DgDevelopment.Identity.Infrastructure.Data;
+using DgDevelopment.Identity.OAuth.Services;
+using DgDevelopment.Identity.Server.Data;
+using DgDevelopment.Identity.Server.Services;
 using DgDevelopment.Identity.ServiceDefaults;
 using Scalar.AspNetCore;
 
@@ -5,6 +10,27 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.Services.AddHealthChecks();
+
+var connectionString = builder.Configuration.GetConnectionString("IdentityDb")
+    ?? throw new InvalidOperationException("Connection string 'IdentityDb' not found.");
+
+builder.Services.AddInfrastructure(connectionString);
+builder.Services.AddScoped<IUserAuthenticationService, UserAuthenticationService>();
+builder.Services.AddOAuthEngine();
+builder.Services.AddScoped<IUserInteractionService, UserInteractionService>();
+builder.Services.AddScoped<DbSeeder>();
+builder.Services.AddSingleton<IClientIdCache, ClientIdCache>();
+
+builder.Services.AddAuthentication("Cookies")
+    .AddCookie("Cookies", options =>
+    {
+        options.LoginPath = "/account/login";
+        options.LogoutPath = "/account/logout";
+    });
+
+builder.Services.AddAuthorization();
+builder.Services.AddControllers();
+builder.Services.AddRazorPages();
 
 builder.Services.AddOpenApi(options =>
 {
@@ -22,70 +48,40 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var seeder = scope.ServiceProvider.GetRequiredService<DbSeeder>();
+    await seeder.SeedAsync().ConfigureAwait(false);
+}
+
+var clientIdCache = app.Services.GetRequiredService<IClientIdCache>();
+await clientIdCache.InitializeAsync().ConfigureAwait(false);
+
 app.MapOpenApi();
 
 if (app.Environment.IsDevelopment())
 {
-    // 4. Configura Scalar (punta al JSON di Microsoft)
     app.MapScalarApiReference(options =>
     {
         options.WithOpenApiRoutePattern("/openapi/v1.json");
     });
 
-    // 5. Configura Swagger UI (puntandolo allo STESSO JSON di Microsoft)
     app.UseSwaggerUI(options =>
     {
         options.SwaggerEndpoint("/openapi/v1.json", "DgDevelopment Identity API v1");
-        options.RoutePrefix = "swagger"; // Sarà raggiungibile a /swagger
+        options.RoutePrefix = "swagger";
     });
 }
 
-app.MapGet("/", () => Results.Content("""
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DgDevelopment Identity API</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: system-ui, sans-serif; background: #0d1117; color: #c9d1d9; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .container { text-align: center; padding: 3rem; }
-        h1 { font-size: 2.5rem; color: #58a6ff; margin-bottom: 0.5rem; }
-        p { color: #8b949e; margin-bottom: 2.5rem; font-size: 1.1rem; }
-        .cards { display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap; }
-        .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 2rem 2.5rem; width: 260px; text-decoration: none; transition: border-color 0.2s, transform 0.2s; }
-        .card:hover { border-color: #58a6ff; transform: translateY(-2px); }
-        .card h2 { color: #f0f6fc; font-size: 1.3rem; margin-bottom: 0.5rem; }
-        .card span { color: #8b949e; font-size: 0.9rem; }
-        .icon { font-size: 2rem; margin-bottom: 0.75rem; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>DgDevelopment Identity API</h1>
-        <p>Identity Provider for authentication, authorization, and user management.</p>
-        <div class="cards">
-            <a class="card" href="/openapi/v1.json">
-                <div class="icon">📄</div>
-                <h2>OpenAPI</h2>
-                <span>Raw OpenAPI specification (JSON)</span>
-            </a>
-            <a class="card" href="/scalar/v1">
-                <div class="icon">🔮</div>
-                <h2>Scalar</h2>
-                <span>Modern API reference UI</span>
-            </a>
-            <a class="card" href="/swagger">
-                <div class="icon">📋</div>
-                <h2>Swagger</h2>
-                <span>Classic Swagger UI</span>
-            </a>
-        </div>
-    </div>
-</body>
-</html>
-""", "text/html"));
+app.MapGet("/", () => Results.Content(System.IO.File.ReadAllText(
+    Path.Combine(app.Environment.ContentRootPath, "wwwroot", "index.html")), "text/html"));
+
 app.MapHealthChecks("/health");
 
-app.Run();
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllers();
+app.MapRazorPages();
+
+await app.RunAsync();

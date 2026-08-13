@@ -6,7 +6,7 @@ public static class OAuthServiceCollectionExtensions
 {
     public static IServiceCollection AddOAuthEngine(this IServiceCollection services)
     {
-        services.AddSingleton<IKeyMaterialService, KeyMaterialService>();
+        services.AddScoped<IKeyMaterialService, KeyMaterialService>();
         services.AddScoped<IJwtService, JwtService>();
         services.AddScoped<IClientValidator, ClientValidator>();
         services.AddScoped<IAuthorizationService, AuthorizationService>();
