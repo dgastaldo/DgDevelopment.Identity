@@ -6,21 +6,29 @@ This file provides full project context for AI tools and LLMs operating on the r
 
 **DgDevelopment.Identity** is a complete Identity Provider for the DgDevelopment ecosystem. It provides authentication (OAuth 2.0 / OIDC, SAML 2.0), authorization (RBAC + PBAC with permissions, roles, hierarchical groups), user profile management, MFA and multi-client SDKs.
 
-## Active Stack
+## Current State — 2026-08-13
 
-The project uses stacked feature branches. Current active chain:
+The OAuth 2.0 / OIDC authentication cycle is **merged into `develop`** (PRs #1–#15, the whole stack closed). All feature/fix branches are deleted; only `develop`, `docs`, `integration`, `main` remain (local + remote).
 
-```
-feature/oauth-server ──> develop
-      ▲
-feature/oauth-hardening
-      ▲
-feature/client-blazor-sdk
-      ▲
-feature/oauth-connect
-      ▲
-feature/docs-update (current)
-```
+### Working end-to-end flow
+
+- AdminUi `/login` → IDP `/connect/authorize` (PKCE S256), redirect `https://localhost:7018/callback` (fixed ports, no Aspire proxy)
+- IDP login (static SSR Razor Page) → authorization code → AdminUi `/callback` → `/connect/token` → session cookie
+- AdminUi top bar shows avatar (initials) + username + Logout when authenticated; Home nav is visible only when authenticated
+- IDP `/connect/userinfo` returns `sub` / `name` / `email` and is used to build the AdminUi principal (single fetch, cached)
+
+### Development database
+
+- Migrations run **up-only** on every start (`MigrateAsync`); `EnsureDeletedAsync` was removed
+- Seeding runs **once** (first run): superadmin password and admin client secret are **stable** between runs
+- `superadmin-credentials.txt` / `admin-client-credentials.txt` are written only on the first seed
+- Stale IDP session cookies (user no longer in the DB after a reseed) self-heal: IDP signs out and shows the login form instead of an `invalid_user` error
+
+### Next steps / open work
+
+1. **OIDC consent screen** (IDP): after login show a consent page with the requested scopes → approve/deny → issue the code. Planned branch `feature/oauth-consent`.
+2. **End-to-end verification** of `/connect/token` (keep the AppHost `Identity:AdminClientSecret` user-secret in sync with the seeded value) and of the AdminUi session restore via `userinfo`.
+3. Milestones M2–M4: SAML 2.0, React/WPF/MAUI client SDKs, TOTP/Push MFA, external providers, localization integration.
 
 ## Architecture Rules
 
