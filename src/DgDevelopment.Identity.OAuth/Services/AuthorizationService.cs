@@ -48,11 +48,8 @@ public sealed class AuthorizationService(IClientRepository clientRepository, IAu
         ArgumentNullException.ThrowIfNull(user);
         var code = Secret.Generate(32);
         var codeHash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(code)));
-        var codeChallengeHash = codeChallenge != null
-            ? Convert.ToBase64String(SHA256.HashData(Encoding.ASCII.GetBytes(codeChallenge))).Replace("+", "-", StringComparison.Ordinal).Replace("/", "_", StringComparison.Ordinal).TrimEnd('=')
-            : null;
 
-        var authCode = new AuthorizationCode(codeHash, client.Id, user.Id, new Uri(redirectUri), scopes, codeChallengeHash, codeChallengeMethod);
+        var authCode = new AuthorizationCode(codeHash, client.Id, user.Id, new Uri(redirectUri), scopes, codeChallenge, codeChallengeMethod);
         await codeRepository.AddAsync(authCode, ct).ConfigureAwait(false);
 
         return code;
