@@ -1,59 +1,17 @@
-﻿@using DgDevelopment.Identity.Client.Blazor
-@using Microsoft.AspNetCore.Components.Authorization
-@inject IdentityAuthStateProvider AuthStateProvider
-@inject NavigationManager Navigation
+﻿<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">Identity Console</a>
+    </div>
+</div>
 
-<AuthorizeView>
-    <Authorized>
-        <div class="top-row ps-3 navbar navbar-dark">
-            <div class="container-fluid">
-                <a class="navbar-brand" href="">Identity Console</a>
-            </div>
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="nav flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+            </NavLink>
         </div>
-
-        <input type="checkbox" title="Navigation menu" class="navbar-toggler" />
-
-        <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-            <nav class="nav flex-column">
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                        <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-                    </NavLink>
-                </div>
-
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="" @onclick="LogoutAsync">
-                        <span class="bi bi-box-arrow-right" aria-hidden="true"></span> Logout
-                    </NavLink>
-                </div>
-            </nav>
-        </div>
-    </Authorized>
-    <NotAuthorized>
-        <div class="top-row ps-3 navbar navbar-dark">
-            <div class="container-fluid">
-                <a class="navbar-brand" href="">Identity Console</a>
-            </div>
-        </div>
-
-        <input type="checkbox" title="Navigation menu" class="navbar-toggler" />
-
-        <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-            <nav class="nav flex-column">
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="login">
-                        <span class="bi bi-box-arrow-in-right" aria-hidden="true"></span> Login
-                    </NavLink>
-                </div>
-            </nav>
-        </div>
-    </NotAuthorized>
-</AuthorizeView>
-
-@code {
-    private async Task LogoutAsync()
-    {
-        await AuthStateProvider.LogoutAsync();
-        Navigation.NavigateTo("/", forceLoad: true);
-    }
-}
+    </nav>
+</div>
