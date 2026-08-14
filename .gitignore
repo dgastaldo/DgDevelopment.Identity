@@ -73,6 +73,10 @@ coverage/
 *.log
 logs/
 
+## Node
+src/DgDevelopment.Identity.Server/node_modules/
+src/DgDevelopment.Identity.AdminUi/DgDevelopment.Identity.AdminUi/node_modules/
+
 ## Credentials (generated at first run)
 superadmin-credentials.txt
 admin-client-credentials.txt
