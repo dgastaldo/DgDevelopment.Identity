@@ -13,36 +13,31 @@ namespace DgDevelopment.Identity.Server.Pages.Connect;
 public sealed class AuthorizeModel : PageModel
 {
     private readonly IAuthorizationService _authorizationService;
-    private readonly IUserAuthenticationService _authService;
-    private readonly IUserSessionRepository _sessionRepo;
     private readonly IUserRepository _userRepo;
+    private readonly IServerSessionService _sessionService;
+    private readonly IUserInteractionService _interaction;
 
     public AuthorizeModel(
         IAuthorizationService authorizationService,
-        IUserAuthenticationService authService,
-        IUserSessionRepository sessionRepo,
-        IUserRepository userRepo)
+        IUserRepository userRepo,
+        IServerSessionService sessionService,
+        IUserInteractionService interaction)
     {
         _authorizationService = authorizationService;
-        _authService = authService;
-        _sessionRepo = sessionRepo;
         _userRepo = userRepo;
+        _sessionService = sessionService;
+        _interaction = interaction;
     }
 
-    [BindProperty] public string ClientId { get; set; } = string.Empty;
-    [BindProperty] public string RedirectUri { get; set; } = string.Empty;
-    [BindProperty] public string ResponseType { get; set; } = string.Empty;
-    [BindProperty] public string Scope { get; set; } = string.Empty;
-    [BindProperty] public string? State { get; set; }
-    [BindProperty] public string? Nonce { get; set; }
-    [BindProperty] public string? CodeChallenge { get; set; }
-    [BindProperty] public string? CodeChallengeMethod { get; set; }
-
-    [BindProperty] public string Username { get; set; } = string.Empty;
-    [BindProperty] public string Password { get; set; } = string.Empty;
-
-    public bool IsAuthenticated { get; set; }
-    public string? Error { get; set; }
+    public string ClientId { get; set; } = string.Empty;
+    public string RedirectUri { get; set; } = string.Empty;
+    public string ResponseType { get; set; } = string.Empty;
+    public string Scope { get; set; } = string.Empty;
+    public string? State { get; set; }
+    public string? Nonce { get; set; }
+    public string? CodeChallenge { get; set; }
+    public string? CodeChallengeMethod { get; set; }
+    public string? LoginHint { get; set; }
 
     public async Task<IActionResult> OnGetAsync(
         [FromQuery] string client_id,
@@ -52,7 +47,8 @@ public sealed class AuthorizeModel : PageModel
         [FromQuery] string? state = null,
         [FromQuery] string? nonce = null,
         [FromQuery] string? code_challenge = null,
-        [FromQuery] string? code_challenge_method = null)
+        [FromQuery] string? code_challenge_method = null,
+        [FromQuery] string? login_hint = null)
     {
         ClientId = client_id;
         RedirectUri = redirect_uri;
@@ -62,6 +58,7 @@ public sealed class AuthorizeModel : PageModel
         Nonce = nonce;
         CodeChallenge = code_challenge;
         CodeChallengeMethod = code_challenge_method;
+        LoginHint = login_hint;
 
         var result = await _authorizationService.ValidateAsync(new(
             ClientId, RedirectUri, ResponseType, Scope, State, Nonce,
@@ -71,10 +68,7 @@ public sealed class AuthorizeModel : PageModel
             return RedirectToPage("/Error", new { errorCode = result.Error, errorDescription = result.ErrorDescription });
 
         if (!User.Identity!.IsAuthenticated)
-        {
-            IsAuthenticated = false;
-            return Page();
-        }
+            return RedirectToLogin();
 
         var userIdValue = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!Guid.TryParse(userIdValue, out var userId))
@@ -83,55 +77,27 @@ public sealed class AuthorizeModel : PageModel
         if (await _userRepo.GetByIdAsync(userId).ConfigureAwait(false) == null)
         {
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme).ConfigureAwait(false);
-            IsAuthenticated = false;
-            return Page();
+            return RedirectToLogin();
+        }
+
+        var activeSession = await _sessionService.FindActiveAsync(userId).ConfigureAwait(false);
+        if (activeSession == null)
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme).ConfigureAwait(false);
+            return RedirectToLogin();
         }
 
         return await IssueCodeAsync(result.Client!, userId).ConfigureAwait(false);
     }
 
-    public async Task<IActionResult> OnPostAsync()
+    private RedirectResult RedirectToLogin()
     {
-        var result = await _authorizationService.ValidateAsync(new(
-            ClientId, RedirectUri, ResponseType, Scope, State, Nonce,
-            CodeChallenge, CodeChallengeMethod)).ConfigureAwait(false);
+        var returnUrl = $"{Request.Path}{Request.QueryString}";
+        var loginUrl = _interaction.GetLoginUrl(returnUrl);
+        if (!string.IsNullOrWhiteSpace(LoginHint))
+            loginUrl += $"&login_hint={Uri.EscapeDataString(LoginHint)}";
 
-        if (!result.IsValid)
-            return RedirectToPage("/Error", new { errorCode = result.Error, errorDescription = result.ErrorDescription });
-
-        if (string.IsNullOrWhiteSpace(Username) || string.IsNullOrWhiteSpace(Password))
-        {
-            Error = "Username and password are required.";
-            IsAuthenticated = false;
-            return Page();
-        }
-
-        var user = await _authService.ValidateCredentialsAsync(Username, Password).ConfigureAwait(false);
-        if (user == null)
-        {
-            Error = "Invalid username or password.";
-            IsAuthenticated = false;
-            return Page();
-        }
-
-        await _authService.RecordSuccessfulLoginAsync(user).ConfigureAwait(false);
-
-        var sessionId = Guid.NewGuid().ToString("N");
-        var session = new DgDevelopment.Identity.Domain.Entities.UserSession(user.Id, sessionId, DateTime.UtcNow.AddHours(8), ["pwd"]);
-        await _sessionRepo.AddAsync(session).ConfigureAwait(false);
-
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, user.Id.ToString(null, CultureInfo.InvariantCulture)),
-            new(ClaimTypes.Name, user.Username),
-            new("session_id", sessionId),
-        };
-
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        var principal = new ClaimsPrincipal(identity);
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal).ConfigureAwait(false);
-
-        return await IssueCodeAsync(result.Client!, user.Id).ConfigureAwait(false);
+        return Redirect(loginUrl);
     }
 
     private async Task<IActionResult> IssueCodeAsync(DgDevelopment.Identity.Domain.Entities.Client client, Guid userId)

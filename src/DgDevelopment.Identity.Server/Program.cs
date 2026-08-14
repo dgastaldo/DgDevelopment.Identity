@@ -16,6 +16,7 @@ var connectionString = builder.Configuration.GetConnectionString("IdentityDb")
 
 builder.Services.AddInfrastructure(connectionString);
 builder.Services.AddScoped<IUserAuthenticationService, UserAuthenticationService>();
+builder.Services.AddScoped<IServerSessionService, ServerSessionService>();
 builder.Services.AddOAuthEngine();
 builder.Services.AddScoped<IUserInteractionService, UserInteractionService>();
 builder.Services.AddScoped<DbSeeder>();
@@ -26,6 +27,8 @@ builder.Services.AddAuthentication("Cookies")
     {
         options.LoginPath = "/account/login";
         options.LogoutPath = "/account/logout";
+        options.ExpireTimeSpan = TimeSpan.FromHours(8);
+        options.SlidingExpiration = true;
     });
 
 builder.Services.AddAuthorization();
@@ -47,6 +50,8 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+app.UseStaticFiles();
 
 using (var scope = app.Services.CreateScope())
 {
