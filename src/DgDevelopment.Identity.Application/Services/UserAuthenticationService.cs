@@ -40,6 +40,13 @@ public sealed class UserAuthenticationService : IUserAuthenticationService
         return user;
     }
 
+    public async Task<User?> FindByIdentifierAsync(string identifier, CancellationToken ct = default)
+    {
+        var user = await _userRepository.GetByUsernameAsync(identifier, ct).ConfigureAwait(false);
+        user ??= await _userRepository.GetByEmailAsync(identifier, ct).ConfigureAwait(false);
+        return user;
+    }
+
     public Task RecordFailedLoginAsync(User user, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(user);
