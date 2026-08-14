@@ -6,8 +6,8 @@
 @inject ITokenStore TokenStore
 @inject IHttpContextAccessor HttpContextAccessor
 
-<h3 class="mb-2 text-lg font-semibold text-gray-800">Logging in...</h3>
-<p class="text-gray-600">If you are not redirected, <a href="/" class="text-brand-600 hover:underline">click here</a>.</p>
+<h3>Logging in...</h3>
+<p>If you are not redirected, <a href="/">click here</a>.</p>
 
 @code {
     [SupplyParameterFromQuery] public string? Code { get; set; }
