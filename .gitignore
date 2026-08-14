@@ -80,3 +80,4 @@ src/DgDevelopment.Identity.Server/node_modules/
 superadmin-credentials.txt
 admin-client-credentials.txt
 /OpencodeSession.txt
+/.opencode/plans
