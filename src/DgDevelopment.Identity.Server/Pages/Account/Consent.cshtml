@@ -4,9 +4,17 @@
     ViewData["Title"] = "Consent";
 }
 
-<h2>Consent</h2>
-<p>You are about to grant access to your account.</p>
-<form method="post">
-    <button type="submit" name="action" value="approve">Approve</button>
-    <button type="submit" name="action" value="deny">Deny</button>
-</form>
+<div class="auth-card">
+    <h1 class="auth-brand">DgDevelopment Identity Server</h1>
+    <h2 class="text-lg font-semibold text-gray-800 mb-2">Consent</h2>
+    <p class="text-sm text-gray-600 mb-6">You are about to grant access to your account.</p>
+    <form method="post">
+        <div class="flex gap-2">
+            <button type="submit" name="action" value="approve" class="auth-btn">Approve</button>
+            <button type="submit" name="action" value="deny"
+                    class="flex-1 rounded-md bg-gray-200 px-4 py-2 text-gray-800 font-medium hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                Deny
+            </button>
+        </div>
+    </form>
+</div>

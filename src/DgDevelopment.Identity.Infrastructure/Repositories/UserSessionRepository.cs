@@ -28,6 +28,15 @@ public sealed class UserSessionRepository : IUserSessionRepository
             .FirstOrDefaultAsync(s => s.SessionId == sessionId, ct).ConfigureAwait(false);
     }
 
+    public async Task<UserSession?> GetActiveByUserIdAsync(Guid userId, CancellationToken ct = default)
+    {
+        return await _context.UserSessions
+            .AsNoTracking()
+            .Where(s => s.UserId == userId && !s.IsRevoked && s.ExpiresAt > DateTime.UtcNow)
+            .OrderByDescending(s => s.CreatedAt)
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+    }
+
     public async Task AddAsync(UserSession session, CancellationToken ct = default)
     {
         await _context.UserSessions.AddAsync(session, ct).ConfigureAwait(false);

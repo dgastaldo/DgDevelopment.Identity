@@ -29,4 +29,8 @@
     <NoWarn>$(NoWarn);CA1707;CA1054;CA1055;CA1056;CA1303;CA1515;CA2007</NoWarn>
   </PropertyGroup>
 
+  <Target Name="BuildTailwindCss" BeforeTargets="PrepareForBuild" Condition="Exists('node_modules') And '$(DesignTimeBuild)' != 'true'">
+    <Exec Command="npm run build:css" />
+  </Target>
+
 </Project>
