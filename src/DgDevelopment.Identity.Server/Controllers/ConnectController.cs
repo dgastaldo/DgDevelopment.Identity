@@ -156,7 +156,7 @@ public sealed class ConnectController : Controller
         if (user.PrimaryEmail != null)
         {
             claims["email"] = user.PrimaryEmail.Value;
-            claims["email_verified"] = "true";
+            claims["email_verified"] = true;
         }
 
         return Ok(claims);
