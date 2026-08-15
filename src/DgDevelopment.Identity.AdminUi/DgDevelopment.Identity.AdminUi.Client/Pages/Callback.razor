@@ -1,10 +1,8 @@
 @page "/callback"
-@using DgDevelopment.Identity.Client.Core
 @using DgDevelopment.Identity.Client.Blazor
 @inject NavigationManager Navigation
-@inject IdentityClient IdentityClient
-@inject ITokenStore TokenStore
-@inject IHttpContextAccessor HttpContextAccessor
+@inject IdentityAuthStateProvider AuthStateProvider
+@inject ISessionStorageService SessionStorage
 
 <h3 class="mb-2 text-lg font-semibold text-gray-800">Logging in...</h3>
 <p class="text-gray-600">If you are not redirected, <a href="/" class="text-brand-600 hover:underline">click here</a>.</p>
@@ -13,16 +11,21 @@
     [SupplyParameterFromQuery] public string? Code { get; set; }
     [SupplyParameterFromQuery] public string? State { get; set; }
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (!firstRender)
+        {
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(Code))
         {
             Navigation.NavigateTo("/", forceLoad: true);
             return;
         }
 
-        var verifier = HttpContextAccessor.HttpContext!.Request.Cookies["pkce_verifier"];
-        HttpContextAccessor.HttpContext.Response.Cookies.Delete("pkce_verifier");
+        var verifier = await SessionStorage.GetItemAsync<string>("pkce_verifier") ?? string.Empty;
+        await SessionStorage.RemoveItemAsync("pkce_verifier");
 
         if (string.IsNullOrEmpty(verifier))
         {
@@ -32,8 +35,7 @@
 
         try
         {
-            var tokens = await IdentityClient.ExchangeCodeAsync(Code, verifier, new Uri(Navigation.BaseUri + "callback"));
-            await TokenStore.SaveTokensAsync(tokens);
+            await AuthStateProvider.CompleteLoginAsync(Code, verifier);
         }
         catch
         {

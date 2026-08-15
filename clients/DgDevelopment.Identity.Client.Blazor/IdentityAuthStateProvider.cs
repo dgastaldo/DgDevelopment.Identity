@@ -7,11 +7,9 @@ using Microsoft.AspNetCore.Components.Authorization;
 
 namespace DgDevelopment.Identity.Client.Blazor;
 
-public sealed class IdentityAuthStateProvider(IdentityClient client, ITokenStore tokenStore
-    //, OidcOptions options
-    ) : AuthenticationStateProvider
+public class IdentityAuthStateProvider(IdentityClient client, ITokenStore tokenStore, ISessionMarkerService markerService) : AuthenticationStateProvider
 {
-private TokenResponse? _tokens;
+    private TokenResponse? _tokens;
     private ClaimsPrincipal? _currentUser;
     private UserInfo? _userInfo;
 
@@ -25,7 +23,7 @@ private TokenResponse? _tokens;
         if (_tokens == null)
             return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
 
-if (_tokens.IsExpired() && _tokens.RefreshToken != null)
+        if (_tokens.IsExpired() && _tokens.RefreshToken != null)
         {
             try
             {
@@ -46,7 +44,7 @@ if (_tokens.IsExpired() && _tokens.RefreshToken != null)
             }
         }
 
-if (_tokens == null || _tokens.IsExpired())
+        if (_tokens == null || _tokens.IsExpired())
             return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
 
         if (_userInfo == null)
@@ -69,32 +67,27 @@ if (_tokens == null || _tokens.IsExpired())
             }
         }
 
-        var claims = new List<Claim>();
-        if (!string.IsNullOrEmpty(_userInfo?.Sub))
-            claims.Add(new Claim(ClaimTypes.NameIdentifier, _userInfo.Sub));
-        if (!string.IsNullOrEmpty(_userInfo?.Name))
-            claims.Add(new Claim(ClaimTypes.Name, _userInfo.Name));
-        if (!string.IsNullOrEmpty(_userInfo?.Email))
-            claims.Add(new Claim(ClaimTypes.Email, _userInfo.Email));
+        _currentUser = BuildPrincipal(_userInfo!);
 
-        _currentUser = new ClaimsPrincipal(new ClaimsIdentity(claims, "oidc"));
+        await markerService.SetAsync(_userInfo!).ConfigureAwait(false);
 
-NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(_currentUser)));
+        NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(_currentUser)));
         return new AuthenticationState(_currentUser);
     }
 
-    private async Task<AuthenticationState> ClearTokensAndReturnAnonymousAsync()
+    protected virtual async Task<AuthenticationState> ClearTokensAndReturnAnonymousAsync()
     {
         await tokenStore.ClearTokensAsync().ConfigureAwait(false);
+        await markerService.ClearAsync().ConfigureAwait(false);
         _tokens = null;
         _currentUser = null;
         _userInfo = null;
         return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
     }
 
-    public Uri GetLoginUrl()
+    public Uri GetLoginUrl(string? state = null, string? codeChallenge = null)
     {
-        return new Uri(client.GetAuthorizeUrl() + "&nonce=" + Guid.NewGuid().ToString("N"));
+        return new Uri(client.GetAuthorizeUrl(state, codeChallenge) + "&nonce=" + Guid.NewGuid().ToString("N"));
     }
 
     public async Task CompleteLoginAsync(string code, string codeVerifier, Uri? redirectUri = null)
@@ -108,8 +101,10 @@ NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(_curren
     public async Task LogoutAsync()
     {
         await tokenStore.ClearTokensAsync().ConfigureAwait(false);
+        await markerService.ClearAsync().ConfigureAwait(false);
         _tokens = null;
         _currentUser = null;
+        _userInfo = null;
         NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()))));
     }
 
@@ -122,5 +117,19 @@ NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(_curren
         var challenge = Convert.ToBase64String(challengeBytes).Replace("+", "-", StringComparison.Ordinal).Replace("/", "_", StringComparison.Ordinal).TrimEnd('=');
 
         return (verifier, challenge);
+    }
+
+    protected static ClaimsPrincipal BuildPrincipal(UserInfo? userInfo)
+    {
+        var claims = new List<Claim>();
+
+        if (!string.IsNullOrEmpty(userInfo?.Sub))
+            claims.Add(new Claim(ClaimTypes.NameIdentifier, userInfo.Sub));
+        if (!string.IsNullOrEmpty(userInfo?.Name))
+            claims.Add(new Claim(ClaimTypes.Name, userInfo.Name));
+        if (!string.IsNullOrEmpty(userInfo?.Email))
+            claims.Add(new Claim(ClaimTypes.Email, userInfo.Email));
+
+        return new ClaimsPrincipal(new ClaimsIdentity(claims, "oidc"));
     }
 }

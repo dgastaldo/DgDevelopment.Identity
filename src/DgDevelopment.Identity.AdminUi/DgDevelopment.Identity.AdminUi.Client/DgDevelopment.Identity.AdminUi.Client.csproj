@@ -11,6 +11,12 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\clients\DgDevelopment.Identity.Client.Blazor\DgDevelopment.Identity.Client.Blazor.csproj" />
+    <ProjectReference Include="..\..\..\clients\DgDevelopment.Identity.Client.Core\DgDevelopment.Identity.Client.Core.csproj" />
   </ItemGroup>
 
 </Project>
