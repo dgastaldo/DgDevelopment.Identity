@@ -1,4 +1,6 @@
 {
+  "$schema": "https://opencode.ai/config.json",
+  "lsp": true,
   "plugin": [
     "openrtk"
   ]
