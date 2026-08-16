@@ -19,7 +19,7 @@ string identityBaseUriString = builder.Configuration.GetValue<string>("IdentityB
 string adminBaseUriString = builder.Configuration.GetValue<string>("AdminBaseUrl") ?? "https://localhost:7018";
 string adminClientSecret = builder.Configuration.GetValue<string>("Identity:AdminClientSecret") ?? "";
 
-builder.Services.AddSingleton(new OidcOptions
+builder.Services.AddIdentityAuthentication(new OidcOptions
 {
     Authority = identityBaseUriString,
     ClientId = "admin-ui",
@@ -29,12 +29,12 @@ builder.Services.AddSingleton(new OidcOptions
     Scopes = ["openid", "profile", "email"]
 });
 
-builder.Services.AddHttpClient<IdentityClient>();
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<ITokenStore, CookieTokenStore>();
-builder.Services.AddScoped<IdentityAuthStateProvider>();
-builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<IdentityAuthStateProvider>());
-builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddScoped<ServerIdentityAuthStateProvider>();
+builder.Services.AddScoped<IdentityAuthStateProvider>(sp => sp.GetRequiredService<ServerIdentityAuthStateProvider>());
+builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<ServerIdentityAuthStateProvider>());
+
+builder.Services.AddHttpClient<IdentityClient>().AddHttpMessageHandler<IdentityRefreshHandler>();
 
 var app = builder.Build();
 

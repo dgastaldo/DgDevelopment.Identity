@@ -35,9 +35,15 @@ public sealed class KeyMaterialService(ISigningKeyRepository repository) : IKeyM
         {
             using var rsa = RSA.Create();
             rsa.ImportFromPem(key.PublicKeyData);
-            var jwk = JsonWebKeyConverter.ConvertFromRSASecurityKey(new RsaSecurityKey(rsa));
-            jwk.KeyId = key.Id;
-            jwk.Alg = key.Algorithm;
+            var parameters = rsa.ExportParameters(false);
+            var jwk = new JsonWebKey
+            {
+                Kty = JsonWebAlgorithmsKeyTypes.RSA,
+                N = Base64UrlEncoder.Encode(parameters.Modulus),
+                E = Base64UrlEncoder.Encode(parameters.Exponent),
+                KeyId = key.Id,
+                Alg = key.Algorithm
+            };
             jwks.Keys.Add(jwk);
         }
 

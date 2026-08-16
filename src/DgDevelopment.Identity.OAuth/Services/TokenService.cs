@@ -11,6 +11,7 @@ public sealed class TokenService(
     IDeviceCodeRepository deviceCodeRepo,
     IClientRepository clientRepo,
     IUserRepository userRepo,
+    IUserSessionRepository sessionRepo,
     IJwtService jwtService
     //,ISigningKeyRepository signingKeyRepo
     ) : ITokenService
@@ -48,7 +49,9 @@ public sealed class TokenService(
         var user = (await userRepo.GetByIdAsync(authCode.UserId, ct).ConfigureAwait(false))!;
         var scopes = authCode.GetScopes();
 
-        return await GenerateTokensAsync(client, user, scopes, null, ct).ConfigureAwait(false);
+        var session = await GetOrCreateSessionAsync(user.Id, existingSessionId: null, ct).ConfigureAwait(false);
+
+        return await GenerateTokensAsync(client, user, scopes, null, session, ct).ConfigureAwait(false);
     }
 
     public async Task<TokenResponse> ProcessClientCredentialsAsync(ClientValidationResult client, string[] scopes, CancellationToken ct = default)
@@ -79,7 +82,9 @@ public sealed class TokenService(
 
         await refreshTokenRepo.RevokeAsync(storedToken.Id, ct).ConfigureAwait(false);
 
-        return await GenerateTokensAsync(client, user, scopes, storedToken.Id, ct).ConfigureAwait(false);
+        var session = await GetOrCreateSessionAsync(user.Id, storedToken.SessionId, ct).ConfigureAwait(false);
+
+        return await GenerateTokensAsync(client, user, scopes, storedToken.Id, session, ct).ConfigureAwait(false);
     }
 
     public async Task<TokenResponse> ProcessDeviceCodeAsync(string deviceCode, string clientId, CancellationToken ct = default)
@@ -100,18 +105,34 @@ public sealed class TokenService(
 
         await deviceCodeRepo.MarkAsUsedAsync(storedDevice.Id, ct).ConfigureAwait(false);
 
-        return await GenerateTokensAsync(client, user, scopes, null, ct).ConfigureAwait(false);
+        var session = await GetOrCreateSessionAsync(user.Id, existingSessionId: null, ct).ConfigureAwait(false);
+
+        return await GenerateTokensAsync(client, user, scopes, null, session, ct).ConfigureAwait(false);
     }
 
-    private async Task<TokenResponse> GenerateTokensAsync(Client client, User user, string[] scopes, Guid? previousTokenId, CancellationToken ct)
+    private async Task<UserSession> GetOrCreateSessionAsync(Guid userId, Guid? existingSessionId, CancellationToken ct)
     {
-        var sessionId = Guid.NewGuid().ToString("N");
+        if (existingSessionId is { } sessionId)
+        {
+            var existing = await sessionRepo.GetByIdAsync(sessionId, ct).ConfigureAwait(false);
+            if (existing is not null && !existing.IsRevoked && !existing.IsExpired())
+                return existing;
+        }
+
+        var session = new UserSession(userId, Guid.NewGuid().ToString("N"), DateTime.UtcNow.AddHours(8), ["pwd"]);
+        await sessionRepo.AddAsync(session, ct).ConfigureAwait(false);
+        return session;
+    }
+
+    private async Task<TokenResponse> GenerateTokensAsync(Client client, User user, string[] scopes, Guid? previousTokenId, UserSession session, CancellationToken ct)
+    {
+        var sessionId = session.Id.ToString("N");
         var accessToken = await jwtService.CreateAccessTokenAsync(new(user, client, scopes, null), ct).ConfigureAwait(false);
         var idToken = await jwtService.CreateIdTokenAsync(new(user, client, scopes, null, ["pwd"], sessionId), ct).ConfigureAwait(false);
 
         var refreshTokenValue = DgDevelopment.Identity.Domain.ValueObjects.Secret.Generate(64);
         var refreshTokenHash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(refreshTokenValue)));
-        var refreshToken = new RefreshToken(refreshTokenHash, client.Id, user.Id, Guid.Parse(sessionId), scopes, previousTokenId);
+        var refreshToken = new RefreshToken(refreshTokenHash, client.Id, user.Id, session.Id, scopes, previousTokenId);
         await refreshTokenRepo.AddAsync(refreshToken, ct).ConfigureAwait(false);
 
         return new(accessToken, "Bearer", 3600, idToken, refreshTokenValue, string.Join(' ', scopes));

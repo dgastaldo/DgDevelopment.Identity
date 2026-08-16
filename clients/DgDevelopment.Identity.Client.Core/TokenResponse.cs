@@ -1,14 +1,16 @@
 namespace DgDevelopment.Identity.Client.Core;
 
+using System.Text.Json.Serialization;
+
 public sealed class TokenResponse
 {
-    public string AccessToken { get; init; } = string.Empty;
-    public string TokenType { get; init; } = string.Empty;
-    public int ExpiresIn { get; init; }
-    public string? IdToken { get; init; }
-    public string? RefreshToken { get; init; }
-    public string Scope { get; init; } = string.Empty;
-    public DateTime IssuedAt { get; init; } = DateTime.UtcNow;
+    [JsonPropertyName("access_token")] public string AccessToken { get; init; } = string.Empty;
+    [JsonPropertyName("token_type")] public string TokenType { get; init; } = string.Empty;
+    [JsonPropertyName("expires_in")] public int ExpiresIn { get; init; }
+    [JsonPropertyName("id_token")] public string? IdToken { get; init; }
+    [JsonPropertyName("refresh_token")] public string? RefreshToken { get; init; }
+    [JsonPropertyName("scope")] public string Scope { get; init; } = string.Empty;
+    [JsonPropertyName("issued_at")] public DateTime IssuedAt { get; init; } = DateTime.UtcNow;
 
     public bool IsExpired() => DateTime.UtcNow >= IssuedAt.AddSeconds(ExpiresIn - 30);
 }

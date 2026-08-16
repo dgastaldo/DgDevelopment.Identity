@@ -5,7 +5,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.IdentityModel.Tokens;
 
-public sealed class JwtService(IKeyMaterialService keyMaterial) : IJwtService
+public sealed class JwtService(IKeyMaterialService keyMaterial, IOidcIssuerProvider issuerProvider) : IJwtService
 {
 
     public async Task<string> CreateIdTokenAsync(IdTokenRequest request, CancellationToken ct = default)
@@ -13,10 +13,11 @@ public sealed class JwtService(IKeyMaterialService keyMaterial) : IJwtService
         ArgumentNullException.ThrowIfNull(request);
         var credentials = await keyMaterial.GetSigningCredentialsAsync(ct).ConfigureAwait(false);
         var now = DateTime.UtcNow;
+        var issuer = issuerProvider.GetIssuer().GetLeftPart(UriPartial.Authority);
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, request.User.Id.ToString(null, CultureInfo.InvariantCulture)),
-            new(JwtRegisteredClaimNames.Iss, "https://identity.dgdevelopment.local"),
+            new(JwtRegisteredClaimNames.Iss, issuer),
             new(JwtRegisteredClaimNames.Aud, request.Client.ClientId),
             new(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString(CultureInfo.InvariantCulture)),
             new(JwtRegisteredClaimNames.Exp, EpochTime.GetIntDate(now.AddMinutes(5)).ToString(CultureInfo.InvariantCulture)),
@@ -40,7 +41,7 @@ public sealed class JwtService(IKeyMaterialService keyMaterial) : IJwtService
             claims.Add(new("amr", method));
 
         var token = new JwtSecurityToken(
-            issuer: "https://identity.dgdevelopment.local",
+            issuer: issuer,
             audience: request.Client.ClientId,
             claims: claims,
             notBefore: now,
@@ -55,10 +56,11 @@ public sealed class JwtService(IKeyMaterialService keyMaterial) : IJwtService
         ArgumentNullException.ThrowIfNull(request);
         var credentials = await keyMaterial.GetSigningCredentialsAsync(ct).ConfigureAwait(false);
         var now = DateTime.UtcNow;
+        var issuer = issuerProvider.GetIssuer().GetLeftPart(UriPartial.Authority);
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, request.User.Id.ToString(null, CultureInfo.InvariantCulture)),
-            new(JwtRegisteredClaimNames.Iss, "https://identity.dgdevelopment.local"),
+            new(JwtRegisteredClaimNames.Iss, issuer),
             new("client_id", request.Client.ClientId),
             new(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString(CultureInfo.InvariantCulture)),
             new(JwtRegisteredClaimNames.Exp, EpochTime.GetIntDate(now.AddSeconds(request.LifetimeSeconds)).ToString(CultureInfo.InvariantCulture)),
@@ -70,7 +72,7 @@ public sealed class JwtService(IKeyMaterialService keyMaterial) : IJwtService
             claims.Add(new("permission", string.Join(' ', request.Permissions)));
 
         var token = new JwtSecurityToken(
-            issuer: "https://identity.dgdevelopment.local",
+            issuer: issuer,
             audience: request.Client.ClientId,
             claims: claims,
             notBefore: now,

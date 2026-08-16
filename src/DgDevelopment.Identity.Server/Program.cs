@@ -4,6 +4,7 @@ using DgDevelopment.Identity.OAuth.Services;
 using DgDevelopment.Identity.Server.Data;
 using DgDevelopment.Identity.Server.Services;
 using DgDevelopment.Identity.ServiceDefaults;
+using Microsoft.AspNetCore.Cors.Infrastructure;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,12 +16,15 @@ var connectionString = builder.Configuration.GetConnectionString("IdentityDb")
     ?? throw new InvalidOperationException("Connection string 'IdentityDb' not found.");
 
 builder.Services.AddInfrastructure(connectionString);
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton<IOidcIssuerProvider, OidcIssuerProvider>();
 builder.Services.AddScoped<IUserAuthenticationService, UserAuthenticationService>();
 builder.Services.AddScoped<IServerSessionService, ServerSessionService>();
 builder.Services.AddOAuthEngine();
 builder.Services.AddScoped<IUserInteractionService, UserInteractionService>();
 builder.Services.AddScoped<DbSeeder>();
 builder.Services.AddSingleton<IClientIdCache, ClientIdCache>();
+builder.Services.AddSingleton<ICorsOriginCache, CorsOriginCache>();
 
 builder.Services.AddAuthentication("Cookies")
     .AddCookie("Cookies", options =>
@@ -34,6 +38,9 @@ builder.Services.AddAuthentication("Cookies")
 builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 builder.Services.AddRazorPages();
+
+builder.Services.AddCors();
+builder.Services.AddSingleton<ICorsPolicyProvider, DynamicCorsPolicyProvider>();
 
 builder.Services.AddOpenApi(options =>
 {
@@ -62,6 +69,9 @@ using (var scope = app.Services.CreateScope())
 var clientIdCache = app.Services.GetRequiredService<IClientIdCache>();
 await clientIdCache.InitializeAsync().ConfigureAwait(false);
 
+var corsOriginCache = app.Services.GetRequiredService<ICorsOriginCache>();
+await corsOriginCache.InitializeAsync().ConfigureAwait(false);
+
 app.MapOpenApi();
 
 if (app.Environment.IsDevelopment())
@@ -85,6 +95,7 @@ app.MapHealthChecks("/health");
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseCors();
 
 app.MapControllers();
 app.MapRazorPages();

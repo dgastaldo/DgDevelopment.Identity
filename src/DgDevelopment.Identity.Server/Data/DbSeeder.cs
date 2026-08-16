@@ -6,6 +6,7 @@ using DgDevelopment.Identity.OAuth.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using System.Diagnostics;
 using System.Security.Cryptography;
 
 namespace DgDevelopment.Identity.Server.Data;
@@ -33,7 +34,10 @@ public sealed class DbSeeder(IServiceProvider serviceProvider)
             WriteSuperadminCredentials(contentRoot, superadminPassword);
 
         if (clientSecret != null)
+        {
             WriteClientCredentials(contentRoot, clientSecret);
+            await SyncClientSecretToAppHostAsync(contentRoot, clientSecret).ConfigureAwait(false);
+        }
     }
 
     private static async Task<string?> SeedPermissionsAsync(IdentityDbContext db)
@@ -203,5 +207,44 @@ public sealed class DbSeeder(IServiceProvider serviceProvider)
 
         File.WriteAllText(path, content);
         Console.WriteLine($"Admin client credentials saved to: {path}");
+    }
+
+    private static async Task SyncClientSecretToAppHostAsync(string contentRoot, string clientSecret, CancellationToken ct = default)
+    {
+        var appHostDir = Path.GetFullPath(Path.Combine(contentRoot, "..", "DgDevelopment.Identity.AppHost"));
+
+        if (!Directory.Exists(appHostDir))
+        {
+            Console.WriteLine($"AppHost secret sync skipped: directory not found at {appHostDir}");
+            return;
+        }
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "dotnet",
+            Arguments = $"user-secrets set \"Identity:AdminClientSecret\" \"{clientSecret}\" --project \"{appHostDir}\"",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+
+        try
+        {
+            using var process = Process.Start(startInfo);
+            if (process is null)
+                return;
+
+            var output = await process.StandardOutput.ReadToEndAsync(ct).ConfigureAwait(false);
+            var error = await process.StandardError.ReadToEndAsync(ct).ConfigureAwait(false);
+            await process.WaitForExitAsync(ct).ConfigureAwait(false);
+
+            Console.WriteLine(output.Trim());
+            if (!string.IsNullOrWhiteSpace(error))
+                Console.WriteLine(error.Trim());
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException or OperationCanceledException)
+        {
+            Console.WriteLine($"AppHost secret sync failed: {ex.Message}");
+        }
     }
 }

@@ -38,6 +38,27 @@ public sealed class ClientRepository(IdentityDbContext context) : IClientReposit
             .ToListAsync(ct).ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyCollection<Uri>> GetAllActiveRedirectUrisAsync(CancellationToken ct = default)
+    {
+        var redirectUris = await context.Clients
+            .AsNoTracking()
+            .Where(c => c.IsActive)
+            .SelectMany(c => c.RedirectUris.Select(r => r.RedirectUri))
+            .Select(uri => uri.ToString())
+            .Distinct()
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        var postLogoutUris = await context.Clients
+            .AsNoTracking()
+            .Where(c => c.IsActive)
+            .SelectMany(c => c.PostLogoutRedirectUris.Select(r => r.RedirectUri))
+            .Select(uri => uri.ToString())
+            .Distinct()
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        return redirectUris.Concat(postLogoutUris).Distinct().Select(u => new Uri(u)).ToArray();
+    }
+
     public async Task AddAsync(Client client, CancellationToken ct = default)
     {
         await context.Clients.AddAsync(client, ct).ConfigureAwait(false);
