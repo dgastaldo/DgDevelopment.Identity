@@ -6,16 +6,27 @@ This file provides full project context for AI tools and LLMs operating on the r
 
 **DgDevelopment.Identity** is a complete Identity Provider for the DgDevelopment ecosystem. It provides authentication (OAuth 2.0 / OIDC, SAML 2.0), authorization (RBAC + PBAC with permissions, roles, hierarchical groups), user profile management, MFA and multi-client SDKs.
 
-## Current State — 2026-08-13
+## Current State — 2026-08-16
 
-The OAuth 2.0 / OIDC authentication cycle is **merged into `develop`** (PRs #1–#15, the whole stack closed). All feature/fix branches are deleted; only `develop`, `docs`, `integration`, `main` remain (local + remote).
+The OAuth 2.0 / OIDC authentication cycle is **fully merged into `develop`** (PRs #1–#23, the whole stack closed). All feature/fix branches are deleted; only `develop`, `docs`, `integration`, `main` remain (local + remote).
+
+**Milestone M1 is still open**: the OAuth/OIDC foundation, login flow and client SDK are functional, but the remaining M1 features (consent, device flow, TOTP, admin APIs, RBAC, audit, tests) are not implemented. **No forward merge (`develop` → `docs` → `integration` → `main`) until M1 is complete.**
+
+### Implemented (merged)
+
+- **OAuth/OIDC engine** (OAuth project): `authorization_code` + PKCE S256, `client_credentials`, `refresh_token` (rotating), `device_code` (token processing); RS256 JWT with active key + N previous keys for validation during rotation.
+- **Server**: `ConnectController` (`/connect/token`, `/connect/jwks`, `/connect/userinfo`, `/connect/endsession`, `/.well-known/openid-configuration`), Razor Pages (login, consent stub, error), dynamic CORS (per-client origin whitelist), OpenAPI + Scalar + Swagger.
+- **AdminUi** is a Blazor **Server + WASM hybrid**, split into two projects: `DgDevelopment.Identity.AdminUi` (server host) and `DgDevelopment.Identity.AdminUi.Client` (WASM interactive pages/layout).
+- **Client SDK** (`Client.Core` + `Client.Blazor`): `IdentityClient`, PKCE, token store in `sessionStorage`, refresh handler, `IdentityAuthStateProvider`, `SessionMarkerService` (`identity_marker` cookie) for SSR prerender restore.
+- **DB seeding**: 30 permissions, SuperAdmin role, SuperAdmins group, superadmin user, admin client. Stable credentials between runs.
 
 ### Working end-to-end flow
 
-- AdminUi `/login` → IDP `/connect/authorize` (PKCE S256), redirect `https://localhost:7018/callback` (fixed ports, no Aspire proxy)
-- IDP login (static SSR Razor Page) → authorization code → AdminUi `/callback` → `/connect/token` → session cookie
+- AdminUi `/login` → IDP `/connect/authorize` (PKCE S256) → IDP login (static SSR Razor Page) → authorization code → AdminUi `/callback` → `/connect/token` → tokens saved in `sessionStorage` + `identity_marker` cookie
+- Ports are **dynamic** (Aspire binding); `IdentityBaseUrl` / `AdminBaseUrl` / `Identity:AdminClientSecret` come from AppHost/user-secrets
 - AdminUi top bar shows avatar (initials) + username + Logout when authenticated; Home nav is visible only when authenticated
-- IDP `/connect/userinfo` returns `sub` / `name` / `email` and is used to build the AdminUi principal (single fetch, cached)
+- Session restore: `IdentityAuthStateProvider` (WASM) reads stored tokens, refreshes if expired, fetches `/connect/userinfo` once (cached); `ServerIdentityAuthStateProvider` (prerender) reads the `identity_marker` cookie without network calls
+- IDP `/connect/userinfo` returns `sub` / `name` / `email`; client DTOs (`TokenResponse`, `UserInfo`) are aligned to the IDP **snake_case** responses
 
 ### Development database
 
@@ -24,11 +35,23 @@ The OAuth 2.0 / OIDC authentication cycle is **merged into `develop`** (PRs #1�
 - `superadmin-credentials.txt` / `admin-client-credentials.txt` are written only on the first seed
 - Stale IDP session cookies (user no longer in the DB after a reseed) self-heal: IDP signs out and shows the login form instead of an `invalid_user` error
 
-### Next steps / open work
+### Next steps / open work (M1 completion)
 
-1. **OIDC consent screen** (IDP): after login show a consent page with the requested scopes → approve/deny → issue the code. Planned branch `feature/oauth-consent`.
-2. **End-to-end verification** of `/connect/token` (keep the AppHost `Identity:AdminClientSecret` user-secret in sync with the seeded value) and of the AdminUi session restore via `userinfo`.
-3. Milestones M2–M4: SAML 2.0, React/WPF/MAUI client SDKs, TOTP/Push MFA, external providers, localization integration.
+Ordered by dependency:
+
+1. **OIDC consent screen** (IDP): wire the existing `Account/Consent` stub into the authorize flow — show requested scopes → approve/deny → issue the code. Branch `feature/oauth-consent`.
+2. **Device code flow**: `ProcessDeviceCodeAsync` is implemented in `TokenService`, but the `/connect/deviceauthorization` endpoint (device + user code issuance) and the verification/approval UI are missing — the endpoint is only advertised in the discovery document.
+3. **`/connect/introspect` + `/connect/revoke`**: advertised in discovery but not implemented.
+4. **End-to-end verification**: first/all-run smoke test of `/connect/token` (keep the AppHost `Identity:AdminClientSecret` user-secret in sync with the seeded value) and of the AdminUi session restore via `userinfo`.
+5. **TOTP MFA** (RFC 6238): domain model (`TotpSecret`, `BackupCode`) and table exist; no enrollment/verification flow yet.
+6. **Admin API `/api/v1/*`**: users, roles, permissions, groups, clients, platforms, audit — none implemented (only `ConnectController` exists).
+7. **RBAC/PBAC**: effective-permissions algorithm (documented), entity scoping, `permission` claims in access tokens.
+8. **User management**: registration + email verification, password reset, password policy, lockout enforcement.
+9. **Audit Log + Event Store**: entities exist; no implementation.
+10. **UI pages**: `/profile`, `/logout`, `/mfa`, `/profile/emails`; rate limiting (login/token/userinfo) and CSP headers on UI pages.
+11. **Tests**: `UnitTests` and `IntegrationTests` projects exist but contain no test source files — coverage is written as the features land.
+
+After M1 is complete: **forward merge** `develop` → `docs` → `integration` → `main`, then milestones M2–M4 (SAML 2.0, React/WPF/MAUI client SDKs, Push MFA + external providers, localization integration).
 
 ## Architecture Rules
 
@@ -36,6 +59,7 @@ The OAuth 2.0 / OIDC authentication cycle is **merged into `develop`** (PRs #1�
 
 ```
 AdminUi ──> Client.Blazor ──> Client.Core
+AdminUi.Client ──> Client.Blazor ──> Client.Core
 Server ──> Application ──> Domain <── Infrastructure (implements Domain interfaces)
   │            ▲               ▲
   ├──> OAuth ──┘               │
@@ -52,7 +76,8 @@ AppHost ──> Server, AdminUi
 - **OAuth** and **Saml** reference Application and Domain. Contain pure protocol logic.
 - **Client.Core** has no project references. Contains OIDC client logic, DTOs.
 - **Client.Blazor** references Client.Core. Contains Blazor auth components.
-- **AdminUi** references Client.Blazor. Blazor Hybrid admin dashboard.
+- **AdminUi** references Client.Blazor. Blazor Server host (prerender, `ServerIdentityAuthStateProvider`).
+- **AdminUi.Client** references Client.Blazor. Blazor WASM interactive pages/layout (login, callback, home, nav).
 
 ### Naming Convention C\#
 

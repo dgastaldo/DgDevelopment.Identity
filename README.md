@@ -67,7 +67,8 @@ DgDevelopment.Identity/
 │   ├── DgDevelopment.Identity.Server/            # ASP.NET Core host (API + Razor Pages)
 │   ├── DgDevelopment.Identity.OAuth/             # Custom OAuth 2.0 / OIDC engine
 │   ├── DgDevelopment.Identity.Saml/              # Custom SAML 2.0 engine (planned)
-│   └── DgDevelopment.Identity.AdminUi/           # Blazor Hybrid admin dashboard
+│   ├── DgDevelopment.Identity.AdminUi/           # Blazor Server host (prerender)
+│   └── DgDevelopment.Identity.AdminUi.Client/    # Blazor WASM interactive pages/layout
 ├── clients/
 │   ├── DgDevelopment.Identity.Client.Core/       # Base .NET SDK (OIDC client)
 │   ├── DgDevelopment.Identity.Client.Blazor/     # Blazor auth components + DI
@@ -75,8 +76,8 @@ DgDevelopment.Identity/
 │   ├── DgDevelopment.Identity.Client.Maui/       # .NET MAUI integration (planned)
 │   └── DgDevelopment.Identity.Client.React/      # TypeScript SDK (planned)
 ├── tests/
-│   ├── DgDevelopment.Identity.UnitTests/
-│   └── DgDevelopment.Identity.IntegrationTests/
+│   ├── DgDevelopment.Identity.UnitTests/         # empty skeleton, no tests yet
+│   └── DgDevelopment.Identity.IntegrationTests/  # empty skeleton, no tests yet
 └── docs/
     ├── functional-specification.md
     ├── architecture.md
@@ -100,6 +101,8 @@ DgDevelopment.Identity/
 | **M3** | ⬜ Planned | Client SDK (React, WPF, MAUI) + Push MFA + External Providers |
 | **M4** | ⬜ Planned | Bidirectional integration with Localization Service |
 
+> **Forward merge** (`develop` → `docs` → `integration` → `main`) is deferred until M1 is complete.
+
 ### M1 Progress
 
 | Feature | Status |
@@ -108,11 +111,20 @@ DgDevelopment.Identity/
 | EF Core Infrastructure (DbContext, configurations, repositories) | ✅ Done |
 | OAuth/OIDC Engine (6 services: key, JWT, client, authorize, token, user interaction) | ✅ Done |
 | Server integration (ConnectController, Razor Pages, DI) | ✅ Done |
-| AdminUi Blazor Hybrid (navbar, footer, login flow) | ✅ Done |
+| AdminUi Blazor Server + WASM hybrid (navbar, footer, login flow) | ✅ Done |
 | OAuth login cycle (authorize → login → code → token → userinfo) | ✅ Done |
 | Password hashing (Argon2id) + authentication service | ✅ Done |
 | DB seeding (30 permissions, SuperAdmin, SuperAdmins, superadmin user, admin client) | ✅ Done |
 | API documentation (OpenAPI + Scalar + Swagger) | ✅ Done |
-| Client SDK (.NET Core + Blazor) | ✅ Done |
-| OIDC consent screen | ⬜ Planned |
-| TOTP MFA | ⬜ Planned |
+| Client SDK (.NET Core + Blazor, sessionStorage + session marker) | ✅ Done |
+| Device code flow — token processing (`ProcessDeviceCodeAsync`) | 🕒 Partial |
+| OIDC consent screen (page stub exists, not wired into authorize flow) | 🕒 Stub |
+| `/connect/deviceauthorization` endpoint + user-code UI | ⬜ Planned |
+| `/connect/introspect` + `/connect/revoke` | ⬜ Planned |
+| TOTP MFA (RFC 6238) | ⬜ Planned |
+| Admin API `/api/v1/*` (users, roles, permissions, groups, clients, platforms, audit) | ⬜ Planned |
+| RBAC/PBAC (effective permissions, entity scoping, `permission` claims) | ⬜ Planned |
+| User management (registration, email verification, password reset, lockout) | ⬜ Planned |
+| Audit Log + Event Store | ⬜ Planned |
+| UI pages (`/profile`, `/logout`, `/mfa`, `/profile/emails`) + rate limiting + CSP | ⬜ Planned |
+| Tests (`UnitTests`, `IntegrationTests`) | ⬜ Empty skeletons |

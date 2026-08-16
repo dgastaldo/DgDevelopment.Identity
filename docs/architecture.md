@@ -39,7 +39,9 @@ DgDevelopment.Identity.slnx
 │   ├── DgDevelopment.Identity.Infrastructure/   EF Core, SQL Server, Repositories
 │   ├── DgDevelopment.Identity.Server/           ASP.NET Core host (API + Razor Pages)
 │   ├── DgDevelopment.Identity.OAuth/            OAuth 2.0 / OIDC custom engine
-│   └── DgDevelopment.Identity.Saml/             SAML 2.0 custom engine
+│   ├── DgDevelopment.Identity.Saml/             SAML 2.0 custom engine
+│   ├── DgDevelopment.Identity.AdminUi/          Blazor Server host (prerender)
+│   └── DgDevelopment.Identity.AdminUi.Client/   Blazor WASM interactive pages/layout
 ├── clients/
 │   ├── DgDevelopment.Identity.Client.Core/      Base .NET SDK
 │   ├── DgDevelopment.Identity.Client.Blazor/     Blazor components (Razor Class Library)
@@ -65,6 +67,9 @@ Server ──> Application ──> Domain
 
 AppHost ──> Server
 
+AdminUi ──> Client.Blazor ──> Client.Core
+AdminUi.Client ──> Client.Blazor ──> Client.Core
+
 Client.[Platform] ──> Client.Core
 ```
 
@@ -80,6 +85,7 @@ Client.[Platform] ──> Client.Core
 | OAuth | `Microsoft.IdentityModel.Tokens`, `System.IdentityModel.Tokens.Jwt` |
 | Server | `Microsoft.AspNetCore.OpenApi`, `Scalar.AspNetCore`, `Microsoft.EntityFrameworkCore.Design` |
 | AdminUi | `Microsoft.AspNetCore.Components.Web` (implicit), references `Client.Blazor` |
+| AdminUi.Client | Blazor WASM SDK, references `Client.Blazor` |
 | Client.Core | None (pure library) |
 | Client.Blazor | `Microsoft.AspNetCore.Components.Authorization`, `Microsoft.JSInterop` |
 
@@ -87,35 +93,51 @@ Client.[Platform] ──> Client.Core
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│  AdminUi (Blazor Hybrid — Server + WASM)                   │
+│  AdminUi — Blazor Server + WASM hybrid                     │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  AdminUi (Server host)                               │  │
+│  │  ┌──────────────────────────────────────────────┐    │  │
+│  │  │ ServerIdentityAuthStateProvider              │    │  │
+│  │  │ (reads identity_marker cookie, no network)   │    │  │
+│  │  └──────────────────────────────────────────────┘    │  │
+│  └──────────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  AdminUi.Client (WASM interactive pages)             │  │
+│  │  Login · Callback · Home · NavMenu · MainLayout      │  │
+│  └──────────────────────────────────────────────────────┘  │
 │                                                             │
 │  ┌──────────────────────────────────────────────────────┐  │
 │  │  Client.Blazor SDK                                    │  │
-│  │  ┌──────────────────┐  ┌──────────────────────────┐  │  │
-│  │  │ AuthStateProvider │  │ Token Store (sessionStorage)│  │
-│  │  ├──────────────────┤  ├──────────────────────────┤  │  │
-│  │  │ IdentityClient   │  │ RefreshHandler           │  │  │
-│  │  └────────┬─────────┘  └──────────────────────────┘  │  │
-│  │           │                                            │  │
-│  └───────────┼────────────────────────────────────────────┘  │
+│  │  ┌────────────────────┐  ┌────────────────────────┐  │  │
+│  │  │ IdentityAuthState │  │ Token Store             │  │  │
+│  │  │ Provider          │  │ (SessionStorage,        │  │  │
+│  │  ├────────────────────┤  │  identity_tokens)      │  │  │
+│  │  │ SessionMarkerService│ │ RefreshHandler         │  │  │
+│  │  │ (identity_marker)  │  └────────────────────────┘  │  │
+│  │  └────────┬──────────┘                                │  │
+│  └───────────┼──────────────────────────────────────────┘  │
 │              │ references                                    │
 │  ┌───────────▼────────────────────────────────────────────┐  │
 │  │  Client.Core SDK                                        │  │
 │  │  ┌──────────────────────────────────────────────────┐  │  │
 │  │  │ IdentityClient (OIDC flows)                       │  │  │
-│  │  │ OidcOptions, TokenResponse, UserInfo              │  │  │
+│  │  │ OidcOptions, TokenResponse, UserInfo (snake_case) │  │  │
 │  │  └──────────────────────────────────────────────────┘  │  │
 │  └────────────────────────────────────────────────────────┘  │
 │                                                               │
 │  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─  │
 │             OAuth 2.0 / OIDC                                  │
 │                                                               │
-│  AdminUi ──(authorize)──> Server /connect/authorize           │
-│  AdminUi <──(code)────── Server                               │
-│  AdminUi ──(token)─────> Server /connect/token                │
-│  AdminUi <──(tokens)──── Server (access_token, id_token)      │
+│  AdminUi ──(authorize+PKCE)──> IDP /connect/authorize         │
+│  AdminUi <──(code)──────────── IDP                            │
+│  AdminUi ──(token)──────────> IDP /connect/token              │
+│  AdminUi <──(tokens)───────── IDP (sessionStorage + marker)   │
+│  AdminUi ──(userinfo)───────> IDP /connect/userinfo           │
 └────────────────────────────────────────────────────────────┘
 ```
+
+> The token store lives in the browser `sessionStorage` (`identity_tokens` key).
+> `SessionMarkerService` mirrors the authenticated `sub`/`name`/`email` into the `identity_marker` cookie (non-`HttpOnly`) so the **server prerender** can restore the auth state without network calls via `ServerIdentityAuthStateProvider`.
 
 ## 4. Clean Architecture (Internal)
 
@@ -328,6 +350,9 @@ Event (Event Store)
 ```
 
 ## 6. OAuth 2.0 / OIDC Flows
+
+> **Implementation status (M1):** `/connect/authorize`, `/connect/token` (`authorization_code` + PKCE, `client_credentials`, rotating `refresh_token`, `device_code` token processing), `/connect/userinfo`, `/connect/jwks`, `/connect/endsession` and `/.well-known/openid-configuration` are implemented.
+> The diagrams below are **design targets**; the following are open work: the device authorization endpoint (`/connect/deviceauthorization`) + user-code approval UI, `/connect/introspect`, `/connect/revoke`, the consent screen wiring, and the advanced security features PAR, JAR, DPoP, mTLS and Token Binding.
 
 ### 6.1 Authorization Code + PKCE
 

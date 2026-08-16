@@ -46,25 +46,27 @@ var options = new OidcOptions
 
 ### Models
 
+Client DTOs are JSON-deserialized with `JsonPropertyName`, aligned to the IDP **snake_case** responses.
+
 **`TokenResponse`**:
 ```csharp
-string AccessToken
-string TokenType       // "Bearer"
-int ExpiresIn          // seconds
-string? IdToken        // OIDC ID Token
-string? RefreshToken   // opaque rotating refresh token
-string Scope           // space-separated
-DateTime IssuedAt
+string AccessToken       // access_token
+string TokenType         // token_type ("Bearer")
+int ExpiresIn            // expires_in (seconds)
+string? IdToken          // id_token
+string? RefreshToken     // refresh_token (opaque rotating)
+string Scope             // scope (space-separated)
+DateTime IssuedAt        // issued_at
 bool IsExpired()
 ```
 
 **`UserInfo`**:
 ```csharp
-string Sub             // user ID
-string? Name
-string? Email
-bool EmailVerified
-string[]? Permissions  // if IdentityManaged platform
+string Sub               // sub (user ID)
+string? Name             // name
+string? Email            // email
+bool EmailVerified       // email_verified
+string[]? Permissions    // permissions (if IdentityManaged platform)
 ```
 
 ---
@@ -87,24 +89,28 @@ builder.Services.AddIdentityAuthentication(new OidcOptions
 });
 ```
 
+`AddIdentityAuthentication` registers: `OidcOptions` (singleton), `ISessionStorageService`/`BrowserSessionStorage`, `ITokenStore`/`SessionStorageTokenStore`, `ISessionMarkerService`/`SessionMarkerService`, `IdentityAuthStateProvider` (as `AuthenticationStateProvider`), `IdentityRefreshHandler` and cascading authentication state.
+
 ### Components
 
 | Class | Role |
 |---|---|
-| `IdentityAuthStateProvider` | Extends `AuthenticationStateProvider`. Handles PKCE, login redirect, token refresh, logout. |
+| `IdentityAuthStateProvider` | Extends `AuthenticationStateProvider`. Handles PKCE, login redirect, token refresh, userinfo fetch (cached), logout, session marker. |
+| `ServerIdentityAuthStateProvider` | (AdminUi server host) Derived provider that restores the principal from the `identity_marker` cookie during SSR prerender — no network calls. |
+| `SessionStorageTokenStore` | `ITokenStore` using browser `sessionStorage` (key `identity_tokens`). |
+| `SessionMarkerService` | `ISessionMarkerService` that mirrors `sub`/`name`/`email` into the `identity_marker` cookie via JS interop. |
 | `IdentityRefreshHandler` | `DelegatingHandler` that injects Bearer token into HTTP requests. Handles 401 by redirecting to logout. |
-| `ITokenStore` / `SessionStorageTokenStore` | Stores tokens in `sessionStorage` via JS interop. |
 | `BrowserSessionStorage` | `IJSRuntime` wrapper for browser `sessionStorage`. |
 
 ### API — `IdentityAuthStateProvider`
 
 | Method | Description |
 |---|---|
-| `GetAuthenticationStateAsync()` | Returns current auth state. Auto-refreshes expired tokens. |
-| `GetLoginUrl()` | Generates PKCE values and returns the authorize URL. |
-| `CompleteLoginAsync(code, codeVerifier)` | Exchanges code for tokens, saves to storage, notifies state change. |
-| `LogoutAsync()` | Clears tokens from storage, notifies state change. |
-| `GeneratePkce()` | Static method returning `(codeVerifier, codeChallenge)` tuple. |
+| `GetAuthenticationStateAsync()` | Returns current auth state. Auto-refreshes expired tokens, fetches `/connect/userinfo` once (cached), sets the session marker. |
+| `GetLoginUrl(state?, codeChallenge?)` | Returns the authorize URL (appends a `nonce`). |
+| `CompleteLoginAsync(code, codeVerifier)` | Exchanges code for tokens, saves to `sessionStorage`, builds the principal, sets the marker, notifies. |
+| `LogoutAsync()` | Clears tokens + marker, notifies state change. |
+| `GeneratePkce()` | Static method returning `(codeVerifier, codeChallenge)` tuple (S256). |
 
 ### Auth Flow
 
@@ -112,12 +118,14 @@ builder.Services.AddIdentityAuthentication(new OidcOptions
 1. User clicks Login
 2. App calls GeneratePkce() → stores verifier locally
 3. App calls GetLoginUrl() → redirects browser to /connect/authorize
-4. Identity Server → login page → consent
+4. Identity Server → login page → consent (currently a stub — skipped)
 5. Browser redirects back to /callback?code=...
 6. App calls CompleteLoginAsync(code, codeVerifier)
-7. Tokens stored in sessionStorage
+7. Tokens stored in sessionStorage (identity_tokens) + marker cookie set
 8. AuthenticationState updated → UI reflects logged-in state
 ```
+
+> During SSR prerender, `ServerIdentityAuthStateProvider` restores the principal from the `identity_marker` cookie, avoiding a `userinfo` round-trip before the WASM runtime loads.
 
 ### Token Refresh
 
