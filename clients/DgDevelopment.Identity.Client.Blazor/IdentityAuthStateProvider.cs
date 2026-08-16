@@ -94,8 +94,23 @@ public class IdentityAuthStateProvider(IdentityClient client, ITokenStore tokenS
     {
         _tokens = await client.ExchangeCodeAsync(code, codeVerifier, redirectUri).ConfigureAwait(false);
         await tokenStore.SaveTokensAsync(_tokens).ConfigureAwait(false);
-        _currentUser = null;
-        NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
+
+        try
+        {
+            _userInfo = await client.GetUserInfoAsync(_tokens.AccessToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            await tokenStore.ClearTokensAsync().ConfigureAwait(false);
+            _tokens = null;
+            throw;
+        }
+
+        _currentUser = BuildPrincipal(_userInfo);
+
+        await markerService.SetAsync(_userInfo!).ConfigureAwait(false);
+
+        NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(_currentUser)));
     }
 
     public async Task LogoutAsync()

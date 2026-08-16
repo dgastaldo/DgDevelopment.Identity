@@ -3,11 +3,12 @@ namespace DgDevelopment.Identity.Server.Controllers;
 using System.Globalization;
 using DgDevelopment.Identity.Domain.Repositories;
 using DgDevelopment.Identity.OAuth.Services;
+using DgDevelopment.Identity.Server.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 
 [Route("connect")]
-public sealed class ConnectController : Controller
+public sealed partial class ConnectController : Controller
 {
     private readonly ITokenService _tokenService;
     private readonly IClientValidator _clientValidator;
@@ -15,6 +16,8 @@ public sealed class ConnectController : Controller
     private readonly IUserRepository _userRepository;
     private readonly IJwtService _jwtService;
     private readonly IClientIdCache _clientIdCache;
+    private readonly IOidcIssuerProvider _issuerProvider;
+    private readonly ILogger<ConnectController> _logger;
 
     private static readonly string[] _supportedScopes = ["openid", "profile", "email"];
     private static readonly string[] _supportedGrantTypes = ["authorization_code", "client_credentials", "refresh_token", "device_code"];
@@ -27,7 +30,9 @@ public sealed class ConnectController : Controller
         IKeyMaterialService keyMaterialService,
         IUserRepository userRepository,
         IJwtService jwtService,
-        IClientIdCache clientIdCache)
+        IClientIdCache clientIdCache,
+        IOidcIssuerProvider issuerProvider,
+        ILogger<ConnectController> logger)
     {
         _tokenService = tokenService;
         _clientValidator = clientValidator;
@@ -35,12 +40,24 @@ public sealed class ConnectController : Controller
         _userRepository = userRepository;
         _jwtService = jwtService;
         _clientIdCache = clientIdCache;
+        _issuerProvider = issuerProvider;
+        _logger = logger;
     }
 
     [HttpPost("token")]
-    public async Task<IActionResult> Token([FromForm] TokenRequest request)
+    public async Task<IActionResult> Token([FromForm] TokenRequestForm form)
     {
-        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(form);
+        var request = new TokenRequest(
+            form.GrantType ?? string.Empty,
+            form.Code,
+            form.RedirectUri,
+            form.ClientId,
+            form.ClientSecret,
+            form.CodeVerifier,
+            form.RefreshToken,
+            form.DeviceCode,
+            form.Scope);
         try
         {
             TokenResponse response = request.GrantType switch
@@ -67,6 +84,7 @@ public sealed class ConnectController : Controller
         }
         catch (InvalidOperationException ex)
         {
+            LogTokenFailed(ex, request.ClientId ?? "unknown", request.GrantType ?? "unknown");
             return BadRequest(new { error = "invalid_grant", error_description = ex.Message });
         }
     }
@@ -91,18 +109,18 @@ public sealed class ConnectController : Controller
     [HttpGet("/.well-known/openid-configuration")]
     public IActionResult Discovery()
     {
-        var baseUrl = $"{Request.Scheme}://{Request.Host}";
+        var issuer = _issuerProvider.GetIssuer().GetLeftPart(UriPartial.Authority);
         return Ok(new
         {
-            issuer = baseUrl,
-            authorization_endpoint = $"{baseUrl}/connect/authorize",
-            token_endpoint = $"{baseUrl}/connect/token",
-            userinfo_endpoint = $"{baseUrl}/connect/userinfo",
-            end_session_endpoint = $"{baseUrl}/connect/endsession",
-            jwks_uri = $"{baseUrl}/connect/jwks",
-            device_authorization_endpoint = $"{baseUrl}/connect/deviceauthorization",
-            introspection_endpoint = $"{baseUrl}/connect/introspect",
-            revocation_endpoint = $"{baseUrl}/connect/revoke",
+            issuer = issuer,
+            authorization_endpoint = $"{issuer}/connect/authorize",
+            token_endpoint = $"{issuer}/connect/token",
+            userinfo_endpoint = $"{issuer}/connect/userinfo",
+            end_session_endpoint = $"{issuer}/connect/endsession",
+            jwks_uri = $"{issuer}/connect/jwks",
+            device_authorization_endpoint = $"{issuer}/connect/deviceauthorization",
+            introspection_endpoint = $"{issuer}/connect/introspect",
+            revocation_endpoint = $"{issuer}/connect/revoke",
             scopes_supported = _supportedScopes,
             grant_types_supported = _supportedGrantTypes,
             code_challenge_methods_supported = _supportedCodeChallengeMethods,
@@ -120,7 +138,7 @@ public sealed class ConnectController : Controller
 
         var token = authHeader["Bearer ".Length..];
         var keys = await _keyMaterialService.GetJwksDocumentAsync().ConfigureAwait(false);
-        var issuer = $"{Request.Scheme}://{Request.Host}";
+        var issuer = _issuerProvider.GetIssuer().GetLeftPart(UriPartial.Authority);
         var parameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
         {
             ValidIssuer = issuer,
@@ -170,4 +188,7 @@ public sealed class ConnectController : Controller
             return Redirect(post_logout_redirect_uri);
         return Ok();
     }
+
+    [LoggerMessage(EventId = 1200, Level = LogLevel.Warning, Message = "Token request failed for client '{ClientId}' grant '{GrantType}'.")]
+    private partial void LogTokenFailed(Exception exception, string clientId, string grantType);
 }

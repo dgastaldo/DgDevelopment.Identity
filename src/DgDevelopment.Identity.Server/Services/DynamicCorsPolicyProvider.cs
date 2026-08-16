@@ -12,8 +12,8 @@ public sealed class DynamicCorsPolicyProvider(ICorsOriginCache originCache) : IC
             SupportsCredentials = true,
         };
 
-        policy.Headers.Clear();
-        policy.Methods.Clear();
+        policy.Headers.Add("*");
+        policy.Methods.Add("*");
 
         return Task.FromResult<CorsPolicy?>(policy);
     }

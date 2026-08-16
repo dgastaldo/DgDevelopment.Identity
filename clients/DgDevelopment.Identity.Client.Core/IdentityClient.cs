@@ -46,7 +46,7 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
         });
 
         var response = await http.PostAsync(new Uri($"{options.Authority}/connect/token"), content, ct).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
 
         var result = await response.Content.ReadFromJsonAsync(TokenResponseJsonContext.Default.TokenResponse, ct).ConfigureAwait(false);
         return result!;
@@ -63,7 +63,7 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
         });
 
         var response = await http.PostAsync(new Uri($"{options.Authority}/connect/token"), content, ct).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
 
         var result = await response.Content.ReadFromJsonAsync(TokenResponseJsonContext.Default.TokenResponse, ct).ConfigureAwait(false);
         return result!;
@@ -75,9 +75,18 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
         request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
 
         var response = await http.SendAsync(request, ct).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
 
         return await response.Content.ReadFromJsonAsync(UserInfoJsonContext.Default.UserInfo, ct).ConfigureAwait(false);
+    }
+
+    private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        if (response.IsSuccessStatusCode)
+            return;
+
+        var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        throw new HttpRequestException($"Request to '{response.RequestMessage?.RequestUri}' failed with {(int)response.StatusCode} {response.ReasonPhrase}: {body}");
     }
 }
 

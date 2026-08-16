@@ -16,6 +16,8 @@ var connectionString = builder.Configuration.GetConnectionString("IdentityDb")
     ?? throw new InvalidOperationException("Connection string 'IdentityDb' not found.");
 
 builder.Services.AddInfrastructure(connectionString);
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton<IOidcIssuerProvider, OidcIssuerProvider>();
 builder.Services.AddScoped<IUserAuthenticationService, UserAuthenticationService>();
 builder.Services.AddScoped<IServerSessionService, ServerSessionService>();
 builder.Services.AddOAuthEngine();

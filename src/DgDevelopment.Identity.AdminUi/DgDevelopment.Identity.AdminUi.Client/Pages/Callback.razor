@@ -7,9 +7,17 @@
 <h3 class="mb-2 text-lg font-semibold text-gray-800">Logging in...</h3>
 <p class="text-gray-600">If you are not redirected, <a href="/" class="text-brand-600 hover:underline">click here</a>.</p>
 
+@if (!string.IsNullOrWhiteSpace(_error))
+{
+    <pre class="mt-4 whitespace-pre-wrap rounded border border-red-300 bg-red-50 p-3 text-xs text-red-800">@_error</pre>
+}
+
 @code {
     [SupplyParameterFromQuery] public string? Code { get; set; }
     [SupplyParameterFromQuery] public string? State { get; set; }
+    [SupplyParameterFromQuery] public string? Error { get; set; }
+
+    private string? _error;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -18,16 +26,7 @@
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(Code))
-        {
-            Navigation.NavigateTo("/", forceLoad: true);
-            return;
-        }
-
-        var verifier = await SessionStorage.GetItemAsync<string>("pkce_verifier") ?? string.Empty;
-        await SessionStorage.RemoveItemAsync("pkce_verifier");
-
-        if (string.IsNullOrEmpty(verifier))
+        if (!string.IsNullOrWhiteSpace(Error) || string.IsNullOrWhiteSpace(Code))
         {
             Navigation.NavigateTo("/", forceLoad: true);
             return;
@@ -35,10 +34,22 @@
 
         try
         {
-            await AuthStateProvider.CompleteLoginAsync(Code, verifier);
+            var verifier = await SessionStorage.GetItemAsync<string>("pkce_verifier").ConfigureAwait(false) ?? string.Empty;
+            await SessionStorage.RemoveItemAsync("pkce_verifier").ConfigureAwait(false);
+
+            if (string.IsNullOrEmpty(verifier))
+            {
+                Navigation.NavigateTo("/", forceLoad: true);
+                return;
+            }
+
+            await AuthStateProvider.CompleteLoginAsync(Code, verifier).ConfigureAwait(false);
         }
-        catch
+        catch (Exception ex)
         {
+            _error = ex.ToString();
+            Console.Error.WriteLine($"Login failed: {ex}");
+            return;
         }
 
         Navigation.NavigateTo("/", forceLoad: true);
