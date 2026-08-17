@@ -38,6 +38,19 @@ public sealed record TokenResponse(
     string? RefreshToken,
     string Scope);
 
+public sealed record DeviceAuthorizationResponse(
+    string DeviceCode,
+    string UserCode,
+    string VerificationUri,
+    string VerificationUriComplete,
+    int ExpiresIn,
+    int Interval);
+
+public sealed record DeviceApprovalInfo(
+    Guid DeviceCodeId,
+    string ClientName,
+    IReadOnlyCollection<string> Scopes);
+
 public sealed record ClientValidationResult(
     bool IsValid,
     Client? Client,

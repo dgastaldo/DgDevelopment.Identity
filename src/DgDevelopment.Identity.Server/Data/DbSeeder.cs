@@ -129,6 +129,7 @@ public sealed class DbSeeder(IServiceProvider serviceProvider)
         client.AddGrantType("authorization_code");
         client.AddGrantType("client_credentials");
         client.AddGrantType("refresh_token");
+        client.AddGrantType("device_code");
         client.AddScope("openid");
         client.AddScope("profile");
         client.AddScope("email");

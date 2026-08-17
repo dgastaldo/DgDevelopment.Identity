@@ -12,6 +12,7 @@ public sealed partial class ConnectController : Controller
 {
     private readonly ITokenService _tokenService;
     private readonly IClientValidator _clientValidator;
+    private readonly IDeviceAuthorizationService _deviceAuthorizationService;
     private readonly IKeyMaterialService _keyMaterialService;
     private readonly IUserRepository _userRepository;
     private readonly IJwtService _jwtService;
@@ -27,6 +28,7 @@ public sealed partial class ConnectController : Controller
     public ConnectController(
         ITokenService tokenService,
         IClientValidator clientValidator,
+        IDeviceAuthorizationService deviceAuthorizationService,
         IKeyMaterialService keyMaterialService,
         IUserRepository userRepository,
         IJwtService jwtService,
@@ -36,6 +38,7 @@ public sealed partial class ConnectController : Controller
     {
         _tokenService = tokenService;
         _clientValidator = clientValidator;
+        _deviceAuthorizationService = deviceAuthorizationService;
         _keyMaterialService = keyMaterialService;
         _userRepository = userRepository;
         _jwtService = jwtService;
@@ -82,10 +85,45 @@ public sealed partial class ConnectController : Controller
                 scope = response.Scope
             });
         }
+        catch (DeviceAuthorizationException ex)
+        {
+            return BadRequest(new { error = ex.ErrorCode, error_description = ex.Message });
+        }
         catch (InvalidOperationException ex)
         {
             LogTokenFailed(ex, request.ClientId ?? "unknown", request.GrantType ?? "unknown");
             return BadRequest(new { error = "invalid_grant", error_description = ex.Message });
+        }
+    }
+
+    [HttpPost("deviceauthorization")]
+    public async Task<IActionResult> DeviceAuthorization([FromForm] DeviceAuthorizationRequestForm form)
+    {
+        ArgumentNullException.ThrowIfNull(form);
+
+        var scopes = form.Scope?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? [];
+        var issuer = _issuerProvider.GetIssuer().GetLeftPart(UriPartial.Authority);
+        var verificationUri = new Uri($"{issuer}/device");
+
+        try
+        {
+            var response = await _deviceAuthorizationService
+                .IssueAsync(form.ClientId, form.ClientSecret, scopes, verificationUri)
+                .ConfigureAwait(false);
+
+            return Ok(new
+            {
+                device_code = response.DeviceCode,
+                user_code = response.UserCode,
+                verification_uri = response.VerificationUri,
+                verification_uri_complete = response.VerificationUriComplete,
+                expires_in = response.ExpiresIn,
+                interval = response.Interval
+            });
+        }
+        catch (DeviceAuthorizationException ex)
+        {
+            return BadRequest(new { error = ex.ErrorCode, error_description = ex.Message });
         }
     }
 

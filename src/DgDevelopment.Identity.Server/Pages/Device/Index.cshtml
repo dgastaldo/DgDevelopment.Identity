@@ -1,0 +1,62 @@
+@page "/device"
+@model DgDevelopment.Identity.Server.Pages.Device.IndexModel
+@{
+    ViewData["Title"] = "Device authorization";
+}
+
+<div class="auth-card">
+    <h1 class="auth-brand">DgDevelopment Identity Server</h1>
+
+    @if (Model.Approved)
+    {
+        <p class="text-sm text-gray-600 mb-6">
+            You have approved this device. You can now close this page.
+        </p>
+    }
+    else if (Model.Approval is not null)
+    {
+        <h2 class="text-lg font-semibold text-gray-800 mb-2">Approve this request</h2>
+        <p class="text-sm text-gray-600 mb-4">
+            <strong>@Model.Approval.ClientName</strong> is requesting access using this device.
+        </p>
+        <div class="mb-6">
+            <p class="text-sm font-medium text-gray-800 mb-2">This will allow it to:</p>
+            <ul class="space-y-1 text-sm text-gray-700">
+                @foreach (var scope in Model.Approval.Scopes)
+                {
+                    <li>@scope</li>
+                }
+            </ul>
+        </div>
+        <form method="post">
+            <input type="hidden" name="userCode" value="@Model.UserCode" />
+            <div class="flex gap-2">
+                <button type="submit" asp-page-handler="Approve" class="auth-btn">Approve</button>
+                <button type="submit" asp-page-handler="Deny"
+                        class="flex-1 rounded-md bg-gray-200 px-4 py-2 text-gray-800 font-medium hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    Deny
+                </button>
+            </div>
+        </form>
+    }
+    else
+    {
+        <h2 class="text-lg font-semibold text-gray-800 mb-2">Device authorization</h2>
+        <p class="text-sm text-gray-600 mb-6">
+            Enter the code shown on your device to approve the sign-in request.
+        </p>
+        <form method="post">
+            <div class="mb-3">
+                <label class="auth-label" for="userCode">User code</label>
+                <input class="auth-input" id="userCode" name="UserCode" type="text"
+                       value="@Model.UserCode" placeholder="XXXX-XXXX" spellcheck="false" autofocus />
+            </div>
+            <button type="submit" class="auth-btn">Continue</button>
+        </form>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Model.Message))
+    {
+        <div class="auth-alert">@Model.Message</div>
+    }
+</div>
