@@ -31,12 +31,13 @@ public sealed class UserConsentRepository : IUserConsentRepository
 
     public async Task AddOrUpdateAsync(UserConsent consent, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(consent);
         var existing = await _context.UserConsents
             .FirstOrDefaultAsync(c => c.UserId == consent.UserId && c.ClientId == consent.ClientId, ct).ConfigureAwait(false);
 
         if (existing is not null)
         {
-            _context.Entry(existing).CurrentValues.SetValues(consent);
+            existing.Update(consent.GetScopes(), consent.ExpiresAt);
         }
         else
         {

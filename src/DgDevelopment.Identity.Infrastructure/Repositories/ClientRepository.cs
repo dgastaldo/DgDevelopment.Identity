@@ -13,6 +13,7 @@ public sealed class ClientRepository(IdentityDbContext context) : IClientReposit
             .AsNoTracking()
             .Include(c => c.GrantTypes)
             .Include(c => c.Scopes)
+            .Include(c => c.AdminConsentScopes)
             .Include(c => c.RedirectUris)
             .Include(c => c.PostLogoutRedirectUris)
             .FirstOrDefaultAsync(c => c.Id == id, ct).ConfigureAwait(false);
@@ -24,6 +25,7 @@ public sealed class ClientRepository(IdentityDbContext context) : IClientReposit
             .AsNoTracking()
             .Include(c => c.GrantTypes)
             .Include(c => c.Scopes)
+            .Include(c => c.AdminConsentScopes)
             .Include(c => c.RedirectUris)
             .Include(c => c.PostLogoutRedirectUris)
             .FirstOrDefaultAsync(c => c.ClientId == clientId, ct).ConfigureAwait(false);

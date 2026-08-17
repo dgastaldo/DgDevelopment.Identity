@@ -34,4 +34,22 @@ public class DatabaseFixture<TTestClass> : IAsyncLifetime
         => new(new DbContextOptionsBuilder<IdentityDbContext>()
             .UseSqlServer(ConnectionString)
             .Options);
+
+    public async Task<Guid> GetSeededClientIdAsync(CancellationToken ct = default)
+    {
+        await using var context = CreateContext();
+        return await context.Clients
+            .Where(c => c.ClientId == TestConstants.AdminClientId)
+            .Select(c => c.Id)
+            .SingleAsync(ct);
+    }
+
+    public async Task<Guid> GetSeededUserIdAsync(CancellationToken ct = default)
+    {
+        await using var context = CreateContext();
+        return await context.Users
+            .Where(u => u.Username == TestConstants.SuperAdminUserName)
+            .Select(u => u.Id)
+            .SingleAsync(ct);
+    }
 }

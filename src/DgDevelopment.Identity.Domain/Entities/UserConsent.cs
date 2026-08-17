@@ -21,6 +21,12 @@ public sealed class UserConsent
         ExpiresAt = expiresAt;
     }
 
+    public void Update(string[] scopes, DateTime? expiresAt)
+    {
+        GrantedScopes = string.Join(' ', scopes);
+        ExpiresAt = expiresAt;
+    }
+
     public bool IsExpired() => ExpiresAt.HasValue && DateTime.UtcNow >= ExpiresAt.Value;
 
     public string[] GetScopes() => GrantedScopes.Split(' ', StringSplitOptions.RemoveEmptyEntries);
