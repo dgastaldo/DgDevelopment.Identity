@@ -1,3 +1,4 @@
+using DgDevelopment.Identity.Application.Consent;
 using DgDevelopment.Identity.Application.Services;
 using DgDevelopment.Identity.Infrastructure.Data;
 using DgDevelopment.Identity.OAuth.Services;
@@ -22,6 +23,8 @@ builder.Services.AddScoped<IUserAuthenticationService, UserAuthenticationService
 builder.Services.AddScoped<IServerSessionService, ServerSessionService>();
 builder.Services.AddOAuthEngine();
 builder.Services.AddScoped<IUserInteractionService, UserInteractionService>();
+builder.Services.AddScoped<IConsentService, ConsentService>();
+builder.Services.Configure<ConsentOptions>(builder.Configuration.GetSection(ConsentOptions.SectionName));
 builder.Services.AddScoped<DbSeeder>();
 builder.Services.AddSingleton<IClientIdCache, ClientIdCache>();
 builder.Services.AddSingleton<ICorsOriginCache, CorsOriginCache>();

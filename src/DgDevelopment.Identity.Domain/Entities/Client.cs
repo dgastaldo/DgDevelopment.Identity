@@ -26,15 +26,17 @@ public sealed class Client
     private readonly List<ClientScope> _scopes = [];
     private readonly List<ClientRedirectUri> _redirectUris = [];
     private readonly List<ClientPostLogoutRedirectUri> _postLogoutRedirectUris = [];
+    private readonly List<ClientAdminConsent> _adminConsentScopes = [];
 
     public IReadOnlyCollection<ClientGrantType> GrantTypes => _grantTypes.AsReadOnly();
     public IReadOnlyCollection<ClientScope> Scopes => _scopes.AsReadOnly();
     public IReadOnlyCollection<ClientRedirectUri> RedirectUris => _redirectUris.AsReadOnly();
     public IReadOnlyCollection<ClientPostLogoutRedirectUri> PostLogoutRedirectUris => _postLogoutRedirectUris.AsReadOnly();
+    public IReadOnlyCollection<ClientAdminConsent> AdminConsentScopes => _adminConsentScopes.AsReadOnly();
 
     private Client() { }
 
-    public Client(string clientId, string clientSecretHash, string name, ClientType clientType, Guid? platformId = null)
+    public Client(string clientId, string clientSecretHash, string name, ClientType clientType, Guid? platformId = null, bool requireConsent = true)
     {
         Id = Guid.NewGuid();
         ClientId = clientId;
@@ -43,7 +45,7 @@ public sealed class Client
         Name = name;
         ClientType = clientType;
         RequirePkce = clientType == ClientType.Public;
-        RequireConsent = true;
+        RequireConsent = requireConsent;
         IsActive = true;
         CreatedAt = DateTime.UtcNow;
         UpdatedAt = DateTime.UtcNow;
@@ -70,6 +72,15 @@ public sealed class Client
             return;
 
         _scopes.Add(new ClientScope(Id, scope));
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void AddAdminConsentScope(string scope)
+    {
+        if (_adminConsentScopes.Any(s => s.Scope == scope))
+            return;
+
+        _adminConsentScopes.Add(new ClientAdminConsent(Id, scope));
         UpdatedAt = DateTime.UtcNow;
     }
 
