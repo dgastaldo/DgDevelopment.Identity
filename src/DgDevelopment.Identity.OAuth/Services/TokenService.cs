@@ -59,7 +59,7 @@ public sealed class TokenService(
     {
         ArgumentNullException.ThrowIfNull(client);
         var accessToken = await jwtService.CreateAccessTokenAsync(new(
-            new User("system", "", DgDevelopment.Identity.Domain.ValueObjects.EmailAddress.FromString("system@localhost")),
+            new User("system", "", DgDevelopment.Identity.Domain.ValueObjects.EmailAddress.FromString("system@idp.local")),
             client.Client!,
             scopes,
             null,
