@@ -10,6 +10,7 @@ public sealed class DeviceCode
     public string Scopes { get; private set; }
     public bool IsAuthorized { get; private set; }
     public bool IsUsed { get; private set; }
+    public DateTime? LastPolledAt { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime ExpiresAt { get; private set; }
 
@@ -35,6 +36,8 @@ public sealed class DeviceCode
     }
 
     public void MarkUsed() => IsUsed = true;
+
+    public void RecordPoll(DateTime now) => LastPolledAt = now;
 
     public bool IsExpired() => DateTime.UtcNow >= ExpiresAt;
 

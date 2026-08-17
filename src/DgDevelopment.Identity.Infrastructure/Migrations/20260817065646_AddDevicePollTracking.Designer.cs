@@ -4,6 +4,7 @@ using DgDevelopment.Identity.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DgDevelopment.Identity.Infrastructure.Migrations
 {
     [DbContext(typeof(IdentityDbContext))]
-    partial class IdentityDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260817065646_AddDevicePollTracking")]
+    partial class AddDevicePollTracking
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -728,23 +731,6 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                         .HasForeignKey("PlatformId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.OwnsMany("DgDevelopment.Identity.Domain.Entities.ClientAdminConsent", "AdminConsentScopes", b1 =>
-                        {
-                            b1.Property<Guid>("ClientId")
-                                .HasColumnType("uniqueidentifier");
-
-                            b1.Property<string>("Scope")
-                                .HasMaxLength(200)
-                                .HasColumnType("nvarchar(200)");
-
-                            b1.HasKey("ClientId", "Scope");
-
-                            b1.ToTable("ClientAdminConsents", (string)null);
-
-                            b1.WithOwner()
-                                .HasForeignKey("ClientId");
-                        });
-
                     b.OwnsMany("DgDevelopment.Identity.Domain.Entities.ClientGrantType", "GrantTypes", b1 =>
                         {
                             b1.Property<Guid>("ClientId")
@@ -812,8 +798,6 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                             b1.WithOwner()
                                 .HasForeignKey("ClientId");
                         });
-
-                    b.Navigation("AdminConsentScopes");
 
                     b.Navigation("GrantTypes");
 

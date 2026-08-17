@@ -16,6 +16,7 @@ public sealed class TokenService(
     //,ISigningKeyRepository signingKeyRepo
     ) : ITokenService
 {
+    private static readonly TimeSpan _pollInterval = TimeSpan.FromSeconds(5);
 
     public async Task<TokenResponse> ProcessAuthorizationCodeAsync(string code, string codeVerifier, string clientId, Uri redirectUri, CancellationToken ct = default)
     {
@@ -91,15 +92,28 @@ public sealed class TokenService(
     {
         var deviceCodeHash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(deviceCode)));
         var storedDevice = await deviceCodeRepo.GetByDeviceCodeHashAsync(deviceCodeHash, ct).ConfigureAwait(false)
-            ?? throw new InvalidOperationException("Invalid device code.");
+            ?? throw new DeviceAuthorizationException("invalid_grant", "Invalid device code.");
 
-        if (!storedDevice.IsAuthorized || storedDevice.IsUsed || storedDevice.IsExpired())
-            throw new InvalidOperationException("Device code not authorized or expired.");
+        if (storedDevice.IsExpired())
+            throw new DeviceAuthorizationException("expired_token", "Device code has expired.");
 
-        if (storedDevice.UserId == null)
-            throw new InvalidOperationException("Device code not authorized by user.");
+        if (storedDevice.IsUsed)
+            throw new DeviceAuthorizationException("invalid_grant", "Device code has already been used.");
 
-        var client = (await clientRepo.GetByClientIdAsync(clientId, ct).ConfigureAwait(false))!;
+        var now = DateTime.UtcNow;
+        await deviceCodeRepo.RecordPollAsync(storedDevice.Id, now, ct).ConfigureAwait(false);
+
+        if (storedDevice.LastPolledAt is { } lastPolledAt && now - lastPolledAt < _pollInterval)
+            throw new DeviceAuthorizationException("slow_down", "Device code polling is too frequent.");
+
+        if (!storedDevice.IsAuthorized || storedDevice.UserId == null)
+            throw new DeviceAuthorizationException("authorization_pending", "Device code authorization is still pending.");
+
+        var client = (await clientRepo.GetByClientIdAsync(clientId, ct).ConfigureAwait(false))
+            ?? throw new DeviceAuthorizationException("invalid_client", "Invalid client.");
+        if (client.Id != storedDevice.ClientId)
+            throw new DeviceAuthorizationException("invalid_grant", "Device code was not issued to this client.");
+
         var user = (await userRepo.GetByIdAsync(storedDevice.UserId.Value, ct).ConfigureAwait(false))!;
         var scopes = storedDevice.GetScopes();
 
