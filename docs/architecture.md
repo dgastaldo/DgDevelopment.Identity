@@ -49,7 +49,7 @@ DgDevelopment.Identity.slnx
 │   ├── DgDevelopment.Identity.Client.Maui/       .NET MAUI integration
 │   └── DgDevelopment.Identity.Client.React/      TypeScript SDK (package.json)
 └── tests/
-    ├── DgDevelopment.Identity.UnitTests/         xUnit unit tests
+    ├── DgDevelopment.Identity.Server.UnitTests/         xUnit unit tests
     └── DgDevelopment.Identity.IntegrationTests/  xUnit integration tests
 ```
 

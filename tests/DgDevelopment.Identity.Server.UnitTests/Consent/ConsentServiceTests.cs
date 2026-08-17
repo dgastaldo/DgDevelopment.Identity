@@ -1,11 +1,21 @@
-namespace DgDevelopment.Identity.UnitTests.Consent;
+namespace DgDevelopment.Identity.Server.UnitTests.Consent;
 
 using DgDevelopment.Identity.Application.Consent;
 using DgDevelopment.Identity.Domain.Entities;
-using DgDevelopment.Identity.Domain.Repositories;
+using DgDevelopment.Identity.Infrastructure.Data;
+using DgDevelopment.Identity.Infrastructure.Repositories;
+using DgDevelopment.Identity.Server.UnitTests.Testing;
+using Xunit;
 
-public sealed class ConsentServiceTests
+public sealed class ConsentServiceTests : IClassFixture<DatabaseFixture<ConsentServiceTests>>
 {
+    private readonly DatabaseFixture<ConsentServiceTests> _fixture;
+
+    public ConsentServiceTests(DatabaseFixture<ConsentServiceTests> fixture)
+    {
+        _fixture = fixture;
+    }
+
     private static readonly DateTime Now = DateTime.UtcNow;
     private static readonly string[] OpenId = ["openid"];
     private static readonly string[] OpenIdProfile = ["openid", "profile"];
@@ -21,10 +31,14 @@ public sealed class ConsentServiceTests
         return client;
     }
 
+    private static ConsentService CreateService(IdentityDbContext context)
+        => new(new UserConsentRepository(context));
+
     [Fact]
-    public void NeedsConsentMasterDisabledReturnsFalse()
+    public async Task NeedsConsentMasterDisabledReturnsFalse()
     {
-        var service = new ConsentService(new FakeUserConsentRepository());
+        await using var context = _fixture.CreateContext();
+        var service = CreateService(context);
         var client = CreateClient(requireConsent: false);
 
         var result = service.NeedsConsent(client, stored: null, OpenIdProfile, Now);
@@ -33,9 +47,10 @@ public sealed class ConsentServiceTests
     }
 
     [Fact]
-    public void GetScopesRequiringUserConsentAdminApprovedCoversAllReturnsEmpty()
+    public async Task GetScopesRequiringUserConsentAdminApprovedCoversAllReturnsEmpty()
     {
-        var service = new ConsentService(new FakeUserConsentRepository());
+        await using var context = _fixture.CreateContext();
+        var service = CreateService(context);
         var client = CreateClient(adminScopes: OpenIdProfile);
 
         var result = service.GetScopesRequiringUserConsent(client, OpenIdProfile);
@@ -44,9 +59,10 @@ public sealed class ConsentServiceTests
     }
 
     [Fact]
-    public void GetScopesRequiringUserConsentMixedScopesReturnsOnlyUserScopes()
+    public async Task GetScopesRequiringUserConsentMixedScopesReturnsOnlyUserScopes()
     {
-        var service = new ConsentService(new FakeUserConsentRepository());
+        await using var context = _fixture.CreateContext();
+        var service = CreateService(context);
         var client = CreateClient(adminScopes: "profile");
 
         var result = service.GetScopesRequiringUserConsent(client, OpenIdProfileEmail);
@@ -55,9 +71,10 @@ public sealed class ConsentServiceTests
     }
 
     [Fact]
-    public void NeedsConsentAllAdminApprovedReturnsFalseEvenWithoutStoredConsent()
+    public async Task NeedsConsentAllAdminApprovedReturnsFalseEvenWithoutStoredConsent()
     {
-        var service = new ConsentService(new FakeUserConsentRepository());
+        await using var context = _fixture.CreateContext();
+        var service = CreateService(context);
         var client = CreateClient(adminScopes: OpenIdProfileEmail);
 
         var result = service.NeedsConsent(client, stored: null, OpenIdProfileEmail, Now);
@@ -66,9 +83,10 @@ public sealed class ConsentServiceTests
     }
 
     [Fact]
-    public void NeedsConsentStoredValidAndCoveringReturnsFalse()
+    public async Task NeedsConsentStoredValidAndCoveringReturnsFalse()
     {
-        var service = new ConsentService(new FakeUserConsentRepository());
+        await using var context = _fixture.CreateContext();
+        var service = CreateService(context);
         var client = CreateClient(adminScopes: "email");
         var stored = new UserConsent(Guid.NewGuid(), client.Id, OpenIdProfile, Now.AddDays(30));
 
@@ -78,9 +96,10 @@ public sealed class ConsentServiceTests
     }
 
     [Fact]
-    public void NeedsConsentStoredMissingNewScopeReturnsTrue()
+    public async Task NeedsConsentStoredMissingNewScopeReturnsTrue()
     {
-        var service = new ConsentService(new FakeUserConsentRepository());
+        await using var context = _fixture.CreateContext();
+        var service = CreateService(context);
         var client = CreateClient();
         var stored = new UserConsent(Guid.NewGuid(), client.Id, OpenId, Now.AddDays(30));
 
@@ -90,9 +109,10 @@ public sealed class ConsentServiceTests
     }
 
     [Fact]
-    public void NeedsConsentNoStoredConsentReturnsTrue()
+    public async Task NeedsConsentNoStoredConsentReturnsTrue()
     {
-        var service = new ConsentService(new FakeUserConsentRepository());
+        await using var context = _fixture.CreateContext();
+        var service = CreateService(context);
         var client = CreateClient();
 
         var result = service.NeedsConsent(client, stored: null, OpenId, Now);
@@ -101,9 +121,10 @@ public sealed class ConsentServiceTests
     }
 
     [Fact]
-    public void NeedsConsentStoredExpiredReturnsTrue()
+    public async Task NeedsConsentStoredExpiredReturnsTrue()
     {
-        var service = new ConsentService(new FakeUserConsentRepository());
+        await using var context = _fixture.CreateContext();
+        var service = CreateService(context);
         var client = CreateClient();
         var stored = new UserConsent(Guid.NewGuid(), client.Id, OpenId, Now.AddDays(-1));
 
@@ -115,20 +136,22 @@ public sealed class ConsentServiceTests
     [Fact]
     public async Task RecordConsentAsyncMergesScopesAndSlidesExpiry()
     {
-        var repo = new FakeUserConsentRepository();
+        var userId = await _fixture.GetSeededUserIdAsync();
+        await using var context = _fixture.CreateContext();
+        var repo = new UserConsentRepository(context);
         var service = new ConsentService(repo);
-        var client = CreateClient();
-        var userId = Guid.NewGuid();
-        var existing = new UserConsent(userId, client.Id, OpenId, Now.AddDays(10));
+        var clientId = Guid.NewGuid();
+        var existing = new UserConsent(userId, clientId, OpenId, Now.AddDays(10));
         await repo.AddOrUpdateAsync(existing);
+        var originalExpiry = existing.ExpiresAt;
 
         var lifetime = TimeSpan.FromDays(180);
-        await service.RecordConsentAsync(userId, client.Id, ProfileEmail, lifetime);
+        await service.RecordConsentAsync(userId, clientId, ProfileEmail, lifetime);
 
-        var saved = repo.LastSaved;
+        var saved = await repo.GetAsync(userId, clientId);
         Assert.NotNull(saved);
         Assert.Equal(OpenIdProfileEmail, saved.GetScopes());
-        Assert.True(saved.ExpiresAt > existing.ExpiresAt);
+        Assert.True(saved.ExpiresAt > originalExpiry);
         Assert.True(saved.ExpiresAt > Now.AddDays(179));
         Assert.True(saved.ExpiresAt <= Now.AddDays(181));
     }
@@ -136,52 +159,18 @@ public sealed class ConsentServiceTests
     [Fact]
     public async Task RecordConsentAsyncNewRecordSavesWithSlidingExpiry()
     {
-        var repo = new FakeUserConsentRepository();
+        var userId = await _fixture.GetSeededUserIdAsync();
+        await using var context = _fixture.CreateContext();
+        var repo = new UserConsentRepository(context);
         var service = new ConsentService(repo);
-        var client = CreateClient();
-        var userId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
 
-        await service.RecordConsentAsync(userId, client.Id, OpenId, TimeSpan.FromDays(180));
+        await service.RecordConsentAsync(userId, clientId, OpenId, TimeSpan.FromDays(180));
 
-        var saved = repo.LastSaved;
+        var saved = await repo.GetAsync(userId, clientId);
         Assert.NotNull(saved);
         Assert.Equal(OpenId, saved.GetScopes());
         Assert.True(saved.ExpiresAt > Now.AddDays(179));
         Assert.True(saved.ExpiresAt <= Now.AddDays(181));
-    }
-
-    private sealed class FakeUserConsentRepository : IUserConsentRepository
-    {
-        private readonly Dictionary<(Guid UserId, Guid ClientId), UserConsent> _consents = [];
-        private readonly List<UserConsent> _history = [];
-
-        public UserConsent? LastSaved => _history.Count > 0 ? _history[^1] : null;
-
-        public Task<UserConsent?> GetAsync(Guid userId, Guid clientId, CancellationToken ct = default)
-            => Task.FromResult(_consents.TryGetValue((userId, clientId), out var consent) ? consent : null);
-
-        public Task<IReadOnlyCollection<UserConsent>> GetByUserAsync(Guid userId, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyCollection<UserConsent>>(
-                _consents.Where(kv => kv.Key.UserId == userId).Select(kv => kv.Value).ToList());
-
-        public Task AddOrUpdateAsync(UserConsent consent, CancellationToken ct = default)
-        {
-            _consents[(consent.UserId, consent.ClientId)] = consent;
-            _history.Add(consent);
-            return Task.CompletedTask;
-        }
-
-        public Task RevokeAsync(Guid userId, Guid clientId, CancellationToken ct = default)
-        {
-            _consents.Remove((userId, clientId));
-            return Task.CompletedTask;
-        }
-
-        public Task DeleteExpiredAsync(CancellationToken ct = default)
-        {
-            foreach (var result in _consents.Where(kv => kv.Value.IsExpired()).Select(kv => kv.Key).ToList())
-                _consents.Remove(result);
-            return Task.CompletedTask;
-        }
     }
 }
