@@ -5,6 +5,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <!-- Test assembly: types must be public for xunit discovery; no synchronization context so ConfigureAwait is irrelevant -->
+    <NoWarn>$(NoWarn);CA1515;CA2007</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -29,6 +31,7 @@
     <ProjectReference Include="..\..\src\DgDevelopment.Identity.Application\DgDevelopment.Identity.Application.csproj" />
     <ProjectReference Include="..\..\src\DgDevelopment.Identity.OAuth\DgDevelopment.Identity.OAuth.csproj" />
     <ProjectReference Include="..\..\src\DgDevelopment.Identity.Saml\DgDevelopment.Identity.Saml.csproj" />
+    <ProjectReference Include="..\..\src\DgDevelopment.Identity.Infrastructure\DgDevelopment.Identity.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
