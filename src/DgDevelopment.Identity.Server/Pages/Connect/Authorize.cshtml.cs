@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Security.Claims;
+using DgDevelopment.Identity.Application.Consent;
 using DgDevelopment.Identity.Application.Services;
 using DgDevelopment.Identity.Domain.Repositories;
 using DgDevelopment.Identity.OAuth.Services;
@@ -16,17 +17,23 @@ public sealed class AuthorizeModel : PageModel
     private readonly IUserRepository _userRepo;
     private readonly IServerSessionService _sessionService;
     private readonly IUserInteractionService _interaction;
+    private readonly IUserConsentRepository _consentRepository;
+    private readonly IConsentService _consentService;
 
     public AuthorizeModel(
         IAuthorizationService authorizationService,
         IUserRepository userRepo,
         IServerSessionService sessionService,
-        IUserInteractionService interaction)
+        IUserInteractionService interaction,
+        IUserConsentRepository consentRepository,
+        IConsentService consentService)
     {
         _authorizationService = authorizationService;
         _userRepo = userRepo;
         _sessionService = sessionService;
         _interaction = interaction;
+        _consentRepository = consentRepository;
+        _consentService = consentService;
     }
 
     public string ClientId { get; set; } = string.Empty;
@@ -87,7 +94,13 @@ public sealed class AuthorizeModel : PageModel
             return RedirectToLogin();
         }
 
-        return await IssueCodeAsync(result.Client!, userId).ConfigureAwait(false);
+        var client = result.Client!;
+        var requestedScopes = Scope.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var stored = await _consentRepository.GetAsync(userId, client.Id).ConfigureAwait(false);
+        if (_consentService.NeedsConsent(client, stored, requestedScopes, DateTime.UtcNow))
+            return Redirect(_interaction.GetConsentUrl($"{Request.Path}{Request.QueryString}"));
+
+        return await IssueCodeAsync(client, userId).ConfigureAwait(false);
     }
 
     private RedirectResult RedirectToLogin()

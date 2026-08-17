@@ -41,6 +41,14 @@ public sealed class ClientConfiguration : IEntityTypeConfiguration<Client>
             sc.Property(s => s.Scope).HasMaxLength(200);
         });
 
+        builder.OwnsMany(x => x.AdminConsentScopes, ac =>
+        {
+            ac.WithOwner().HasForeignKey("ClientId");
+            ac.HasKey("ClientId", "Scope");
+            ac.ToTable("ClientAdminConsents");
+            ac.Property(s => s.Scope).HasMaxLength(200);
+        });
+
         builder.OwnsMany(x => x.RedirectUris, ru =>
         {
             ru.WithOwner().HasForeignKey("ClientId");
