@@ -63,7 +63,7 @@ appsettings.*.local.json
 appsettings.Development.json
 
 ## Test Results
-testresults/
+TestResults/
 *.trx
 *.coverage
 coverage/
