@@ -18,7 +18,6 @@ public sealed class JwtService(IKeyMaterialService keyMaterial, IOidcIssuerProvi
         {
             new(JwtRegisteredClaimNames.Sub, request.User.Id.ToString(null, CultureInfo.InvariantCulture)),
             new(JwtRegisteredClaimNames.Iss, issuer),
-            new(JwtRegisteredClaimNames.Aud, request.Client.ClientId),
             new(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString(CultureInfo.InvariantCulture)),
             new(JwtRegisteredClaimNames.Exp, EpochTime.GetIntDate(now.AddMinutes(5)).ToString(CultureInfo.InvariantCulture)),
             new(JwtRegisteredClaimNames.AuthTime, EpochTime.GetIntDate(now).ToString(CultureInfo.InvariantCulture)),
