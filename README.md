@@ -76,7 +76,7 @@ DgDevelopment.Identity/
 │   ├── DgDevelopment.Identity.Client.Maui/       # .NET MAUI integration (planned)
 │   └── DgDevelopment.Identity.Client.React/      # TypeScript SDK (planned)
 ├── tests/
-│   ├── DgDevelopment.Identity.UnitTests/         # empty skeleton, no tests yet
+│   ├── DgDevelopment.Identity.Server.UnitTests/         # empty skeleton, no tests yet
 │   └── DgDevelopment.Identity.IntegrationTests/  # empty skeleton, no tests yet
 └── docs/
     ├── functional-specification.md

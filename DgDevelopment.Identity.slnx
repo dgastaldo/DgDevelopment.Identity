@@ -19,6 +19,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/DgDevelopment.Identity.IntegrationTests/DgDevelopment.Identity.IntegrationTests.csproj" />
-    <Project Path="tests/DgDevelopment.Identity.UnitTests/DgDevelopment.Identity.UnitTests.csproj" />
+    <Project Path="tests/DgDevelopment.Identity.Server.UnitTests/DgDevelopment.Identity.Server.UnitTests.csproj" />
   </Folder>
 </Solution>
