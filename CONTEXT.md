@@ -10,17 +10,18 @@ This file provides full project context for AI tools and LLMs operating on the r
 
 The OAuth 2.0 / OIDC authentication cycle is **fully merged into `develop`** (PRs #1–#30, the whole stack closed). All feature/fix branches are deleted; only `develop`, `docs`, `integration`, `main` remain (local + remote).
 
-**Milestone M1 is still open**: the OAuth/OIDC foundation, login + consent + device flow and client SDK are functional, but the remaining M1 features (introspect/revoke, TOTP, admin APIs, RBAC, user management, audit, integration tests) are not implemented. **No forward merge (`develop` → `docs` → `integration` → `main`) until M1 is complete.**
+**Milestone M1 is still open**: the OAuth/OIDC foundation, login + consent + device flow, token introspection/revocation and client SDK are functional, but the remaining M1 features (TOTP, admin APIs, RBAC, user management, audit, integration tests) are not implemented. **No forward merge (`develop` → `docs` → `integration` → `main`) until M1 is complete.**
 
 ### Implemented (merged)
 
 - **OAuth/OIDC engine** (OAuth project): `authorization_code` + PKCE S256, `client_credentials`, `refresh_token` (rotating), `device_code` (token processing); RS256 JWT with active key + N previous keys for validation during rotation.
 - **OIDC consent** (PR #24): `Account/Consent` page wired into the authorize flow — shows requested scopes with client name → approve/deny (admin-approved scopes allowed without prompt).
 - **Device code flow** (PR #25): `/connect/deviceauthorization` (device + user code issuance, RFC 8628 errors) + `/device` verification/approval UI; `ProcessDeviceCodeAsync` exchanges on poll.
-- **Server**: `ConnectController` (`/connect/token`, `/connect/deviceauthorization`, `/connect/jwks`, `/connect/userinfo`, `/connect/endsession`, `/.well-known/openid-configuration`), Razor Pages (login, consent, device approval, error), dynamic CORS (per-client origin whitelist), OpenAPI + Scalar + Swagger.
+- **Token introspection + revocation**: `/connect/introspect` (RFC 7662) and `/connect/revoke` (RFC 7009), both with `client_id`/`client_secret` authentication. Refresh tokens revoke the whole rotating family; access tokens go to a `RevokedToken` denylist (jti-hashed table) that is enforced by `/connect/userinfo` and introspection.
+- **Server**: `ConnectController` (`/connect/token`, `/connect/deviceauthorization`, `/connect/introspect`, `/connect/revoke`, `/connect/jwks`, `/connect/userinfo`, `/connect/endsession`, `/.well-known/openid-configuration`), Razor Pages (login, consent, device approval, error), dynamic CORS (per-client origin whitelist), OpenAPI + Scalar + Swagger.
 - **AdminUi** is a Blazor **Server + WASM hybrid**, split into two projects: `DgDevelopment.Identity.AdminUi` (server host) and `DgDevelopment.Identity.AdminUi.Client` (WASM interactive pages/layout).
 - **Client SDK** (`Client.Core` + `Client.Blazor`): `IdentityClient`, PKCE, token store in `sessionStorage`, refresh handler, `IdentityAuthStateProvider`, `SessionMarkerService` (`identity_marker` cookie) for SSR prerender restore.
-- **Test suite** (PRs #26–#30): `DgDevelopment.Identity.Server.UnitTests` (renamed from `UnitTests`) — 260 tests over domain, application, infrastructure and OAuth layers on a LocalDB fixture. Coverage HTML auto-generated to `TestResults\html` on every Debug build (ReportGenerator 5.5.11).
+- **Test suite** (PRs #26–#30): `DgDevelopment.Identity.Server.UnitTests` (renamed from `UnitTests`) — 279 tests over domain, application, infrastructure and OAuth layers on a LocalDB fixture. Coverage HTML auto-generated to `TestResults\html` on every Debug build (ReportGenerator 5.5.11).
 - **DB seeding**: 30 permissions, SuperAdmin role, SuperAdmins group, superadmin user, admin client. Stable credentials between runs.
 
 ### Working end-to-end flow
@@ -42,15 +43,14 @@ The OAuth 2.0 / OIDC authentication cycle is **fully merged into `develop`** (PR
 
 Ordered by dependency:
 
-1. **`/connect/introspect` + `/connect/revoke`**: advertised in discovery but not implemented.
-2. **End-to-end verification**: first/all-run smoke test of `/connect/token` (keep the AppHost `Identity:AdminClientSecret` user-secret in sync with the seeded value) and of the AdminUi session restore via `userinfo`.
-3. **TOTP MFA** (RFC 6238): domain model (`TotpSecret`, `BackupCode`) and table exist; no enrollment/verification flow yet.
-4. **Admin API `/api/v1/*`**: users, roles, permissions, groups, clients, platforms, audit — none implemented (only `ConnectController` exists).
-5. **RBAC/PBAC**: effective-permissions algorithm (documented), entity scoping, `permission` claims in access tokens.
-6. **User management**: registration + email verification, password reset, password policy, lockout enforcement.
-7. **Audit Log + Event Store**: entities exist; no implementation.
-8. **UI pages**: `/profile`, `/logout`, `/mfa`, `/profile/emails`; rate limiting (login/token/userinfo) and CSP headers on UI pages.
-9. **Tests**: `DgDevelopment.Identity.Server.UnitTests` has 260 tests; `IntegrationTests` project still empty — coverage is written as the features land.
+1. **End-to-end verification**: first/all-run smoke test of `/connect/token` (keep the AppHost `Identity:AdminClientSecret` user-secret in sync with the seeded value) and of the AdminUi session restore via `userinfo`.
+2. **TOTP MFA** (RFC 6238): domain model (`TotpSecret`, `BackupCode`) and table exist; no enrollment/verification flow yet.
+3. **Admin API `/api/v1/*`**: users, roles, permissions, groups, clients, platforms, audit — none implemented (only `ConnectController` exists).
+4. **RBAC/PBAC**: effective-permissions algorithm (documented), entity scoping, `permission` claims in access tokens.
+5. **User management**: registration + email verification, password reset, password policy, lockout enforcement.
+6. **Audit Log + Event Store**: entities exist; no implementation.
+7. **UI pages**: `/profile`, `/logout`, `/mfa`, `/profile/emails`; rate limiting (login/token/userinfo) and CSP headers on UI pages.
+8. **Tests**: `DgDevelopment.Identity.Server.UnitTests` has 279 tests; `IntegrationTests` project still empty — coverage is written as the features land.
 
 After M1 is complete: **forward merge** `develop` → `docs` → `integration` → `main`, then milestones M2–M4 (SAML 2.0, React/WPF/MAUI client SDKs, Push MFA + external providers, localization integration).
 

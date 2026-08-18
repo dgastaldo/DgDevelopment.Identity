@@ -9,6 +9,18 @@ public sealed class ClientValidator(IClientRepository repository) : IClientValid
 
     public async Task<ClientValidationResult> ValidateAsync(string? clientId, string? clientSecret, string grantType, CancellationToken ct = default)
     {
+        var result = await AuthenticateAsync(clientId, clientSecret, ct).ConfigureAwait(false);
+        if (!result.IsValid)
+            return result;
+
+        if (!result.Client!.GrantTypes.Any(g => g.GrantType == grantType))
+            return new(false, null, $"Grant type '{grantType}' not allowed for this client.");
+
+        return result;
+    }
+
+    public async Task<ClientValidationResult> AuthenticateAsync(string? clientId, string? clientSecret, CancellationToken ct = default)
+    {
         if (string.IsNullOrWhiteSpace(clientId))
             return new(false, null, "Missing client_id.");
 
@@ -18,9 +30,6 @@ public sealed class ClientValidator(IClientRepository repository) : IClientValid
 
         if (!client.IsActive)
             return new(false, null, "Client is deactivated.");
-
-        if (!client.GrantTypes.Any(g => g.GrantType == grantType))
-            return new(false, null, $"Grant type '{grantType}' not allowed for this client.");
 
         if (client.ClientType == Domain.Entities.ClientType.Confidential)
         {
