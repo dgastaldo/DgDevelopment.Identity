@@ -351,8 +351,8 @@ Event (Event Store)
 
 ## 6. OAuth 2.0 / OIDC Flows
 
-> **Implementation status (M1):** `/connect/authorize`, `/connect/token` (`authorization_code` + PKCE, `client_credentials`, rotating `refresh_token`, `device_code` token processing), `/connect/userinfo`, `/connect/jwks`, `/connect/endsession` and `/.well-known/openid-configuration` are implemented.
-> The diagrams below are **design targets**; the following are open work: the device authorization endpoint (`/connect/deviceauthorization`) + user-code approval UI, `/connect/introspect`, `/connect/revoke`, the consent screen wiring, and the advanced security features PAR, JAR, DPoP, mTLS and Token Binding.
+> **Implementation status (M1):** `/connect/authorize` (with the consent screen), `/connect/token` (`authorization_code` + PKCE, `client_credentials`, rotating `refresh_token`, `device_code`), `/connect/deviceauthorization` + user-code approval UI, `/connect/userinfo`, `/connect/jwks`, `/connect/endsession` and `/.well-known/openid-configuration` are implemented.
+> The following are open work: `/connect/introspect`, `/connect/revoke`, and the advanced security features PAR, JAR, DPoP, mTLS and Token Binding.
 
 ### 6.1 Authorization Code + PKCE
 
