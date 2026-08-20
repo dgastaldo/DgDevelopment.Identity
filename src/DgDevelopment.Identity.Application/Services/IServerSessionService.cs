@@ -5,5 +5,5 @@ namespace DgDevelopment.Identity.Application.Services;
 public interface IServerSessionService
 {
     Task<UserSession?> FindActiveAsync(Guid userId, CancellationToken ct = default);
-    Task<UserSession> CreateAsync(User user, bool rememberMe, CancellationToken ct = default);
+    Task<UserSession> CreateAsync(User user, bool rememberMe, IReadOnlyCollection<string> authMethods, CancellationToken ct = default);
 }

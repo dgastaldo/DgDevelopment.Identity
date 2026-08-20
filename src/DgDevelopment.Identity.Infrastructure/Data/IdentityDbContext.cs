@@ -32,6 +32,8 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     public DbSet<SigningKey> SigningKeys => Set<SigningKey>();
     public DbSet<TotpSecret> TotpSecrets => Set<TotpSecret>();
     public DbSet<BackupCode> BackupCodes => Set<BackupCode>();
+    public DbSet<PushDevice> PushDevices => Set<PushDevice>();
+    public DbSet<MfaChallenge> MfaChallenges => Set<MfaChallenge>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<DomainEvent> DomainEvents => Set<DomainEvent>();
 

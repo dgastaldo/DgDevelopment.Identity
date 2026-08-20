@@ -274,10 +274,31 @@ TotpSecret
     ├── Code: string (hashed)
     └── IsUsed: bool
 
+PushDevice
+├── Id: Guid
+├── UserId: Guid
+├── Platform: string (enum)
+├── PushToken: string
+├── DeviceName: string?
+├── IsActive: bool
+├── CreatedAt: DateTime
+└── LastSeenAt: DateTime
+
+MfaChallenge
+├── Id: Guid
+├── UserId: Guid
+├── Provider: string
+├── ChallengeCodeHash: string (SHA-256)
+├── Status: Pending | Approved | Denied
+├── CreatedAt: DateTime
+├── ExpiresAt: DateTime (5 min)
+└── ResolvedAt: DateTime?
+
 UserSession
 ├── Id: Guid
 ├── UserId: Guid
 ├── SessionId: string
+├── AuthMethods: List<string> (e.g. ["pwd"], ["pwd","totp"])
 ├── CreatedAt: DateTime
 ├── ExpiresAt: DateTime
 └── IsRevoked: bool
@@ -418,6 +439,47 @@ Device Client                     Identity Server            User (Browser)
       │                                  │                         │
       │  6. Token Response               │                         │
       │<─────────────────────────────────│                         │
+```
+
+### 6.3 MFA Login Step
+
+```
+User (Browser)              Identity Server
+      │                            │
+      │  1. Password page          │
+      │  (username + password)     │
+      │───────────────────────────>│
+      │                            │  RequiresMfaStepAsync?
+      │                            │  (RequireMfa, TOTP enabled,
+      │                            │   active push devices)
+      │  2. Redirect to /Account/Mfa
+      │     with Identity.Partial  │
+      │     cookie (15 min, amr=pwd│
+      │<───────────────────────────│
+      │                            │
+      │  TOTP path:                │
+      │  3a. POST totp (code)      │
+      │      ─────────────────────>│  VerifyAsync (TOTP or backup)
+      │                            │
+      │  Enrollment path (first):  │
+      │  3b. QR code (otpauth://)  │
+      │      <──────────────────── │
+      │  4b. POST enroll (code)    │
+      │      ─────────────────────>│  EnableAsync → 10 backup codes
+      │                            │
+      │  Push path:                │
+      │  3c. POST start-push       │
+      │      ─────────────────────>│  StartChallengeAsync → MfaChallenge
+      │      notifier fan-out → phone app approves/denies
+      │  4c. Poll challenge status │
+      │      (SignalR /api poll)   │
+      │  <─────────────────────────│
+      │                            │
+      │  5. CompleteLoginAsync     │
+      │     (full session cookie,  │
+      │      amr merged into ID    │
+      │      token)                │
+      │<───────────────────────────│
 ```
 
 ## 7. SAML 2.0 SSO Flow
@@ -709,3 +771,4 @@ Per RFC 6749, errors from OAuth endpoints use the standard format:
 - **Rate Limiting**: on login, token, and userinfo endpoints
 - **CORS**: whitelist of allowed origins per client
 - **CSP Headers**: Content-Security-Policy on all UI pages
+- **TOTP secret**: encrypted at rest (AES) via `ISecretProtector`; backup codes and push challenge codes stored as SHA-256 hashes; challenge-code comparison uses constant-time comparison

@@ -6,11 +6,13 @@ This file provides full project context for AI tools and LLMs operating on the r
 
 **DgDevelopment.Identity** is a complete Identity Provider for the DgDevelopment ecosystem. It provides authentication (OAuth 2.0 / OIDC, SAML 2.0), authorization (RBAC + PBAC with permissions, roles, hierarchical groups), user profile management, MFA and multi-client SDKs.
 
-## Current State — 2026-08-18
+## Current State — 2026-08-20
 
 The OAuth 2.0 / OIDC authentication cycle is **fully merged into `develop`** (PRs #1–#30, the whole stack closed). All feature/fix branches are deleted; only `develop`, `docs`, `integration`, `main` remain (local + remote).
 
-**Milestone M1 is still open**: the OAuth/OIDC foundation, login + consent + device flow and client SDK are functional, but the remaining M1 features (introspect/revoke, TOTP, admin APIs, RBAC, user management, audit, integration tests) are not implemented. **No forward merge (`develop` → `docs` → `integration` → `main`) until M1 is complete.**
+**Milestone M1 is still open**: the OAuth/OIDC foundation, login + consent + device flow, client SDK and TOTP MFA are functional, but the remaining M1 features (admin APIs, RBAC, user management, audit, integration tests) are not implemented. **No forward merge (`develop` → `docs` → `integration` → `main`) until M1 is complete.**
+
+**TOTP + Push MFA** (TOTP done, on `feature/totp-mfa` waiting for PR): RFC 6238 enrollment/verification with QR code and hashed single-use backup codes, plus push-mfa primitives (device registry, challenge lifecycle, ANH notifier). MFA login step via partial-authentication cookie (`Identity.Partial`) wired into the password page → `Account/Mfa` page. See `docs/mfa.md`.
 
 ### Implemented (merged)
 
@@ -22,6 +24,14 @@ The OAuth 2.0 / OIDC authentication cycle is **fully merged into `develop`** (PR
 - **Client SDK** (`Client.Core` + `Client.Blazor`): `IdentityClient`, PKCE, token store in `sessionStorage`, refresh handler, `IdentityAuthStateProvider`, `SessionMarkerService` (`identity_marker` cookie) for SSR prerender restore.
 - **Test suite** (PRs #26–#30): `DgDevelopment.Identity.Server.UnitTests` (renamed from `UnitTests`) — 260 tests over domain, application, infrastructure and OAuth layers on a LocalDB fixture. Coverage HTML auto-generated to `TestResults\html` on every Debug build (ReportGenerator 5.5.11).
 - **DB seeding**: 30 permissions, SuperAdmin role, SuperAdmins group, superadmin user, admin client. Stable credentials between runs.
+
+### MFA (feature branch `feature/totp-mfa`)
+
+- **TOTP (RFC 6238)**: `TotpGenerator` (HMAC-SHA1, 30 s window, 6/8 digits, base32), `TotpSecret` + owned `BackupCode` entities, `TotpSecretProtector` (AES) for the secret key. `TotpService` handles enroll (QR provisioning URI), enable (verifies one TOTP code + issues 10 hashed single-use backup codes), verify (accepts TOTP code or one backup code), regenerate backup codes, disable.
+- **Push MFA primitives**: `PushDevice` registry per user, `MfaChallenge` lifecycle (Pending → Approved/Denied, 5 min expiry, 6-digit hashed challenge code), `IPushNotifier` fan-out (heap of notifiers); `AzureNotificationHubNotifier` implements the ANH transport via `Azure:NotificationHub:*` config.
+- **MFA login step**: password page → `MfaPolicyService.RequiresMfaStepAsync` decides (user `RequireMfa` flag, TOTP enabled, active push devices) → signs in to short-lived `Identity.Partial` cookie (15 min) → `Account/Mfa` page offers TOTP code, QR enrollment (QRCoder) or push challenge (SignalR hub `/hubs/mfa` polling) → on success, upgrades to the full session cookie with `amr` claims (`pwd`,`totp` / `pwd`,`push`) that flow into the `amr` claim of the ID token.
+- **API**: `/api/v1/account/mfa` (push device CRUD, challenge status/approve/deny).
+- Tests: `TotpGeneratorTests` (RFC 6238 test vectors), `TotpServiceTests`, `PushMfaServiceTests` on the LocalDB fixture.
 
 ### Working end-to-end flow
 
@@ -42,15 +52,13 @@ The OAuth 2.0 / OIDC authentication cycle is **fully merged into `develop`** (PR
 
 Ordered by dependency:
 
-1. **`/connect/introspect` + `/connect/revoke`**: advertised in discovery but not implemented.
-2. **End-to-end verification**: first/all-run smoke test of `/connect/token` (keep the AppHost `Identity:AdminClientSecret` user-secret in sync with the seeded value) and of the AdminUi session restore via `userinfo`.
-3. **TOTP MFA** (RFC 6238): domain model (`TotpSecret`, `BackupCode`) and table exist; no enrollment/verification flow yet.
-4. **Admin API `/api/v1/*`**: users, roles, permissions, groups, clients, platforms, audit — none implemented (only `ConnectController` exists).
-5. **RBAC/PBAC**: effective-permissions algorithm (documented), entity scoping, `permission` claims in access tokens.
-6. **User management**: registration + email verification, password reset, password policy, lockout enforcement.
-7. **Audit Log + Event Store**: entities exist; no implementation.
-8. **UI pages**: `/profile`, `/logout`, `/mfa`, `/profile/emails`; rate limiting (login/token/userinfo) and CSP headers on UI pages.
-9. **Tests**: `DgDevelopment.Identity.Server.UnitTests` has 260 tests; `IntegrationTests` project still empty — coverage is written as the features land.
+1. **End-to-end verification**: first/all-run smoke test of `/connect/token` (keep the AppHost `Identity:AdminClientSecret` user-secret in sync with the seeded value) and of the AdminUi session restore via `userinfo`.
+2. **Admin API `/api/v1/*`**: users, roles, permissions, groups, clients, platforms, audit — none implemented (only `ConnectController` and `MfaController` exist).
+3. **RBAC/PBAC**: effective-permissions algorithm (documented), entity scoping, `permission` claims in access tokens.
+4. **User management**: registration + email verification, password reset, password policy, lockout enforcement. **`INotificationService`** transport layer (email/notification sending) also not implemented.
+5. **Audit Log + Event Store**: entities exist; no implementation.
+6. **UI pages**: `/profile`, `/logout`, `/mfa` (self-service management; login-time enrollment works), `/profile/emails`; rate limiting (login/token/userinfo) and CSP headers on UI pages.
+7. **Tests**: `DgDevelopment.Identity.Server.UnitTests` has 296 tests; `IntegrationTests` project still empty — coverage is written as the features land.
 
 After M1 is complete: **forward merge** `develop` → `docs` → `integration` → `main`, then milestones M2–M4 (SAML 2.0, React/WPF/MAUI client SDKs, Push MFA + external providers, localization integration).
 

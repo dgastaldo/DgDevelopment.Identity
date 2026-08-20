@@ -12,11 +12,16 @@ public sealed class PasswordModel : PageModel
 {
     private readonly IUserAuthenticationService _authService;
     private readonly IServerSessionService _sessionService;
+    private readonly IMfaPolicyService _mfaPolicy;
 
-    public PasswordModel(IUserAuthenticationService authService, IServerSessionService sessionService)
+    public PasswordModel(
+        IUserAuthenticationService authService,
+        IServerSessionService sessionService,
+        IMfaPolicyService mfaPolicy)
     {
         _authService = authService;
         _sessionService = sessionService;
+        _mfaPolicy = mfaPolicy;
     }
 
     [BindProperty] public string Username { get; set; } = string.Empty;
@@ -54,13 +59,39 @@ public sealed class PasswordModel : PageModel
 
         await _authService.RecordSuccessfulLoginAsync(user).ConfigureAwait(false);
 
-        var session = await _sessionService.CreateAsync(user, RememberMe).ConfigureAwait(false);
+        if (await _mfaPolicy.RequiresMfaStepAsync(user).ConfigureAwait(false))
+        {
+            await SignInPartialAsync(user, RememberMe).ConfigureAwait(false);
+            return RedirectToPage("/Account/Mfa", new { returnUrl });
+        }
+
+        var session = await _sessionService.CreateAsync(user, RememberMe, ["pwd"]).ConfigureAwait(false);
         await SignInAsync(user, session.SessionId, RememberMe).ConfigureAwait(false);
 
         if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
             return LocalRedirect(returnUrl);
 
         return RedirectToPage("/Index");
+    }
+
+    private const string PartialAuthenticationScheme = "Identity.Partial";
+
+    private async Task SignInPartialAsync(DgDevelopment.Identity.Domain.Entities.User user, bool rememberMe)
+    {
+        var identity = new ClaimsIdentity(
+            [
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString(null, CultureInfo.InvariantCulture)),
+                new Claim(ClaimTypes.Name, user.Username),
+                new Claim("amr", "pwd"),
+                new Claim("remember_me", rememberMe ? "true" : "false"),
+            ],
+            PartialAuthenticationScheme);
+
+        var properties = new AuthenticationProperties { IsPersistent = rememberMe };
+        if (rememberMe)
+            properties.ExpiresUtc = DateTimeOffset.UtcNow.AddHours(1);
+
+        await HttpContext.SignInAsync(PartialAuthenticationScheme, new ClaimsPrincipal(identity), properties).ConfigureAwait(false);
     }
 
     private async Task SignInAsync(DgDevelopment.Identity.Domain.Entities.User user, string sessionId, bool rememberMe)
