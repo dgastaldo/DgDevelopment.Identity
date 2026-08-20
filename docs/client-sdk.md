@@ -118,7 +118,7 @@ builder.Services.AddIdentityAuthentication(new OidcOptions
 1. User clicks Login
 2. App calls GeneratePkce() → stores verifier locally
 3. App calls GetLoginUrl() → redirects browser to /connect/authorize
-4. Identity Server → login page → consent (currently a stub — skipped)
+4. Identity Server → login page → consent (approve/deny, admin-approved scopes skip the prompt)
 5. Browser redirects back to /callback?code=...
 6. App calls CompleteLoginAsync(code, codeVerifier)
 7. Tokens stored in sessionStorage (identity_tokens) + marker cookie set

@@ -76,8 +76,8 @@ DgDevelopment.Identity/
 │   ├── DgDevelopment.Identity.Client.Maui/       # .NET MAUI integration (planned)
 │   └── DgDevelopment.Identity.Client.React/      # TypeScript SDK (planned)
 ├── tests/
-│   ├── DgDevelopment.Identity.Server.UnitTests/         # empty skeleton, no tests yet
-│   └── DgDevelopment.Identity.IntegrationTests/  # empty skeleton, no tests yet
+│   ├── DgDevelopment.Identity.Server.UnitTests/         # 279 xUnit tests (domain, application, infra, OAuth)
+│   └── DgDevelopment.Identity.IntegrationTests/         # empty skeleton, no tests yet
 └── docs/
     ├── functional-specification.md
     ├── architecture.md
@@ -112,19 +112,19 @@ DgDevelopment.Identity/
 | OAuth/OIDC Engine (6 services: key, JWT, client, authorize, token, user interaction) | ✅ Done |
 | Server integration (ConnectController, Razor Pages, DI) | ✅ Done |
 | AdminUi Blazor Server + WASM hybrid (navbar, footer, login flow) | ✅ Done |
-| OAuth login cycle (authorize → login → code → token → userinfo) | ✅ Done |
+| OAuth login cycle (authorize → login → consent → code → token → userinfo) | ✅ Done |
 | Password hashing (Argon2id) + authentication service | ✅ Done |
 | DB seeding (30 permissions, SuperAdmin, SuperAdmins, superadmin user, admin client) | ✅ Done |
 | API documentation (OpenAPI + Scalar + Swagger) | ✅ Done |
 | Client SDK (.NET Core + Blazor, sessionStorage + session marker) | ✅ Done |
-| Device code flow — token processing (`ProcessDeviceCodeAsync`) | 🕒 Partial |
-| OIDC consent screen (page stub exists, not wired into authorize flow) | 🕒 Stub |
-| `/connect/deviceauthorization` endpoint + user-code UI | ⬜ Planned |
-| `/connect/introspect` + `/connect/revoke` | ⬜ Planned |
+| Device code flow (RFC 8628: `/connect/deviceauthorization` + user-code UI + token exchange) | ✅ Done |
+| OIDC consent screen (wired into authorize flow, admin-approved scopes skip prompt) | ✅ Done |
+| Token introspection + revocation (RFC 7662/7009, refresh family + access denylist) | ✅ Done |
+| Tests (`Server.UnitTests` — 279 tests over domain, application, infrastructure, OAuth) | ✅ Done |
 | TOTP MFA (RFC 6238) | ⬜ Planned |
 | Admin API `/api/v1/*` (users, roles, permissions, groups, clients, platforms, audit) | ⬜ Planned |
 | RBAC/PBAC (effective permissions, entity scoping, `permission` claims) | ⬜ Planned |
 | User management (registration, email verification, password reset, lockout) | ⬜ Planned |
 | Audit Log + Event Store | ⬜ Planned |
 | UI pages (`/profile`, `/logout`, `/mfa`, `/profile/emails`) + rate limiting + CSP | ⬜ Planned |
-| Tests (`UnitTests`, `IntegrationTests`) | ⬜ Empty skeletons |
+| Integration tests (`IntegrationTests`) | ⬜ Empty skeleton |

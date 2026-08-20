@@ -5,4 +5,5 @@ namespace DgDevelopment.Identity.OAuth.Services;
 public interface IClientValidator
 {
     Task<ClientValidationResult> ValidateAsync(string? clientId, string? clientSecret, string grantType, CancellationToken ct = default);
+    Task<ClientValidationResult> AuthenticateAsync(string? clientId, string? clientSecret, CancellationToken ct = default);
 }

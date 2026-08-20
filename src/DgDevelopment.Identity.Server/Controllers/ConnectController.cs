@@ -1,6 +1,7 @@
 namespace DgDevelopment.Identity.Server.Controllers;
 
 using System.Globalization;
+using System.Text;
 using DgDevelopment.Identity.Domain.Repositories;
 using DgDevelopment.Identity.OAuth.Services;
 using DgDevelopment.Identity.Server.Models;
@@ -18,6 +19,9 @@ public sealed partial class ConnectController : Controller
     private readonly IJwtService _jwtService;
     private readonly IClientIdCache _clientIdCache;
     private readonly IOidcIssuerProvider _issuerProvider;
+    private readonly ITokenIntrospectionService _tokenIntrospectionService;
+    private readonly ITokenRevocationService _tokenRevocationService;
+    private readonly IRevokedTokenRepository _revokedTokenRepository;
     private readonly ILogger<ConnectController> _logger;
 
     private static readonly string[] _supportedScopes = ["openid", "profile", "email"];
@@ -34,6 +38,9 @@ public sealed partial class ConnectController : Controller
         IJwtService jwtService,
         IClientIdCache clientIdCache,
         IOidcIssuerProvider issuerProvider,
+        ITokenIntrospectionService tokenIntrospectionService,
+        ITokenRevocationService tokenRevocationService,
+        IRevokedTokenRepository revokedTokenRepository,
         ILogger<ConnectController> logger)
     {
         _tokenService = tokenService;
@@ -44,6 +51,9 @@ public sealed partial class ConnectController : Controller
         _jwtService = jwtService;
         _clientIdCache = clientIdCache;
         _issuerProvider = issuerProvider;
+        _tokenIntrospectionService = tokenIntrospectionService;
+        _tokenRevocationService = tokenRevocationService;
+        _revokedTokenRepository = revokedTokenRepository;
         _logger = logger;
     }
 
@@ -127,6 +137,53 @@ public sealed partial class ConnectController : Controller
         }
     }
 
+    [HttpPost("introspect")]
+    public async Task<IActionResult> Introspect([FromForm] IntrospectionRequestForm form)
+    {
+        ArgumentNullException.ThrowIfNull(form);
+        var validation = await _clientValidator.AuthenticateAsync(form.ClientId, form.ClientSecret).ConfigureAwait(false);
+        if (!validation.IsValid)
+            return Unauthorized();
+
+        if (string.IsNullOrWhiteSpace(form.Token))
+            return BadRequest(new { error = "invalid_request", error_description = "Token is missing." });
+
+        var response = await _tokenIntrospectionService.IntrospectAsync(form.Token, form.TokenTypeHint).ConfigureAwait(false);
+        return Ok(ToIntrospectionJson(response));
+    }
+
+    [HttpPost("revoke")]
+    public async Task<IActionResult> Revoke([FromForm] RevocationRequestForm form)
+    {
+        ArgumentNullException.ThrowIfNull(form);
+        var validation = await _clientValidator.AuthenticateAsync(form.ClientId, form.ClientSecret).ConfigureAwait(false);
+        if (!validation.IsValid)
+            return Unauthorized();
+
+        if (string.IsNullOrWhiteSpace(form.Token))
+            return BadRequest(new { error = "invalid_request", error_description = "Token is missing." });
+
+        await _tokenRevocationService.RevokeAsync(validation, form.Token, form.TokenTypeHint).ConfigureAwait(false);
+        return Ok();
+    }
+
+    private static Dictionary<string, object> ToIntrospectionJson(IntrospectionResponse response)
+    {
+        var body = new Dictionary<string, object> { ["active"] = response.Active };
+        if (response.Scope is not null) body["scope"] = response.Scope;
+        if (response.ClientId is not null) body["client_id"] = response.ClientId;
+        if (response.TokenType is not null) body["token_type"] = response.TokenType;
+        if (response.Sub is not null) body["sub"] = response.Sub;
+        if (response.Username is not null) body["username"] = response.Username;
+        if (response.Aud is not null) body["aud"] = response.Aud;
+        if (response.Iss is not null) body["iss"] = response.Iss;
+        if (response.Exp is not null) body["exp"] = response.Exp;
+        if (response.Iat is not null) body["iat"] = response.Iat;
+        if (response.Jti is not null) body["jti"] = response.Jti;
+        if (response.Permissions is { Count: > 0 }) body["permission"] = response.Permissions;
+        return body;
+    }
+
     private async Task<TokenResponse> ProcessClientCredentialsAsync(TokenRequest request)
     {
         var validation = await _clientValidator.ValidateAsync(request.ClientId, request.ClientSecret, "client_credentials").ConfigureAwait(false);
@@ -196,6 +253,16 @@ public sealed partial class ConnectController : Controller
         };
 
         var principal = await _jwtService.ValidateTokenAsync(token, parameters).ConfigureAwait(false);
+
+        var jti = principal.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Jti)?.Value;
+        if (jti is not null)
+        {
+            var jtiHash = Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(jti)));
+            var revoked = await _revokedTokenRepository.ExistsAsync(jtiHash).ConfigureAwait(false);
+            if (revoked)
+                return Unauthorized();
+        }
+
         var sub = principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         if (sub == null || !Guid.TryParse(sub, out var userId))
             return Unauthorized();

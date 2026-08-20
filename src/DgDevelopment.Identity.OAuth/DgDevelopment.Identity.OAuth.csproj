@@ -14,7 +14,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <NoWarn>$(NoWarn);CA2000;CA1054;CA1055;CA1056;CA2234</NoWarn>
+    <NoWarn>$(NoWarn);CA2000;CA1054;CA1055;CA1056;CA2234;CA5404</NoWarn>
   </PropertyGroup>
 
 </Project>

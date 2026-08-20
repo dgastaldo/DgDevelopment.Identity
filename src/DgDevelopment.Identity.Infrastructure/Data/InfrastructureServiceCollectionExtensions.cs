@@ -26,6 +26,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IUserSessionRepository, UserSessionRepository>();
         services.AddScoped<IUserConsentRepository, UserConsentRepository>();
         services.AddScoped<ISigningKeyRepository, SigningKeyRepository>();
+        services.AddScoped<IRevokedTokenRepository, RevokedTokenRepository>();
         services.AddScoped<ITotpSecretRepository, TotpSecretRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<IEventStoreRepository, EventStoreRepository>();
