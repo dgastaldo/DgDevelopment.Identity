@@ -76,7 +76,7 @@ DgDevelopment.Identity/
 │   ├── DgDevelopment.Identity.Client.Maui/       # .NET MAUI integration (planned)
 │   └── DgDevelopment.Identity.Client.React/      # TypeScript SDK (planned)
 ├── tests/
-│   ├── DgDevelopment.Identity.Server.UnitTests/         # 260 xUnit tests (domain, application, infra, OAuth)
+│   ├── DgDevelopment.Identity.Server.UnitTests/         # 279 xUnit tests (domain, application, infra, OAuth)
 │   └── DgDevelopment.Identity.IntegrationTests/         # empty skeleton, no tests yet
 └── docs/
     ├── functional-specification.md
@@ -119,8 +119,8 @@ DgDevelopment.Identity/
 | Client SDK (.NET Core + Blazor, sessionStorage + session marker) | ✅ Done |
 | Device code flow (RFC 8628: `/connect/deviceauthorization` + user-code UI + token exchange) | ✅ Done |
 | OIDC consent screen (wired into authorize flow, admin-approved scopes skip prompt) | ✅ Done |
-| Tests (`Server.UnitTests` — 260 tests over domain, application, infrastructure, OAuth) | ✅ Done |
-| `/connect/introspect` + `/connect/revoke` | ⬜ Planned |
+| Token introspection + revocation (RFC 7662/7009, refresh family + access denylist) | ✅ Done |
+| Tests (`Server.UnitTests` — 279 tests over domain, application, infrastructure, OAuth) | ✅ Done |
 | TOTP MFA (RFC 6238) | ⬜ Planned |
 | Admin API `/api/v1/*` (users, roles, permissions, groups, clients, platforms, audit) | ⬜ Planned |
 | RBAC/PBAC (effective permissions, entity scoping, `permission` claims) | ⬜ Planned |

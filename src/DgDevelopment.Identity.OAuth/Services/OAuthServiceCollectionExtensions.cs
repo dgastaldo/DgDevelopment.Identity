@@ -12,6 +12,8 @@ public static class OAuthServiceCollectionExtensions
         services.AddScoped<IAuthorizationService, AuthorizationService>();
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IDeviceAuthorizationService, DeviceAuthorizationService>();
+        services.AddScoped<ITokenIntrospectionService, TokenIntrospectionService>();
+        services.AddScoped<ITokenRevocationService, TokenRevocationService>();
 
         return services;
     }

@@ -30,6 +30,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<DeviceCode> DeviceCodes => Set<DeviceCode>();
     public DbSet<SigningKey> SigningKeys => Set<SigningKey>();
+    public DbSet<RevokedToken> RevokedTokens => Set<RevokedToken>();
     public DbSet<TotpSecret> TotpSecrets => Set<TotpSecret>();
     public DbSet<BackupCode> BackupCodes => Set<BackupCode>();
     public DbSet<PushDevice> PushDevices => Set<PushDevice>();

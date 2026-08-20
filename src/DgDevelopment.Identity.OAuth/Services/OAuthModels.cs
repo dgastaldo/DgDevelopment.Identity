@@ -84,3 +84,17 @@ public sealed record DiscoveryDocument(
     IReadOnlyCollection<string> ScopesSupported,
     IReadOnlyCollection<string> GrantTypesSupported,
     IReadOnlyCollection<string> CodeChallengeMethodsSupported);
+
+public sealed record IntrospectionResponse(
+    bool Active,
+    string? Scope = null,
+    string? ClientId = null,
+    string? Sub = null,
+    string? Username = null,
+    string? TokenType = null,
+    string? Aud = null,
+    string? Iss = null,
+    long? Exp = null,
+    long? Iat = null,
+    string? Jti = null,
+    IReadOnlyCollection<string>? Permissions = null);

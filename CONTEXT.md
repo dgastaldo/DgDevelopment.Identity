@@ -13,16 +13,18 @@ The OAuth 2.0 / OIDC authentication cycle is **fully merged into `develop`** (PR
 **Milestone M1 is still open**: the OAuth/OIDC foundation, login + consent + device flow, client SDK and TOTP MFA are functional, but the remaining M1 features (admin APIs, RBAC, user management, audit, integration tests) are not implemented. **No forward merge (`develop` → `docs` → `integration` → `main`) until M1 is complete.**
 
 **TOTP + Push MFA** (TOTP done, on `feature/totp-mfa` waiting for PR): RFC 6238 enrollment/verification with QR code and hashed single-use backup codes, plus push-mfa primitives (device registry, challenge lifecycle, ANH notifier). MFA login step via partial-authentication cookie (`Identity.Partial`) wired into the password page → `Account/Mfa` page. See `docs/mfa.md`.
+**Milestone M1 is still open**: the OAuth/OIDC foundation, login + consent + device flow, token introspection/revocation and client SDK are functional, but the remaining M1 features (TOTP, admin APIs, RBAC, user management, audit, integration tests) are not implemented. **No forward merge (`develop` → `docs` → `integration` → `main`) until M1 is complete.**
 
 ### Implemented (merged)
 
 - **OAuth/OIDC engine** (OAuth project): `authorization_code` + PKCE S256, `client_credentials`, `refresh_token` (rotating), `device_code` (token processing); RS256 JWT with active key + N previous keys for validation during rotation.
 - **OIDC consent** (PR #24): `Account/Consent` page wired into the authorize flow — shows requested scopes with client name → approve/deny (admin-approved scopes allowed without prompt).
 - **Device code flow** (PR #25): `/connect/deviceauthorization` (device + user code issuance, RFC 8628 errors) + `/device` verification/approval UI; `ProcessDeviceCodeAsync` exchanges on poll.
-- **Server**: `ConnectController` (`/connect/token`, `/connect/deviceauthorization`, `/connect/jwks`, `/connect/userinfo`, `/connect/endsession`, `/.well-known/openid-configuration`), Razor Pages (login, consent, device approval, error), dynamic CORS (per-client origin whitelist), OpenAPI + Scalar + Swagger.
+- **Token introspection + revocation**: `/connect/introspect` (RFC 7662) and `/connect/revoke` (RFC 7009), both with `client_id`/`client_secret` authentication. Refresh tokens revoke the whole rotating family; access tokens go to a `RevokedToken` denylist (jti-hashed table) that is enforced by `/connect/userinfo` and introspection.
+- **Server**: `ConnectController` (`/connect/token`, `/connect/deviceauthorization`, `/connect/introspect`, `/connect/revoke`, `/connect/jwks`, `/connect/userinfo`, `/connect/endsession`, `/.well-known/openid-configuration`), Razor Pages (login, consent, device approval, error), dynamic CORS (per-client origin whitelist), OpenAPI + Scalar + Swagger.
 - **AdminUi** is a Blazor **Server + WASM hybrid**, split into two projects: `DgDevelopment.Identity.AdminUi` (server host) and `DgDevelopment.Identity.AdminUi.Client` (WASM interactive pages/layout).
 - **Client SDK** (`Client.Core` + `Client.Blazor`): `IdentityClient`, PKCE, token store in `sessionStorage`, refresh handler, `IdentityAuthStateProvider`, `SessionMarkerService` (`identity_marker` cookie) for SSR prerender restore.
-- **Test suite** (PRs #26–#30): `DgDevelopment.Identity.Server.UnitTests` (renamed from `UnitTests`) — 260 tests over domain, application, infrastructure and OAuth layers on a LocalDB fixture. Coverage HTML auto-generated to `TestResults\html` on every Debug build (ReportGenerator 5.5.11).
+- **Test suite** (PRs #26–#30): `DgDevelopment.Identity.Server.UnitTests` (renamed from `UnitTests`) — 279 tests over domain, application, infrastructure and OAuth layers on a LocalDB fixture. Coverage HTML auto-generated to `TestResults\html` on every Debug build (ReportGenerator 5.5.11).
 - **DB seeding**: 30 permissions, SuperAdmin role, SuperAdmins group, superadmin user, admin client. Stable credentials between runs.
 
 ### MFA (feature branch `feature/totp-mfa`)
@@ -59,6 +61,13 @@ Ordered by dependency:
 5. **Audit Log + Event Store**: entities exist; no implementation.
 6. **UI pages**: `/profile`, `/logout`, `/mfa` (self-service management; login-time enrollment works), `/profile/emails`; rate limiting (login/token/userinfo) and CSP headers on UI pages.
 7. **Tests**: `DgDevelopment.Identity.Server.UnitTests` has 296 tests; `IntegrationTests` project still empty — coverage is written as the features land.
+2. **TOTP MFA** (RFC 6238): domain model (`TotpSecret`, `BackupCode`) and table exist; no enrollment/verification flow yet.
+3. **Admin API `/api/v1/*`**: users, roles, permissions, groups, clients, platforms, audit — none implemented (only `ConnectController` exists).
+4. **RBAC/PBAC**: effective-permissions algorithm (documented), entity scoping, `permission` claims in access tokens.
+5. **User management**: registration + email verification, password reset, password policy, lockout enforcement.
+6. **Audit Log + Event Store**: entities exist; no implementation.
+7. **UI pages**: `/profile`, `/logout`, `/mfa`, `/profile/emails`; rate limiting (login/token/userinfo) and CSP headers on UI pages.
+8. **Tests**: `DgDevelopment.Identity.Server.UnitTests` has 279 tests; `IntegrationTests` project still empty — coverage is written as the features land.
 
 After M1 is complete: **forward merge** `develop` → `docs` → `integration` → `main`, then milestones M2–M4 (SAML 2.0, React/WPF/MAUI client SDKs, Push MFA + external providers, localization integration).
 
