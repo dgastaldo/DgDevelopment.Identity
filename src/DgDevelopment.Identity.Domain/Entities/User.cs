@@ -10,6 +10,7 @@ public sealed class User
     public bool IsActive { get; private set; }
     public bool IsLocked { get; private set; }
     public bool IsSystemAccount { get; private set; }
+    public bool RequireMfa { get; private set; }
     public DateTime? LockoutEnd { get; private set; }
     public int FailedLoginAttempts { get; set; }
     public DateTime CreatedAt { get; private set; }
@@ -129,6 +130,15 @@ public sealed class User
     public void SetPassword(string passwordHash)
     {
         PasswordHash = passwordHash;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void SetMfaRequired(bool required)
+    {
+        if (RequireMfa == required)
+            return;
+
+        RequireMfa = required;
         UpdatedAt = DateTime.UtcNow;
     }
 

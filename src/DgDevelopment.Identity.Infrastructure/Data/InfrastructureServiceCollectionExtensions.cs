@@ -28,6 +28,8 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<ISigningKeyRepository, SigningKeyRepository>();
         services.AddScoped<IRevokedTokenRepository, RevokedTokenRepository>();
         services.AddScoped<ITotpSecretRepository, TotpSecretRepository>();
+        services.AddScoped<IPushDeviceRepository, PushDeviceRepository>();
+        services.AddScoped<IMfaChallengeRepository, MfaChallengeRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<IEventStoreRepository, EventStoreRepository>();
         services.AddScoped<IPermissionRepository, PermissionRepository>();
@@ -36,6 +38,8 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IPlatformRepository, PlatformRepository>();
 
         services.AddSingleton<IPasswordHasher, Argon2PasswordHasher>();
+        services.AddScoped<ISecretProtector, TotpSecretProtector>();
+        services.AddSingleton<IPushNotifier, AzureNotificationHubNotifier>();
 
         return services;
     }

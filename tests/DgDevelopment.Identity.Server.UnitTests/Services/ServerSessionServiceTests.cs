@@ -36,7 +36,7 @@ public sealed class ServerSessionServiceTests : IClassFixture<DatabaseFixture<Se
         await using var context = _fixture.CreateContext();
         var service = CreateService(context);
 
-        var session = await service.CreateAsync(user, rememberMe: false);
+        var session = await service.CreateAsync(user, rememberMe: false, ["pwd"]);
 
         Assert.Equal(user.Id, session.UserId);
         Assert.False(string.IsNullOrWhiteSpace(session.SessionId));
@@ -51,7 +51,7 @@ public sealed class ServerSessionServiceTests : IClassFixture<DatabaseFixture<Se
         await using var context = _fixture.CreateContext();
         var service = CreateService(context);
 
-        var session = await service.CreateAsync(user, rememberMe: true);
+        var session = await service.CreateAsync(user, rememberMe: true, ["pwd"]);
 
         Assert.InRange(session.ExpiresAt, DateTime.UtcNow.AddDays(13), DateTime.UtcNow.AddDays(14.1));
     }
@@ -63,7 +63,7 @@ public sealed class ServerSessionServiceTests : IClassFixture<DatabaseFixture<Se
         await using var context = _fixture.CreateContext();
         var service = CreateService(context);
 
-        var session = await service.CreateAsync(user, rememberMe: false);
+        var session = await service.CreateAsync(user, rememberMe: false, ["pwd"]);
 
         var stored = await new UserSessionRepository(context).GetBySessionIdAsync(session.SessionId);
         Assert.NotNull(stored);
@@ -77,7 +77,7 @@ public sealed class ServerSessionServiceTests : IClassFixture<DatabaseFixture<Se
         var user = await CreateUserAsync();
         await using var context = _fixture.CreateContext();
         var service = CreateService(context);
-        var session = await service.CreateAsync(user, rememberMe: false);
+        var session = await service.CreateAsync(user, rememberMe: false, ["pwd"]);
 
         var found = await service.FindActiveAsync(user.Id);
 
@@ -102,7 +102,7 @@ public sealed class ServerSessionServiceTests : IClassFixture<DatabaseFixture<Se
         var user = await CreateUserAsync();
         await using var context = _fixture.CreateContext();
         var service = CreateService(context);
-        var session = await service.CreateAsync(user, rememberMe: false);
+        var session = await service.CreateAsync(user, rememberMe: false, ["pwd"]);
         await new UserSessionRepository(context).RevokeAsync(session.Id);
 
         var found = await service.FindActiveAsync(user.Id);

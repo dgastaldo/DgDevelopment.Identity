@@ -21,6 +21,11 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<IOidcIssuerProvider, OidcIssuerProvider>();
 builder.Services.AddScoped<IUserAuthenticationService, UserAuthenticationService>();
 builder.Services.AddScoped<IServerSessionService, ServerSessionService>();
+builder.Services.AddScoped<ITotpService, TotpService>();
+builder.Services.AddScoped<IPushMfaService, PushMfaService>();
+builder.Services.AddScoped<IMfaPolicyService, MfaPolicyService>();
+builder.Services.AddScoped<IMfaProvider, TotpMfaProvider>();
+builder.Services.AddScoped<IMfaProvider, PushMfaProvider>();
 builder.Services.AddOAuthEngine();
 builder.Services.AddScoped<IUserInteractionService, UserInteractionService>();
 builder.Services.AddScoped<IConsentService, ConsentService>();
@@ -36,8 +41,18 @@ builder.Services.AddAuthentication("Cookies")
         options.LogoutPath = "/account/logout";
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
+    })
+    .AddCookie("Identity.Partial", options =>
+    {
+        options.LoginPath = "/account/login";
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(15);
+        options.SlidingExpiration = true;
+        options.Cookie.Name = ".DgDevelopment.Identity.Partial";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.IsEssential = true;
     });
 
+builder.Services.AddSignalR();
 builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 builder.Services.AddRazorPages();
@@ -102,5 +117,6 @@ app.UseCors();
 
 app.MapControllers();
 app.MapRazorPages();
+app.MapHub<DgDevelopment.Identity.Server.Hubs.MfaHub>("/hubs/mfa");
 
 await app.RunAsync();

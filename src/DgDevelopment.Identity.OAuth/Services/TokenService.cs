@@ -141,8 +141,9 @@ public sealed class TokenService(
     private async Task<TokenResponse> GenerateTokensAsync(Client client, User user, string[] scopes, Guid? previousTokenId, UserSession session, CancellationToken ct)
     {
         var sessionId = session.Id.ToString("N");
+        var authMethods = session.GetAuthMethods();
         var accessToken = await jwtService.CreateAccessTokenAsync(new(user, client, scopes, null), ct).ConfigureAwait(false);
-        var idToken = await jwtService.CreateIdTokenAsync(new(user, client, scopes, null, ["pwd"], sessionId), ct).ConfigureAwait(false);
+        var idToken = await jwtService.CreateIdTokenAsync(new(user, client, scopes, null, authMethods, sessionId), ct).ConfigureAwait(false);
 
         var refreshTokenValue = DgDevelopment.Identity.Domain.ValueObjects.Secret.Generate(64);
         var refreshTokenHash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(refreshTokenValue)));

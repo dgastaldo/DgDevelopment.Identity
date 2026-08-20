@@ -20,6 +20,7 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(x => x.LockoutEnd).HasColumnType("datetime2");
         builder.Property(x => x.FailedLoginAttempts);
         builder.Property(x => x.IsSystemAccount);
+        builder.Property(x => x.RequireMfa);
         builder.Property(x => x.CreatedAt).HasColumnType("datetime2");
         builder.Property(x => x.UpdatedAt).HasColumnType("datetime2");
 

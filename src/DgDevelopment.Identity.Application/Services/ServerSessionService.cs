@@ -20,13 +20,16 @@ public sealed class ServerSessionService : IServerSessionService
         return _sessionRepository.GetActiveByUserIdAsync(userId, ct);
     }
 
-    public async Task<UserSession> CreateAsync(User user, bool rememberMe, CancellationToken ct = default)
+    public async Task<UserSession> CreateAsync(User user, bool rememberMe, IReadOnlyCollection<string> authMethods, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(authMethods);
+        if (authMethods.Count == 0)
+            throw new ArgumentException("At least one authentication method is required.", nameof(authMethods));
 
         var expiresAt = rememberMe ? DateTime.UtcNow.Add(RememberMeLifetime) : DateTime.UtcNow.Add(StandardLifetime);
         var sessionId = Guid.NewGuid().ToString("N");
-        var session = new UserSession(user.Id, sessionId, expiresAt, ["pwd"]);
+        var session = new UserSession(user.Id, sessionId, expiresAt, authMethods.ToArray());
         await _sessionRepository.AddAsync(session, ct).ConfigureAwait(false);
         return session;
     }

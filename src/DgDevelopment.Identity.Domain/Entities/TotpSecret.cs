@@ -48,4 +48,12 @@ public sealed class TotpSecret
     }
 
     public int AvailableBackupCodes() => _backupCodes.Count(c => !c.IsUsed);
+
+    public void RegenerateBackupCodes(IEnumerable<string> newCodeHashes)
+    {
+        ArgumentNullException.ThrowIfNull(newCodeHashes);
+        _backupCodes.Clear();
+        foreach (var codeHash in newCodeHashes)
+            _backupCodes.Add(new BackupCode(Id, codeHash));
+    }
 }
