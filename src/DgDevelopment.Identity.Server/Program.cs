@@ -5,7 +5,9 @@ using DgDevelopment.Identity.OAuth.Services;
 using DgDevelopment.Identity.Server.Data;
 using DgDevelopment.Identity.Server.Services;
 using DgDevelopment.Identity.ServiceDefaults;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,6 +28,8 @@ builder.Services.AddScoped<IPushMfaService, PushMfaService>();
 builder.Services.AddScoped<IMfaPolicyService, MfaPolicyService>();
 builder.Services.AddScoped<IMfaProvider, TotpMfaProvider>();
 builder.Services.AddScoped<IMfaProvider, PushMfaProvider>();
+builder.Services.AddScoped<DgDevelopment.Identity.Application.Authorization.IPermissionEvaluator, DgDevelopment.Identity.Application.Authorization.EffectivePermissionsService>();
+builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddOAuthEngine();
 builder.Services.AddScoped<IUserInteractionService, UserInteractionService>();
 builder.Services.AddScoped<IConsentService, ConsentService>();
@@ -50,7 +54,28 @@ builder.Services.AddAuthentication("Cookies")
         options.Cookie.Name = ".DgDevelopment.Identity.Partial";
         options.Cookie.HttpOnly = true;
         options.Cookie.IsEssential = true;
+     });
+
+builder.Services.AddOptions<JwtBearerOptions>("Bearer")
+    .Configure<IServiceScopeFactory, IClientIdCache>((options, scopeFactory, clientIdCache) =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            ValidateIssuer = true,
+            ValidIssuer = builder.Configuration["Identity:Issuer"] ?? "https://localhost:7157",
+            ValidateAudience = true,
+            AudienceValidator = (audiences, _, _) => audiences.Any(clientIdCache.IsValidClientId),
+            IssuerSigningKeyResolver = (_, _, _, _) =>
+            {
+                using var scope = scopeFactory.CreateScope();
+                var keyMaterial = scope.ServiceProvider.GetRequiredService<IKeyMaterialService>();
+                return keyMaterial.GetJwksDocumentAsync().GetAwaiter().GetResult().GetSigningKeys();
+            }
+        };
     });
+builder.Services.AddAuthentication().AddJwtBearer("Bearer", _ => { });
+builder.Services.AddProblemDetails();
 
 builder.Services.AddSignalR();
 builder.Services.AddAuthorization();
@@ -76,6 +101,7 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
+app.UseExceptionHandler();
 app.UseStaticFiles();
 
 using (var scope = app.Services.CreateScope())
