@@ -54,6 +54,7 @@ public static class TestDbSeeder
             new Permission("identity-platform.audit.read", "Read audit logs", "Audit"),
             new Permission("identity-platform.identity.manage", "Manage identity system settings", "Identity"),
             new Permission("identity-platform.identity.superadmin", "Super administrator access", "Identity"),
+            new Permission("identity-platform.dashboard.read", "View identity platform dashboard", "Dashboard"),
         };
 
         db.Permissions.AddRange(permissions);

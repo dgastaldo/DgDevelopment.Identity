@@ -80,6 +80,40 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
         return await response.Content.ReadFromJsonAsync(UserInfoJsonContext.Default.UserInfo, ct).ConfigureAwait(false);
     }
 
+    public Task<DashboardSummary?> GetDashboardSummaryAsync(CancellationToken ct = default)
+        => http.GetFromJsonAsync<DashboardSummary>($"{options.Authority}/api/v1/dashboard/summary", ct);
+
+    public Task<PagedUsersResponse?> GetUsersAsync(string? search, int page, int pageSize, CancellationToken ct = default)
+    {
+        var query = $"?page={page}&pageSize={pageSize}";
+        if (!string.IsNullOrWhiteSpace(search))
+            query += $"&search={Uri.EscapeDataString(search)}";
+
+        return http.GetFromJsonAsync<PagedUsersResponse>($"{options.Authority}/api/v1/users{query}", ct);
+    }
+
+    public Task<UserResponse?> GetUserAsync(Guid id, CancellationToken ct = default)
+        => http.GetFromJsonAsync<UserResponse>($"{options.Authority}/api/v1/users/{id}", ct);
+
+    public async Task<UserResponse?> CreateUserAsync(CreateUserRequest request, CancellationToken ct = default)
+    {
+        using var response = await http.PostAsJsonAsync($"{options.Authority}/api/v1/users", request, ct).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<UserResponse>(ct).ConfigureAwait(false);
+    }
+
+    public Task<HttpResponseMessage> LockUserAsync(Guid id, CancellationToken ct = default)
+        => http.PostAsync(new Uri($"{options.Authority}/api/v1/users/{id}/lock"), null, ct);
+
+    public Task<HttpResponseMessage> UnlockUserAsync(Guid id, CancellationToken ct = default)
+        => http.PostAsync(new Uri($"{options.Authority}/api/v1/users/{id}/unlock"), null, ct);
+
+    public Task<HttpResponseMessage> DeactivateUserAsync(Guid id, CancellationToken ct = default)
+        => http.DeleteAsync(new Uri($"{options.Authority}/api/v1/users/{id}"), ct);
+
+    public Task<HttpResponseMessage> ResetPasswordAsync(Guid id, string password, CancellationToken ct = default)
+        => http.PostAsJsonAsync(new Uri($"{options.Authority}/api/v1/users/{id}/reset-password"), new { password }, ct);
+
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken ct)
     {
         if (response.IsSuccessStatusCode)
@@ -89,6 +123,33 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
         throw new HttpRequestException($"Request to '{response.RequestMessage?.RequestUri}' failed with {(int)response.StatusCode} {response.ReasonPhrase}: {body}");
     }
 }
+
+public sealed record DashboardSummary(
+    [property: JsonPropertyName("total")] int Total,
+    [property: JsonPropertyName("active")] int Active,
+    [property: JsonPropertyName("locked")] int Locked,
+    [property: JsonPropertyName("createdLast30Days")] int CreatedLast30Days,
+    [property: JsonPropertyName("mfaEnabled")] int MfaEnabled);
+
+public sealed record PagedUsersResponse(
+    [property: JsonPropertyName("items")] IReadOnlyCollection<UserResponse> Items,
+    [property: JsonPropertyName("page")] int Page,
+    [property: JsonPropertyName("pageSize")] int PageSize,
+    [property: JsonPropertyName("totalCount")] int TotalCount,
+    [property: JsonPropertyName("totalPages")] int TotalPages);
+
+public sealed record UserResponse(
+    [property: JsonPropertyName("id")] Guid Id,
+    [property: JsonPropertyName("username")] string Username,
+    [property: JsonPropertyName("email")] string? Email,
+    [property: JsonPropertyName("isActive")] bool IsActive,
+    [property: JsonPropertyName("isLocked")] bool IsLocked,
+    [property: JsonPropertyName("isSystemAccount")] bool IsSystemAccount,
+    [property: JsonPropertyName("requireMfa")] bool RequireMfa,
+    [property: JsonPropertyName("createdAt")] DateTime CreatedAt,
+    [property: JsonPropertyName("updatedAt")] DateTime UpdatedAt);
+
+public sealed record CreateUserRequest(string Username, string Password, string Email, bool IsSystemAccount = false);
 
 [JsonSerializable(typeof(TokenResponse))]
 internal sealed partial class TokenResponseJsonContext : JsonSerializerContext;

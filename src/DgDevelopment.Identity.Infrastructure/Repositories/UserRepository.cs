@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using DgDevelopment.Identity.Domain.Authorization;
 using DgDevelopment.Identity.Domain.Entities;
 using DgDevelopment.Identity.Domain.Repositories;
 using DgDevelopment.Identity.Infrastructure.Data;
@@ -93,6 +94,17 @@ public sealed class UserRepository : IUserRepository
                 || u.Emails.Any(e => EF.Functions.Like(e.Email.Value, $"%{search}%")));
 
         return await query.CountAsync(ct).ConfigureAwait(false);
+    }
+
+    public async Task<UserStatistics> GetStatisticsAsync(CancellationToken ct = default)
+    {
+        var since = DateTime.UtcNow.AddDays(-30);
+        var total = await _context.Users.CountAsync(ct).ConfigureAwait(false);
+        var active = await _context.Users.CountAsync(u => u.IsActive, ct).ConfigureAwait(false);
+        var locked = await _context.Users.CountAsync(u => u.IsLocked, ct).ConfigureAwait(false);
+        var createdLast30Days = await _context.Users.CountAsync(u => u.CreatedAt >= since, ct).ConfigureAwait(false);
+        var mfaEnabled = await _context.TotpSecrets.CountAsync(s => s.IsEnabled, ct).ConfigureAwait(false);
+        return new(total, active, locked, createdLast30Days, mfaEnabled);
     }
 
     private IQueryable<User> BuildQuery()

@@ -1,7 +1,91 @@
 ﻿@page "/"
+@inject IdentityClient Api
+@inject NavigationManager Navigation
 
-<PageTitle>DgDevelopment Identity Console</PageTitle>
+<PageTitle>Overview | IdentityPlatform</PageTitle>
 
-<h1 class="mb-3 text-2xl font-semibold text-gray-800">DgDevelopment Identity Console</h1>
+<div class="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+    <div>
+        <p class="mb-2 text-xs font-semibold tracking-[0.2em] text-violet-700 uppercase">Operations overview</p>
+        <h1 class="text-3xl font-semibold tracking-tight text-slate-900">IdentityPlatform dashboard</h1>
+        <p class="mt-2 max-w-2xl text-sm text-slate-500">A quiet view of the identity system. Start with the users that need attention.</p>
+    </div>
+    <button class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-800" @onclick="OpenUsers">Manage users</button>
+</div>
 
-<p class="text-gray-600">Welcome to the Identity administration console.</p>
+@if (_loading)
+{
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        @for (var i = 0; i < 4; i++)
+        {
+            <div class="h-32 animate-pulse rounded-2xl bg-slate-100"></div>
+        }
+    </div>
+}
+else if (_error is not null)
+{
+    <div class="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">@_error</div>
+}
+else if (_summary is not null)
+{
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard Label="Total users" Value="@_summary.Total" Detail="All accounts" Accent="violet" />
+        <StatCard Label="Active users" Value="@_summary.Active" Detail="Currently enabled" Accent="emerald" />
+        <StatCard Label="Locked users" Value="@_summary.Locked" Detail="Need attention" Accent="amber" />
+        <StatCard Label="MFA enabled" Value="@_summary.MfaEnabled" Detail="Protected accounts" Accent="sky" />
+    </div>
+
+    <div class="mt-6 grid gap-6 lg:grid-cols-[1.4fr_0.6fr]">
+        <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div class="flex items-start justify-between">
+                <div>
+                    <p class="text-xs font-semibold tracking-[0.16em] text-slate-400 uppercase">Account health</p>
+                    <h2 class="mt-2 text-lg font-semibold text-slate-900">Where to look next</h2>
+                </div>
+                <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">Live data</span>
+            </div>
+            <div class="mt-8 space-y-5">
+                <HealthBar Label="Active" Value="@_summary.Active" Total="@_summary.Total" Color="bg-emerald-500" />
+                <HealthBar Label="Locked" Value="@_summary.Locked" Total="@_summary.Total" Color="bg-amber-500" />
+                <HealthBar Label="MFA coverage" Value="@_summary.MfaEnabled" Total="@_summary.Total" Color="bg-sky-500" />
+            </div>
+        </section>
+        <section class="rounded-2xl bg-slate-900 p-6 text-white shadow-sm">
+            <p class="text-xs font-semibold tracking-[0.16em] text-violet-300 uppercase">Recent movement</p>
+            <p class="mt-5 text-5xl font-semibold tracking-tight">@_summary.CreatedLast30Days</p>
+            <p class="mt-2 text-sm text-slate-300">new accounts created in the last 30 days</p>
+            <button class="mt-8 text-sm font-semibold text-violet-300 transition hover:text-white" @onclick="OpenUsers">Open user directory <span aria-hidden="true">→</span></button>
+        </section>
+    </div>
+}
+
+@code {
+    private DashboardSummary? _summary;
+    private string? _error;
+    private bool _loading = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || !OperatingSystem.IsBrowser())
+            return;
+
+        try
+        {
+            _summary = await Api.GetDashboardSummaryAsync().ConfigureAwait(false);
+            if (_summary is null)
+                _error = "The dashboard did not return any data.";
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException)
+        {
+            _error = "Dashboard data is currently unavailable.";
+        }
+        finally
+        {
+            _loading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void OpenUsers() => Navigation.NavigateTo("/users");
+
+}
