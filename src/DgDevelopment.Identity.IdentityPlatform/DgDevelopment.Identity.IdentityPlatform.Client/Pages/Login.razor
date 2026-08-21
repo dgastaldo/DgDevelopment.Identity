@@ -5,6 +5,9 @@
 @inject ISessionStorageService SessionStorage
 
 @code {
+    [SupplyParameterFromQuery]
+    public string? Tenant { get; set; }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender)
@@ -15,6 +18,6 @@
         var (verifier, challenge) = IdentityAuthStateProvider.GeneratePkce();
         await SessionStorage.SetItemAsync("pkce_verifier", verifier);
 
-        Navigation.NavigateTo(AuthStateProvider.GetLoginUrl(state: null, codeChallenge: challenge).ToString(), forceLoad: true);
+        Navigation.NavigateTo(AuthStateProvider.GetLoginUrl(state: null, codeChallenge: challenge, tenant: Tenant).ToString(), forceLoad: true);
     }
 }
