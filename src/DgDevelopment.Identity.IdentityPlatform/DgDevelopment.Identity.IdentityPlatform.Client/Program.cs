@@ -14,7 +14,7 @@ var identityConfig = await configClient.GetFromJsonAsync<JsonObject>("config/ide
 
 string identityBaseUriString = identityConfig["IdentityBaseUrl"]?.GetValue<string>()
     ?? throw new InvalidOperationException("IdentityPlatform authority is unavailable.");
-string adminBaseUriString = builder.HostEnvironment.BaseAddress;
+string adminBaseUriString = builder.HostEnvironment.BaseAddress.TrimEnd('/');
 string adminClientId = identityConfig["AdminClientId"]?.GetValue<string>()
     ?? throw new InvalidOperationException("IdentityPlatform client ID is unavailable.");
 string adminClientSecret = builder.Configuration.GetValue<string>("Identity:AdminClientSecret") ?? "";

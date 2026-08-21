@@ -64,6 +64,7 @@ builder.Services.AddAuthentication("Cookies")
 builder.Services.AddOptions<JwtBearerOptions>("Bearer")
     .Configure<IServiceScopeFactory, IClientIdCache>((options, scopeFactory, clientIdCache) =>
     {
+        options.MapInboundClaims = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
@@ -80,7 +81,18 @@ builder.Services.AddOptions<JwtBearerOptions>("Bearer")
         };
     });
 builder.Services.AddAuthentication().AddJwtBearer("Bearer", _ => { });
-builder.Services.AddProblemDetails();
+builder.Services.AddProblemDetails(options =>
+{
+    options.CustomizeProblemDetails = context =>
+    {
+        if (!context.HttpContext.RequestServices.GetRequiredService<IHostEnvironment>().IsDevelopment())
+            return;
+
+        var error = context.HttpContext.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
+        if (error is not null)
+            context.ProblemDetails.Extensions["exception"] = error.ToString();
+    };
+});
 
 builder.Services.AddSignalR();
 builder.Services.AddAuthorization();
@@ -142,9 +154,9 @@ app.MapGet("/", () => Results.Content(System.IO.File.ReadAllText(
 
 app.MapHealthChecks("/health");
 
+app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseCors();
 
 app.MapControllers();
 app.MapRazorPages();
