@@ -56,10 +56,10 @@ public sealed class PermissionRepositoryTests : IClassFixture<DatabaseFixture<Pe
         await using var context = _fixture.CreateContext();
         var repo = new PermissionRepository(context);
 
-        var stored = await repo.GetByNameAsync("user:read");
+        var stored = await repo.GetByNameAsync("identity-platform.user.read");
 
         Assert.NotNull(stored);
-        Assert.Equal("user:read", stored.Name);
+        Assert.Equal("identity-platform.user.read", stored.Name);
     }
 
     [Fact]

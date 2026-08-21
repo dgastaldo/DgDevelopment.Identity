@@ -1,5 +1,6 @@
 using DgDevelopment.Identity.Application.Consent;
 using DgDevelopment.Identity.Application.Services;
+using DgDevelopment.Identity.Application.Users;
 using DgDevelopment.Identity.Infrastructure.Data;
 using DgDevelopment.Identity.OAuth.Services;
 using DgDevelopment.Identity.Server.Data;
@@ -30,6 +31,7 @@ builder.Services.AddScoped<IMfaProvider, TotpMfaProvider>();
 builder.Services.AddScoped<IMfaProvider, PushMfaProvider>();
 builder.Services.AddScoped<DgDevelopment.Identity.Application.Authorization.IPermissionEvaluator, DgDevelopment.Identity.Application.Authorization.EffectivePermissionsService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddOAuthEngine();
 builder.Services.AddScoped<IUserInteractionService, UserInteractionService>();
 builder.Services.AddScoped<IConsentService, ConsentService>();

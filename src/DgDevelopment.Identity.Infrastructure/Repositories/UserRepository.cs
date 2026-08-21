@@ -70,6 +70,41 @@ public sealed class UserRepository : IUserRepository
             .FirstOrDefaultAsync(ct).ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyCollection<User>> GetPagedAsync(string? search, int skip, int take, CancellationToken ct = default)
+    {
+        var query = BuildQuery();
+        if (!string.IsNullOrWhiteSpace(search))
+            query = query.Where(u => EF.Functions.Like(u.Username, $"%{search}%")
+                || u.Emails.Any(e => EF.Functions.Like(e.Email.Value, $"%{search}%")));
+
+        return await query
+            .OrderBy(u => u.Username)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+    }
+
+    public async Task<int> CountAsync(string? search, CancellationToken ct = default)
+    {
+        var query = _context.Users.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(search))
+            query = query.Where(u => EF.Functions.Like(u.Username, $"%{search}%")
+                || u.Emails.Any(e => EF.Functions.Like(e.Email.Value, $"%{search}%")));
+
+        return await query.CountAsync(ct).ConfigureAwait(false);
+    }
+
+    private IQueryable<User> BuildQuery()
+        => _context.Users
+            .AsNoTracking()
+            .Include(u => u.Emails)
+            .Include(u => u.Claims)
+            .Include(u => u.Logins)
+            .Include(u => u.Roles)
+            .Include(u => u.Permissions)
+            .Include(u => u.Groups);
+
     public async Task AddAsync(User user, CancellationToken ct = default)
     {
         await _context.Users.AddAsync(user, ct).ConfigureAwait(false);
