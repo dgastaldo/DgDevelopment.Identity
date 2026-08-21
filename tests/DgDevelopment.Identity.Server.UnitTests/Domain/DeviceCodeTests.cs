@@ -26,11 +26,13 @@ public sealed class DeviceCodeTests
     public void AuthorizeAssociatesUserAndMarksAuthorized()
     {
         var code = new DeviceCode("d", "u", ClientId, ["openid"]);
+        var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
 
-        code.Authorize(userId);
+        code.Authorize(tenantId, userId);
 
         Assert.True(code.IsAuthorized);
+        Assert.Equal(tenantId, code.TenantId);
         Assert.Equal(userId, code.UserId);
     }
 

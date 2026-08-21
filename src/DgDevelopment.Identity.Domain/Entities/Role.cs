@@ -3,6 +3,7 @@ namespace DgDevelopment.Identity.Domain.Entities;
 public sealed class Role
 {
     public Guid Id { get; private set; }
+    public Guid TenantId { get; private set; }
     public string Name { get; private set; }
     public string Description { get; private set; }
 
@@ -11,9 +12,10 @@ public sealed class Role
 
     private Role() { }
 
-    public Role(string name, string description)
+    public Role(Guid tenantId, string name, string description)
     {
         Id = Guid.NewGuid();
+        TenantId = tenantId;
         Name = name;
         Description = description;
     }

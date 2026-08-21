@@ -1,0 +1,20 @@
+@page "/account/select-tenant"
+@model DgDevelopment.Identity.Server.Pages.Account.SelectTenantModel
+@{
+    ViewData["Title"] = "Select Tenant";
+}
+
+<div class="auth-card">
+    <h1 class="auth-brand">DgDevelopment Identity Server</h1>
+    <h2 class="text-lg font-semibold text-gray-800 mb-2">Select a tenant</h2>
+    <p class="text-sm text-gray-600 mb-6">You belong to more than one tenant. Choose which one to continue with.</p>
+
+    <ul class="space-y-2">
+        @foreach (var tenant in Model.Tenants)
+        {
+            <li>
+                <a href="@tenant.RedirectUrl" class="auth-btn block text-center">@tenant.Name</a>
+            </li>
+        }
+    </ul>
+</div>

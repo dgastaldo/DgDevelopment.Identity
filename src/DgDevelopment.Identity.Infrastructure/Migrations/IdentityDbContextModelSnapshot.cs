@@ -60,6 +60,9 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("Timestamp")
                         .HasColumnType("datetime2");
 
@@ -72,6 +75,8 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                     b.HasIndex("Action");
 
                     b.HasIndex("ActorType");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("Timestamp");
 
@@ -118,6 +123,9 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
 
@@ -127,6 +135,8 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
 
                     b.HasIndex("CodeHash")
                         .IsUnique();
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("UserId");
 
@@ -139,10 +149,8 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("ClientId")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("ClientSecretHash")
                         .IsRequired()
@@ -173,6 +181,9 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                     b.Property<bool>("RequirePkce")
                         .HasColumnType("bit");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -182,6 +193,8 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                         .IsUnique();
 
                     b.HasIndex("PlatformId");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("Clients");
                 });
@@ -219,6 +232,9 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("UserCodeHash")
                         .IsRequired()
                         .HasMaxLength(512)
@@ -233,6 +249,8 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
 
                     b.HasIndex("DeviceCodeHash")
                         .IsUnique();
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("UserCodeHash")
                         .IsUnique();
@@ -299,9 +317,14 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                     b.Property<Guid?>("ParentGroupId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ParentGroupId");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("Groups");
                 });
@@ -378,6 +401,9 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<bool>("IsGlobal")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -417,7 +443,12 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("Platforms");
                 });
@@ -489,6 +520,9 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                     b.Property<Guid>("SessionId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("TokenHash")
                         .IsRequired()
                         .HasMaxLength(512)
@@ -504,6 +538,8 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                     b.HasIndex("PreviousTokenId");
 
                     b.HasIndex("SessionId");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("TokenHash")
                         .IsUnique();
@@ -565,9 +601,12 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
+                    b.HasIndex("TenantId", "Name")
                         .IsUnique();
 
                     b.ToTable("Roles");
@@ -625,6 +664,75 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("SigningKeys");
+                });
+
+            modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.Tenant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Slug")
+                        .IsUnique();
+
+                    b.ToTable("Tenants");
+                });
+
+            modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.TenantMembership", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsOwner")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("RemovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("TenantId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("TenantMemberships");
                 });
 
             modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.TotpSecret", b =>
@@ -721,10 +829,15 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("UserId", "ClientId")
                         .IsUnique();
@@ -761,7 +874,12 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("UserId", "PermissionId");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("UserPermissions");
                 });
@@ -782,7 +900,12 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("UserId", "RoleId");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("UserRoles");
                 });
@@ -824,11 +947,26 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                     b.ToTable("UserSessions");
                 });
 
+            modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.AuditLog", b =>
+                {
+                    b.HasOne("DgDevelopment.Identity.Domain.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.AuthorizationCode", b =>
                 {
                     b.HasOne("DgDevelopment.Identity.Domain.Entities.Client", null)
                         .WithMany()
                         .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DgDevelopment.Identity.Domain.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -845,6 +983,12 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("PlatformId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DgDevelopment.Identity.Domain.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.OwnsMany("DgDevelopment.Identity.Domain.Entities.ClientAdminConsent", "AdminConsentScopes", b1 =>
                         {
@@ -950,6 +1094,11 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("DgDevelopment.Identity.Domain.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("DgDevelopment.Identity.Domain.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
@@ -962,6 +1111,12 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("ParentGroupId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("DgDevelopment.Identity.Domain.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.GroupRole", b =>
@@ -978,6 +1133,15 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                     b.HasOne("DgDevelopment.Identity.Domain.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.Platform", b =>
+                {
+                    b.HasOne("DgDevelopment.Identity.Domain.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -1010,9 +1174,24 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("DgDevelopment.Identity.Domain.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("DgDevelopment.Identity.Domain.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.Role", b =>
+                {
+                    b.HasOne("DgDevelopment.Identity.Domain.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -1022,6 +1201,21 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                     b.HasOne("DgDevelopment.Identity.Domain.Entities.Role", null)
                         .WithMany("Permissions")
                         .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.TenantMembership", b =>
+                {
+                    b.HasOne("DgDevelopment.Identity.Domain.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DgDevelopment.Identity.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -1189,6 +1383,12 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
 
             modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.UserConsent", b =>
                 {
+                    b.HasOne("DgDevelopment.Identity.Domain.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("DgDevelopment.Identity.Domain.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
@@ -1207,6 +1407,12 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
 
             modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.UserPermission", b =>
                 {
+                    b.HasOne("DgDevelopment.Identity.Domain.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("DgDevelopment.Identity.Domain.Entities.User", null)
                         .WithMany("Permissions")
                         .HasForeignKey("UserId")
@@ -1216,6 +1422,12 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
 
             modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.UserRole", b =>
                 {
+                    b.HasOne("DgDevelopment.Identity.Domain.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("DgDevelopment.Identity.Domain.Entities.User", null)
                         .WithMany("Roles")
                         .HasForeignKey("UserId")

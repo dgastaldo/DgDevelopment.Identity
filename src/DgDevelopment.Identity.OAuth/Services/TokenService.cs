@@ -12,6 +12,7 @@ public sealed class TokenService(
     IClientRepository clientRepo,
     IUserRepository userRepo,
     IUserSessionRepository sessionRepo,
+    ITenantRepository tenantRepo,
     IJwtService jwtService
     //,ISigningKeyRepository signingKeyRepo
     ) : ITokenService
@@ -52,13 +53,14 @@ public sealed class TokenService(
 
         var session = await GetOrCreateSessionAsync(user.Id, existingSessionId: null, ct).ConfigureAwait(false);
 
-        return await GenerateTokensAsync(client, user, scopes, null, session, ct).ConfigureAwait(false);
+        return await GenerateTokensAsync(authCode.TenantId, client, user, scopes, null, session, ct).ConfigureAwait(false);
     }
 
     public async Task<TokenResponse> ProcessClientCredentialsAsync(ClientValidationResult client, string[] scopes, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(client);
         var accessToken = await jwtService.CreateAccessTokenAsync(new(
+            client.Client!.TenantId,
             new User("system", "", DgDevelopment.Identity.Domain.ValueObjects.EmailAddress.FromString("system@idp.local")),
             client.Client!,
             scopes,
@@ -77,6 +79,9 @@ public sealed class TokenService(
         if (storedToken.IsRevoked || storedToken.IsExpired())
             throw new InvalidOperationException("Refresh token has expired or was revoked.");
 
+        if (!await tenantRepo.IsUserMemberAsync(storedToken.TenantId, storedToken.UserId, ct).ConfigureAwait(false))
+            throw new InvalidOperationException("Tenant membership revoked.");
+
         var client = (await clientRepo.GetByClientIdAsync(clientId, ct).ConfigureAwait(false))!;
         var user = (await userRepo.GetByIdAsync(storedToken.UserId, ct).ConfigureAwait(false))!;
         var scopes = storedToken.GetScopes();
@@ -85,7 +90,7 @@ public sealed class TokenService(
 
         var session = await GetOrCreateSessionAsync(user.Id, storedToken.SessionId, ct).ConfigureAwait(false);
 
-        return await GenerateTokensAsync(client, user, scopes, storedToken.Id, session, ct).ConfigureAwait(false);
+        return await GenerateTokensAsync(storedToken.TenantId, client, user, scopes, storedToken.Id, session, ct).ConfigureAwait(false);
     }
 
     public async Task<TokenResponse> ProcessDeviceCodeAsync(string deviceCode, string clientId, CancellationToken ct = default)
@@ -116,12 +121,14 @@ public sealed class TokenService(
 
         var user = (await userRepo.GetByIdAsync(storedDevice.UserId.Value, ct).ConfigureAwait(false))!;
         var scopes = storedDevice.GetScopes();
+        var tenantId = storedDevice.TenantId
+            ?? throw new DeviceAuthorizationException("invalid_grant", "Device code was not assigned to a tenant.");
 
         await deviceCodeRepo.MarkAsUsedAsync(storedDevice.Id, ct).ConfigureAwait(false);
 
         var session = await GetOrCreateSessionAsync(user.Id, existingSessionId: null, ct).ConfigureAwait(false);
 
-        return await GenerateTokensAsync(client, user, scopes, null, session, ct).ConfigureAwait(false);
+        return await GenerateTokensAsync(tenantId, client, user, scopes, null, session, ct).ConfigureAwait(false);
     }
 
     private async Task<UserSession> GetOrCreateSessionAsync(Guid userId, Guid? existingSessionId, CancellationToken ct)
@@ -138,16 +145,16 @@ public sealed class TokenService(
         return session;
     }
 
-    private async Task<TokenResponse> GenerateTokensAsync(Client client, User user, string[] scopes, Guid? previousTokenId, UserSession session, CancellationToken ct)
+    private async Task<TokenResponse> GenerateTokensAsync(Guid tenantId, Client client, User user, string[] scopes, Guid? previousTokenId, UserSession session, CancellationToken ct)
     {
         var sessionId = session.Id.ToString("N");
         var authMethods = session.GetAuthMethods();
-        var accessToken = await jwtService.CreateAccessTokenAsync(new(user, client, scopes, null), ct).ConfigureAwait(false);
-        var idToken = await jwtService.CreateIdTokenAsync(new(user, client, scopes, null, authMethods, sessionId), ct).ConfigureAwait(false);
+        var accessToken = await jwtService.CreateAccessTokenAsync(new(tenantId, user, client, scopes, null), ct).ConfigureAwait(false);
+        var idToken = await jwtService.CreateIdTokenAsync(new(tenantId, user, client, scopes, null, authMethods, sessionId), ct).ConfigureAwait(false);
 
         var refreshTokenValue = DgDevelopment.Identity.Domain.ValueObjects.Secret.Generate(64);
         var refreshTokenHash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(refreshTokenValue)));
-        var refreshToken = new RefreshToken(refreshTokenHash, client.Id, user.Id, session.Id, scopes, previousTokenId);
+        var refreshToken = new RefreshToken(tenantId, refreshTokenHash, client.Id, user.Id, session.Id, scopes, previousTokenId);
         await refreshTokenRepo.AddAsync(refreshToken, ct).ConfigureAwait(false);
 
         return new(accessToken, "Bearer", 3600, idToken, refreshTokenValue, string.Join(' ', scopes));

@@ -20,9 +20,10 @@ public sealed class GroupRepositoryTests : IClassFixture<DatabaseFixture<GroupRe
     [Fact]
     public async Task AddAndGetByIdRoundTripsWithRoles()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var name = UniqueName("group");
-        var role = new Role($"role-{Guid.NewGuid():N}", "desc");
-        var group = new Group(name, "desc");
+        var role = new Role(tenantId, $"role-{Guid.NewGuid():N}", "desc");
+        var group = new Group(tenantId, name, "desc");
         group.AddRole(role);
         await using var context = _fixture.CreateContext();
         var repo = new GroupRepository(context);
@@ -41,10 +42,11 @@ public sealed class GroupRepositoryTests : IClassFixture<DatabaseFixture<GroupRe
     [Fact]
     public async Task GetAllReturnsGroupsOrderedByName()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         await using var context = _fixture.CreateContext();
         var repo = new GroupRepository(context);
-        await repo.AddAsync(new Group(UniqueName("z-group"), "desc"));
-        await repo.AddAsync(new Group(UniqueName("a-group"), "desc"));
+        await repo.AddAsync(new Group(tenantId, UniqueName("z-group"), "desc"));
+        await repo.AddAsync(new Group(tenantId, UniqueName("a-group"), "desc"));
 
         var stored = await repo.GetAllAsync();
 
@@ -55,12 +57,13 @@ public sealed class GroupRepositoryTests : IClassFixture<DatabaseFixture<GroupRe
     [Fact]
     public async Task GetChildrenReturnsDirectChildrenOnly()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         await using var context = _fixture.CreateContext();
         var repo = new GroupRepository(context);
-        var parent = new Group(UniqueName("parent"), "desc");
+        var parent = new Group(tenantId, UniqueName("parent"), "desc");
         await repo.AddAsync(parent);
-        var child = new Group(UniqueName("child"), "desc", parent.Id);
-        var grandchild = new Group(UniqueName("grandchild"), "desc", child.Id);
+        var child = new Group(tenantId, UniqueName("child"), "desc", parent.Id);
+        var grandchild = new Group(tenantId, UniqueName("grandchild"), "desc", child.Id);
         await repo.AddAsync(child);
         await repo.AddAsync(grandchild);
 
@@ -72,9 +75,10 @@ public sealed class GroupRepositoryTests : IClassFixture<DatabaseFixture<GroupRe
     [Fact]
     public async Task GetChildrenReturnsEmptyForLeafGroup()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         await using var context = _fixture.CreateContext();
         var repo = new GroupRepository(context);
-        var leaf = new Group(UniqueName("leaf"), "desc");
+        var leaf = new Group(tenantId, UniqueName("leaf"), "desc");
         await repo.AddAsync(leaf);
 
         var children = await repo.GetChildrenAsync(leaf.Id);
@@ -85,10 +89,11 @@ public sealed class GroupRepositoryTests : IClassFixture<DatabaseFixture<GroupRe
     [Fact]
     public async Task UpdateAsyncPersistsParentChange()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         await using var context = _fixture.CreateContext();
         var repo = new GroupRepository(context);
-        var parent = new Group(UniqueName("parent"), "desc");
-        var child = new Group(UniqueName("child"), "desc");
+        var parent = new Group(tenantId, UniqueName("parent"), "desc");
+        var child = new Group(tenantId, UniqueName("child"), "desc");
         await repo.AddAsync(parent);
         await repo.AddAsync(child);
 
@@ -103,8 +108,9 @@ public sealed class GroupRepositoryTests : IClassFixture<DatabaseFixture<GroupRe
     [Fact]
     public async Task DeleteAsyncRemovesGroup()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var name = UniqueName("group");
-        var group = new Group(name, "desc");
+        var group = new Group(tenantId, name, "desc");
         await using var context = _fixture.CreateContext();
         var repo = new GroupRepository(context);
         await repo.AddAsync(group);

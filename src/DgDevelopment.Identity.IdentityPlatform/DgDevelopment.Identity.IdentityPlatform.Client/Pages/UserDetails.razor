@@ -1,0 +1,71 @@
+@page "/users/{Id:guid}"
+@using DgDevelopment.Identity.IdentityPlatform.Client.State
+@inject IdentityClient Api
+@inject NavigationManager Navigation
+@inject TenantState TenantState
+
+<PageTitle>User details | IdentityPlatform</PageTitle>
+
+@if (Loading)
+{
+    <div class="h-64 animate-pulse rounded-2xl bg-slate-100"></div>
+}
+else if (User is null)
+{
+    <div class="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">@Error</div>
+}
+else
+{
+    <div class="mb-8 flex items-end justify-between gap-4"><div><button class="mb-4 text-sm font-semibold text-violet-700" @onclick="Back">← Users</button><p class="text-xs font-semibold tracking-[0.2em] text-violet-700 uppercase">Account detail</p><h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">@User.Username</h1><p class="mt-2 text-sm text-slate-500">@User.Email</p></div><span class="rounded-full px-3 py-1 text-xs font-semibold @(User.IsLocked ? "bg-amber-50 text-amber-700" : User.IsActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500")">@(User.IsLocked ? "Locked" : User.IsActive ? "Active" : "Inactive")</span></div>
+    @if (Error is not null) { <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">@Error</div> }
+    <div class="grid gap-6 lg:grid-cols-[1fr_0.7fr]">
+        <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><p class="text-xs font-semibold tracking-[0.16em] text-slate-400 uppercase">Profile</p><dl class="mt-5 grid gap-5 sm:grid-cols-2"><div><dt class="text-xs text-slate-400">Account ID</dt><dd class="mt-1 break-all text-sm font-medium text-slate-700">@User.Id</dd></div><div><dt class="text-xs text-slate-400">MFA policy</dt><dd class="mt-1 text-sm font-medium text-slate-700">@(User.RequireMfa ? "Required" : "Optional")</dd></div><div><dt class="text-xs text-slate-400">Created</dt><dd class="mt-1 text-sm font-medium text-slate-700">@User.CreatedAt.ToLocalTime()</dd></div><div><dt class="text-xs text-slate-400">System account</dt><dd class="mt-1 text-sm font-medium text-slate-700">@(User.IsSystemAccount ? "Yes" : "No")</dd></div></dl></section>
+        <section class="rounded-2xl bg-slate-900 p-6 text-white shadow-sm"><p class="text-xs font-semibold tracking-[0.16em] text-violet-300 uppercase">Actions</p><div class="mt-5 grid gap-3"><button disabled="@Busy" @onclick="ToggleLock" class="rounded-lg bg-white/10 px-4 py-2 text-left text-sm font-semibold hover:bg-white/20">@(User.IsLocked ? "Unlock account" : "Lock account")</button><button disabled="@(Busy || User.IsSystemAccount || !User.IsActive)" @onclick="Deactivate" class="rounded-lg bg-rose-400/20 px-4 py-2 text-left text-sm font-semibold text-rose-200 hover:bg-rose-400/30">Deactivate account</button></div></section>
+    </div>
+    <section class="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><p class="text-xs font-semibold tracking-[0.16em] text-slate-400 uppercase">Credentials</p><div class="mt-4 flex flex-col gap-3 sm:flex-row"><input @bind="NewPassword" type="password" placeholder="New temporary password" class="flex-1 rounded-lg border-slate-300 text-sm" /><button disabled="@(Busy || string.IsNullOrWhiteSpace(NewPassword))" @onclick="ResetPassword" class="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800 disabled:opacity-50">Reset password</button></div></section>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private UserResponse? User;
+    private bool Loading = true;
+    private bool Busy;
+    private string NewPassword = string.Empty;
+    private string? Error;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && OperatingSystem.IsBrowser())
+        {
+            try { User = await Api.GetUserAsync(Id, TenantState.AllTenants).ConfigureAwait(false); if (User is null) Error = "User not found."; }
+            catch (HttpRequestException) { Error = "The user could not be loaded."; }
+            finally { Loading = false; await InvokeAsync(StateHasChanged); }
+        }
+    }
+
+    private async Task ToggleLock()
+    {
+        Busy = true;
+        try { using var response = User!.IsLocked ? await Api.UnlockUserAsync(Id, TenantState.AllTenants) : await Api.LockUserAsync(Id, TenantState.AllTenants); response.EnsureSuccessStatusCode(); User = await Api.GetUserAsync(Id, TenantState.AllTenants); }
+        catch (HttpRequestException) { Error = "The account status could not be changed."; }
+        finally { Busy = false; }
+    }
+
+    private async Task Deactivate()
+    {
+        Busy = true;
+        try { using var response = await Api.DeactivateUserAsync(Id, TenantState.AllTenants); response.EnsureSuccessStatusCode(); Navigation.NavigateTo("/users"); }
+        catch (HttpRequestException) { Error = "The account could not be deactivated."; }
+        finally { Busy = false; }
+    }
+
+    private async Task ResetPassword()
+    {
+        Busy = true;
+        try { using var response = await Api.ResetPasswordAsync(Id, NewPassword, TenantState.AllTenants); response.EnsureSuccessStatusCode(); NewPassword = string.Empty; }
+        catch (HttpRequestException) { Error = "The password could not be reset."; }
+        finally { Busy = false; }
+    }
+
+    private void Back() => Navigation.NavigateTo("/users");
+}

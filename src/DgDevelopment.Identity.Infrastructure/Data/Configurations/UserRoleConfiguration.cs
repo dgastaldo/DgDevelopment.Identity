@@ -12,5 +12,8 @@ public sealed class UserRoleConfiguration : IEntityTypeConfiguration<UserRole>
         builder.HasKey(x => new { x.UserId, x.RoleId });
         builder.Property(x => x.ScopeType).HasMaxLength(100);
         builder.Property(x => x.ScopeValue).HasMaxLength(200);
+
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(x => x.TenantId);
     }
 }

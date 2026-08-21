@@ -91,7 +91,7 @@ public sealed class ConsentModel : PageModel
             var requested = parsed.Scope?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? [];
             var needUser = _consentService.GetScopesRequiringUserConsent(client, requested);
             var lifetime = TimeSpan.FromDays(_options.Value.ConsentLifetimeDays);
-            await _consentService.RecordConsentAsync(userId, client.Id, needUser, lifetime).ConfigureAwait(false);
+            await _consentService.RecordConsentAsync(userId, client, needUser, lifetime).ConfigureAwait(false);
             return LocalRedirect(returnUrl);
         }
 

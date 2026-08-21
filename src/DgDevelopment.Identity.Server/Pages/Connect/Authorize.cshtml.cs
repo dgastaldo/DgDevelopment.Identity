@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Security.Claims;
+using DgDevelopment.Identity.Application.Authorization;
 using DgDevelopment.Identity.Application.Consent;
 using DgDevelopment.Identity.Application.Services;
 using DgDevelopment.Identity.Domain.Repositories;
@@ -19,6 +20,7 @@ public sealed class AuthorizeModel : PageModel
     private readonly IUserInteractionService _interaction;
     private readonly IUserConsentRepository _consentRepository;
     private readonly IConsentService _consentService;
+    private readonly ITenantSelectionService _tenantSelectionService;
 
     public AuthorizeModel(
         IAuthorizationService authorizationService,
@@ -26,7 +28,8 @@ public sealed class AuthorizeModel : PageModel
         IServerSessionService sessionService,
         IUserInteractionService interaction,
         IUserConsentRepository consentRepository,
-        IConsentService consentService)
+        IConsentService consentService,
+        ITenantSelectionService tenantSelectionService)
     {
         _authorizationService = authorizationService;
         _userRepo = userRepo;
@@ -34,6 +37,7 @@ public sealed class AuthorizeModel : PageModel
         _interaction = interaction;
         _consentRepository = consentRepository;
         _consentService = consentService;
+        _tenantSelectionService = tenantSelectionService;
     }
 
     public string ClientId { get; set; } = string.Empty;
@@ -45,6 +49,7 @@ public sealed class AuthorizeModel : PageModel
     public string? CodeChallenge { get; set; }
     public string? CodeChallengeMethod { get; set; }
     public string? LoginHint { get; set; }
+    public string? Tenant { get; set; }
 
     public async Task<IActionResult> OnGetAsync(
         [FromQuery] string client_id,
@@ -55,7 +60,8 @@ public sealed class AuthorizeModel : PageModel
         [FromQuery] string? nonce = null,
         [FromQuery] string? code_challenge = null,
         [FromQuery] string? code_challenge_method = null,
-        [FromQuery] string? login_hint = null)
+        [FromQuery] string? login_hint = null,
+        [FromQuery] string? tenant = null)
     {
         ClientId = client_id;
         RedirectUri = redirect_uri;
@@ -66,6 +72,7 @@ public sealed class AuthorizeModel : PageModel
         CodeChallenge = code_challenge;
         CodeChallengeMethod = code_challenge_method;
         LoginHint = login_hint;
+        Tenant = tenant;
 
         var result = await _authorizationService.ValidateAsync(new(
             ClientId, RedirectUri, ResponseType, Scope, State, Nonce,
@@ -94,13 +101,23 @@ public sealed class AuthorizeModel : PageModel
             return RedirectToLogin();
         }
 
+        var selection = await _tenantSelectionService.ResolveAsync(userId, Tenant).ConfigureAwait(false);
+        if (selection.Denied)
+            return RedirectToPage("/Error", new { errorCode = "access_denied", errorDescription = "The user does not belong to any active tenant." });
+
+        if (selection.TenantId is null)
+        {
+            var returnUrl = $"{Request.Path}{Request.QueryString}";
+            return RedirectToPage("/Account/SelectTenant", new { returnUrl });
+        }
+
         var client = result.Client!;
         var requestedScopes = Scope.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var stored = await _consentRepository.GetAsync(userId, client.Id).ConfigureAwait(false);
         if (_consentService.NeedsConsent(client, stored, requestedScopes, DateTime.UtcNow))
             return Redirect(_interaction.GetConsentUrl($"{Request.Path}{Request.QueryString}"));
 
-        return await IssueCodeAsync(client, userId).ConfigureAwait(false);
+        return await IssueCodeAsync(client, userId, selection.TenantId.Value).ConfigureAwait(false);
     }
 
     private RedirectResult RedirectToLogin()
@@ -113,7 +130,7 @@ public sealed class AuthorizeModel : PageModel
         return Redirect(loginUrl);
     }
 
-    private async Task<IActionResult> IssueCodeAsync(DgDevelopment.Identity.Domain.Entities.Client client, Guid userId)
+    private async Task<IActionResult> IssueCodeAsync(DgDevelopment.Identity.Domain.Entities.Client client, Guid userId, Guid tenantId)
     {
         var user = await _userRepo.GetByIdAsync(userId).ConfigureAwait(false);
         if (user == null)
@@ -121,7 +138,7 @@ public sealed class AuthorizeModel : PageModel
 
         var scopes = Scope.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var code = await _authorizationService.CreateAuthorizationCodeAsync(
-            client, user, scopes, RedirectUri, CodeChallenge, CodeChallengeMethod).ConfigureAwait(false);
+            tenantId, client, user, scopes, RedirectUri, CodeChallenge, CodeChallengeMethod).ConfigureAwait(false);
 
         var redirect = $"{RedirectUri}?code={Uri.EscapeDataString(code)}";
         if (State != null)

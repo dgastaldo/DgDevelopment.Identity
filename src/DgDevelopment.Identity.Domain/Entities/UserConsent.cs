@@ -3,6 +3,7 @@ namespace DgDevelopment.Identity.Domain.Entities;
 public sealed class UserConsent
 {
     public Guid Id { get; private set; }
+    public Guid TenantId { get; private set; }
     public Guid UserId { get; private set; }
     public Guid ClientId { get; private set; }
     public string GrantedScopes { get; private set; }
@@ -11,9 +12,10 @@ public sealed class UserConsent
 
     private UserConsent() { }
 
-    public UserConsent(Guid userId, Guid clientId, string[] scopes, DateTime? expiresAt = null)
+    public UserConsent(Guid tenantId, Guid userId, Guid clientId, string[] scopes, DateTime? expiresAt = null)
     {
         Id = Guid.NewGuid();
+        TenantId = tenantId;
         UserId = userId;
         ClientId = clientId;
         GrantedScopes = string.Join(' ', scopes);

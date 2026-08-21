@@ -1,0 +1,8 @@
+<div><div class="mb-2 flex justify-between text-sm"><span class="font-medium text-slate-600">@Label</span><span class="text-slate-400">@Value / @Total</span></div><div class="h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full @Color" style="@Width"></div></div></div>
+@code {
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public int Value { get; set; }
+    [Parameter] public int Total { get; set; }
+    [Parameter] public string Color { get; set; } = string.Empty;
+    private string Width => $"width: {(Total == 0 ? 0 : Math.Min(100, Value * 100 / Total))}%";
+}

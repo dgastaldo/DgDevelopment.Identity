@@ -21,7 +21,7 @@ The OAuth 2.0 / OIDC authentication cycle is **fully merged into `develop`** (PR
 - **Device code flow** (PR #25): `/connect/deviceauthorization` (device + user code issuance, RFC 8628 errors) + `/device` verification/approval UI; `ProcessDeviceCodeAsync` exchanges on poll.
 - **Token introspection + revocation**: `/connect/introspect` (RFC 7662) and `/connect/revoke` (RFC 7009), both with `client_id`/`client_secret` authentication. Refresh tokens revoke the whole rotating family; access tokens go to a `RevokedToken` denylist (jti-hashed table) that is enforced by `/connect/userinfo` and introspection.
 - **Server**: `ConnectController` (`/connect/token`, `/connect/deviceauthorization`, `/connect/introspect`, `/connect/revoke`, `/connect/jwks`, `/connect/userinfo`, `/connect/endsession`, `/.well-known/openid-configuration`), Razor Pages (login, consent, device approval, error), dynamic CORS (per-client origin whitelist), OpenAPI + Scalar + Swagger.
-- **AdminUi** is a Blazor **Server + WASM hybrid**, split into two projects: `DgDevelopment.Identity.AdminUi` (server host) and `DgDevelopment.Identity.AdminUi.Client` (WASM interactive pages/layout).
+- **IdentityPlatform** is a Blazor **Server + WASM hybrid**, split into two projects: `DgDevelopment.Identity.IdentityPlatform` (server host) and `DgDevelopment.Identity.IdentityPlatform.Client` (WASM interactive pages/layout).
 - **Client SDK** (`Client.Core` + `Client.Blazor`): `IdentityClient`, PKCE, token store in `sessionStorage`, refresh handler, `IdentityAuthStateProvider`, `SessionMarkerService` (`identity_marker` cookie) for SSR prerender restore.
 - **Test suite** (PRs #26–#33): `DgDevelopment.Identity.Server.UnitTests` (renamed from `UnitTests`) — 296 tests over domain, application, infrastructure and OAuth layers on a LocalDB fixture. Coverage HTML auto-generated to `TestResults\html` on every Debug build (ReportGenerator 5.5.11).
 - **DB seeding**: 30 permissions, SuperAdmin role, SuperAdmins group, superadmin user, admin client. Stable credentials between runs.
@@ -36,9 +36,9 @@ The OAuth 2.0 / OIDC authentication cycle is **fully merged into `develop`** (PR
 
 ### Working end-to-end flow
 
-- AdminUi `/login` → IDP `/connect/authorize` (PKCE S256) → IDP login (static SSR Razor Page) → consent (`Account/Consent`) → authorization code → AdminUi `/callback` → `/connect/token` → tokens saved in `sessionStorage` + `identity_marker` cookie
+- IdentityPlatform `/login` → IDP `/connect/authorize` (PKCE S256) → IDP login (static SSR Razor Page) → consent (`Account/Consent`) → authorization code → IdentityPlatform `/callback` → `/connect/token` → tokens saved in `sessionStorage` + `identity_marker` cookie
 - Ports are **dynamic** (Aspire binding); `IdentityBaseUrl` / `AdminBaseUrl` / `Identity:AdminClientSecret` come from AppHost/user-secrets
-- AdminUi top bar shows avatar (initials) + username + Logout when authenticated; Home nav is visible only when authenticated
+- IdentityPlatform top bar shows avatar (initials) + username + Logout when authenticated; Home nav is visible only when authenticated
 - Session restore: `IdentityAuthStateProvider` (WASM) reads stored tokens, refreshes if expired, fetches `/connect/userinfo` once (cached); `ServerIdentityAuthStateProvider` (prerender) reads the `identity_marker` cookie without network calls
 - IDP `/connect/userinfo` returns `sub` / `name` / `email`; client DTOs (`TokenResponse`, `UserInfo`) are aligned to the IDP **snake_case** responses
 
@@ -53,7 +53,7 @@ The OAuth 2.0 / OIDC authentication cycle is **fully merged into `develop`** (PR
 
 Ordered by dependency:
 
-1. **End-to-end verification**: first/all-run smoke test of `/connect/token` (keep the AppHost `Identity:AdminClientSecret` user-secret in sync with the seeded value) and of the AdminUi session restore via `userinfo`.
+1. **End-to-end verification**: first/all-run smoke test of `/connect/token` (keep the AppHost `Identity:AdminClientId` and `Identity:AdminClientSecret` user-secrets in sync with the seeded values) and of the IdentityPlatform session restore via `userinfo`.
 2. **Admin API `/api/v1/*`**: users, roles, permissions, groups, clients, platforms, audit — none implemented (only `ConnectController` and `MfaController` exist).
 3. **RBAC/PBAC**: effective-permissions algorithm (documented), entity scoping, `permission` claims in access tokens.
 4. **User management**: registration + email verification, password reset, password policy, lockout enforcement. **`INotificationService`** transport layer (email/notification sending) also not implemented.
@@ -76,7 +76,7 @@ Server ──> Application ──> Domain <── Infrastructure (implements Dom
   └──> Saml ───────────────────┘
         OAuth ──> Application ──> Domain
         Saml ──> Application ──> Domain
-AppHost ──> Server, AdminUi
+AppHost ──> Server, IdentityPlatform
 ```
 
 - **Domain** references no other projects. Contains entities, value objects, repository interfaces, domain services.
@@ -86,8 +86,8 @@ AppHost ──> Server, AdminUi
 - **OAuth** and **Saml** reference Application and Domain. Contain pure protocol logic.
 - **Client.Core** has no project references. Contains OIDC client logic, DTOs.
 - **Client.Blazor** references Client.Core. Contains Blazor auth components.
-- **AdminUi** references Client.Blazor. Blazor Server host (prerender, `ServerIdentityAuthStateProvider`).
-- **AdminUi.Client** references Client.Blazor. Blazor WASM interactive pages/layout (login, callback, home, nav).
+- **IdentityPlatform** references Client.Blazor. Blazor Server host (prerender, `ServerIdentityAuthStateProvider`).
+- **IdentityPlatform.Client** references Client.Blazor. Blazor WASM interactive pages/layout (login, callback, home, nav).
 
 ### Naming Convention C\#
 

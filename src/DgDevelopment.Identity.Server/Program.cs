@@ -1,11 +1,14 @@
 using DgDevelopment.Identity.Application.Consent;
 using DgDevelopment.Identity.Application.Services;
+using DgDevelopment.Identity.Application.Users;
 using DgDevelopment.Identity.Infrastructure.Data;
 using DgDevelopment.Identity.OAuth.Services;
 using DgDevelopment.Identity.Server.Data;
 using DgDevelopment.Identity.Server.Services;
 using DgDevelopment.Identity.ServiceDefaults;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,6 +29,12 @@ builder.Services.AddScoped<IPushMfaService, PushMfaService>();
 builder.Services.AddScoped<IMfaPolicyService, MfaPolicyService>();
 builder.Services.AddScoped<IMfaProvider, TotpMfaProvider>();
 builder.Services.AddScoped<IMfaProvider, PushMfaProvider>();
+builder.Services.AddScoped<DgDevelopment.Identity.Application.Authorization.IPermissionEvaluator, DgDevelopment.Identity.Application.Authorization.EffectivePermissionsService>();
+builder.Services.AddScoped<DgDevelopment.Identity.Application.Authorization.ITenantContext, DgDevelopment.Identity.Server.Authorization.TenantContext>();
+builder.Services.AddScoped<DgDevelopment.Identity.Application.Authorization.ITenantAccessValidator, DgDevelopment.Identity.Server.Authorization.TenantAccessValidator>();
+builder.Services.AddScoped<DgDevelopment.Identity.Application.Authorization.ITenantSelectionService, DgDevelopment.Identity.Application.Authorization.TenantSelectionService>();
+builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddOAuthEngine();
 builder.Services.AddScoped<IUserInteractionService, UserInteractionService>();
 builder.Services.AddScoped<IConsentService, ConsentService>();
@@ -50,7 +59,40 @@ builder.Services.AddAuthentication("Cookies")
         options.Cookie.Name = ".DgDevelopment.Identity.Partial";
         options.Cookie.HttpOnly = true;
         options.Cookie.IsEssential = true;
+     });
+
+builder.Services.AddOptions<JwtBearerOptions>("Bearer")
+    .Configure<IServiceScopeFactory, IClientIdCache>((options, scopeFactory, clientIdCache) =>
+    {
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            ValidateIssuer = true,
+            ValidIssuer = builder.Configuration["Identity:Issuer"] ?? "https://localhost:7157",
+            ValidateAudience = true,
+            AudienceValidator = (audiences, _, _) => audiences.Any(clientIdCache.IsValidClientId),
+            IssuerSigningKeyResolver = (_, _, _, _) =>
+            {
+                using var scope = scopeFactory.CreateScope();
+                var keyMaterial = scope.ServiceProvider.GetRequiredService<IKeyMaterialService>();
+                return keyMaterial.GetJwksDocumentAsync().GetAwaiter().GetResult().GetSigningKeys();
+            }
+        };
     });
+builder.Services.AddAuthentication().AddJwtBearer("Bearer", _ => { });
+builder.Services.AddProblemDetails(options =>
+{
+    options.CustomizeProblemDetails = context =>
+    {
+        if (!context.HttpContext.RequestServices.GetRequiredService<IHostEnvironment>().IsDevelopment())
+            return;
+
+        var error = context.HttpContext.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
+        if (error is not null)
+            context.ProblemDetails.Extensions["exception"] = error.ToString();
+    };
+});
 
 builder.Services.AddSignalR();
 builder.Services.AddAuthorization();
@@ -76,6 +118,7 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
+app.UseExceptionHandler();
 app.UseStaticFiles();
 
 using (var scope = app.Services.CreateScope())
@@ -111,9 +154,9 @@ app.MapGet("/", () => Results.Content(System.IO.File.ReadAllText(
 
 app.MapHealthChecks("/health");
 
+app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseCors();
 
 app.MapControllers();
 app.MapRazorPages();

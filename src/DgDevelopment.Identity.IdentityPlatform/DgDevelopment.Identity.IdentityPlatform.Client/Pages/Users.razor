@@ -1,0 +1,134 @@
+@page "/users"
+@using DgDevelopment.Identity.IdentityPlatform.Client.State
+@inject IdentityClient Api
+@inject NavigationManager Navigation
+@inject TenantState TenantState
+
+<PageTitle>Users | IdentityPlatform</PageTitle>
+
+<div class="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+    <div>
+        <p class="mb-2 text-xs font-semibold tracking-[0.2em] text-violet-700 uppercase">Directory</p>
+        <h1 class="text-3xl font-semibold tracking-tight text-slate-900">Users</h1>
+        <p class="mt-2 text-sm text-slate-500">Search accounts, review their status, and take operational actions.</p>
+    </div>
+    <button class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-800" @onclick="ToggleCreate">@(ShowCreate ? "Close form" : "Create user")</button>
+</div>
+
+@if (ShowCreate)
+{
+    <section class="mb-6 rounded-2xl border border-violet-200 bg-violet-50 p-5">
+        <h2 class="text-lg font-semibold text-slate-900">Create account</h2>
+        <EditForm Model="CreateModel" OnValidSubmit="CreateAsync" class="mt-4 grid gap-4 md:grid-cols-3">
+            <div><label class="mb-1 block text-xs font-semibold text-slate-500 uppercase">Username</label><InputText @bind-Value="CreateModel.Username" class="w-full rounded-lg border-slate-300" /></div>
+            <div><label class="mb-1 block text-xs font-semibold text-slate-500 uppercase">Email</label><InputText @bind-Value="CreateModel.Email" type="email" class="w-full rounded-lg border-slate-300" /></div>
+            <div><label class="mb-1 block text-xs font-semibold text-slate-500 uppercase">Temporary password</label><InputText @bind-Value="CreateModel.Password" type="password" class="w-full rounded-lg border-slate-300" /></div>
+            <div class="md:col-span-3"><button class="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800" disabled="@Busy">Create account</button></div>
+        </EditForm>
+    </section>
+}
+
+<div class="mb-4 flex flex-col gap-3 sm:flex-row">
+    <input @bind="Search" @bind:event="oninput" @onkeydown="HandleSearchKeyDown" placeholder="Search username or email" class="min-w-0 flex-1 rounded-lg border-slate-300 text-sm shadow-sm" />
+    <button class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" @onclick="LoadAsync">Search</button>
+</div>
+
+@if (TenantState.AllTenants)
+{
+    <div class="mb-4 rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs font-semibold text-violet-800">Viewing users across all tenants</div>
+}
+
+@if (Error is not null)
+{
+    <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">@Error</div>
+}
+else if (Loading)
+{
+    <div class="h-64 animate-pulse rounded-2xl bg-slate-100"></div>
+}
+else if (UserPage is not null)
+{
+    <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[700px] text-left text-sm">
+                <thead class="border-b border-slate-200 bg-slate-50 text-xs tracking-wide text-slate-500 uppercase"><tr><th class="px-5 py-4">Account</th><th class="px-5 py-4">Status</th><th class="px-5 py-4">MFA</th><th class="px-5 py-4">Created</th><th class="px-5 py-4"></th></tr></thead>
+                <tbody class="divide-y divide-slate-100">
+                    @foreach (var user in UserPage.Items)
+                    {
+                        <tr class="transition hover:bg-slate-50">
+                            <td class="px-5 py-4"><a href="/users/@user.Id" class="font-semibold text-slate-900 hover:text-violet-700">@user.Username</a><div class="text-xs text-slate-400">@user.Email</div></td>
+                            <td class="px-5 py-4"><span class="rounded-full px-2.5 py-1 text-xs font-semibold @(user.IsLocked ? "bg-amber-50 text-amber-700" : user.IsActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500")">@(user.IsLocked ? "Locked" : user.IsActive ? "Active" : "Inactive")</span></td>
+                            <td class="px-5 py-4 text-slate-500">@(user.RequireMfa ? "Required" : "Optional")</td>
+                            <td class="px-5 py-4 text-slate-500">@user.CreatedAt.ToLocalTime().ToString("d")</td>
+                            <td class="px-5 py-4 text-right"><a href="/users/@user.Id" class="font-semibold text-violet-700 hover:text-violet-900">Open</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="flex items-center justify-between border-t border-slate-200 px-5 py-4 text-sm text-slate-500"><span>@UserPage.TotalCount users</span><div class="flex gap-2"><button disabled="@(UserPage.Page <= 1)" @onclick="PreviousPage" class="rounded-md border border-slate-300 px-3 py-1.5 disabled:opacity-40">Previous</button><span class="px-2 py-1.5">@UserPage.Page / @UserPage.TotalPages</span><button disabled="@(UserPage.Page >= UserPage.TotalPages)" @onclick="NextPage" class="rounded-md border border-slate-300 px-3 py-1.5 disabled:opacity-40">Next</button></div></div>
+    </section>
+}
+
+@code {
+    private PagedUsersResponse? UserPage;
+    private string Search = string.Empty;
+    private int Page = 1;
+    private bool Loading = true;
+    private bool Busy;
+    private bool ShowCreate;
+    private string? Error;
+    private CreateUserForm CreateModel = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && OperatingSystem.IsBrowser())
+            await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            UserPage = await Api.GetUsersAsync(Search, Page, 20, TenantState.AllTenants).ConfigureAwait(false);
+            if (UserPage is null) Error = "The user directory returned no data.";
+        }
+        catch (HttpRequestException)
+        {
+            Error = "The user directory is currently unavailable.";
+        }
+        finally
+        {
+            Loading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        Busy = true;
+        try
+        {
+            await Api.CreateUserAsync(new CreateUserRequest(CreateModel.Username, CreateModel.Password, CreateModel.Email)).ConfigureAwait(false);
+            CreateModel = new();
+            ShowCreate = false;
+            await LoadAsync();
+        }
+        catch (HttpRequestException) { Error = "The user could not be created."; }
+        finally { Busy = false; }
+    }
+
+    private void ToggleCreate() => ShowCreate = !ShowCreate;
+    private async Task PreviousPage() { if (Page > 1) { Page--; await LoadAsync(); } }
+    private async Task NextPage() { if (UserPage is not null && Page < UserPage.TotalPages) { Page++; await LoadAsync(); } }
+    private async Task HandleSearchKeyDown(KeyboardEventArgs args) { if (args.Key == "Enter") { Page = 1; await LoadAsync(); } }
+
+    private sealed class CreateUserForm
+    {
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+    }
+}

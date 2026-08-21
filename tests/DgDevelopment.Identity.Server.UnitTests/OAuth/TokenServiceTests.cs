@@ -29,9 +29,9 @@ public sealed class TokenServiceTests : IClassFixture<DatabaseFixture<TokenServi
             .Replace("/", "_", StringComparison.Ordinal)
             .TrimEnd('=');
 
-    private static Client CreateOtherClient(string clientId, string secret, params string[] scopes)
+    private static Client CreateOtherClient(Guid tenantId, string clientId, string secret, params string[] scopes)
     {
-        var client = new Client(clientId, Hash(secret), $"Other {clientId}", ClientType.Confidential);
+        var client = new Client(tenantId, Guid.NewGuid(), Hash(secret), $"Other {clientId}", ClientType.Confidential);
         client.AddGrantType("authorization_code");
         foreach (var scope in scopes)
             client.AddScope(scope);
@@ -46,6 +46,7 @@ public sealed class TokenServiceTests : IClassFixture<DatabaseFixture<TokenServi
             new ClientRepository(context),
             new UserRepository(context),
             new UserSessionRepository(context),
+            new TenantRepository(context),
             new JwtService(keyMaterial, new FakeIssuerProvider()));
 
     private sealed class FakeIssuerProvider : IOidcIssuerProvider
@@ -56,6 +57,7 @@ public sealed class TokenServiceTests : IClassFixture<DatabaseFixture<TokenServi
     [Fact]
     public async Task ProcessAuthorizationCodeAsyncReturnsTokensForValidCode()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var clientId = await _fixture.GetSeededClientIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
         var code = $"code-{Guid.NewGuid():N}";
@@ -63,7 +65,7 @@ public sealed class TokenServiceTests : IClassFixture<DatabaseFixture<TokenServi
 
         await using var context = _fixture.CreateContext();
         var codeRepo = new AuthorizationCodeRepository(context);
-        await codeRepo.AddAsync(new AuthorizationCode(Hash(code), clientId, userId, SeededRedirect, ["openid", "profile"],
+        await codeRepo.AddAsync(new AuthorizationCode(tenantId, Hash(code), clientId, userId, SeededRedirect, ["openid", "profile"],
             ComputePkceChallenge(verifier), "S256"));
         using var keyMaterial = new KeyMaterialService(new SigningKeyRepository(context));
         var service = CreateService(context, keyMaterial);
@@ -98,13 +100,14 @@ public sealed class TokenServiceTests : IClassFixture<DatabaseFixture<TokenServi
     [Fact]
     public async Task ProcessAuthorizationCodeAsyncRejectsUsedCode()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var clientId = await _fixture.GetSeededClientIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
         var code = $"code-{Guid.NewGuid():N}";
 
         await using var context = _fixture.CreateContext();
         var codeRepo = new AuthorizationCodeRepository(context);
-        var stored = new AuthorizationCode(Hash(code), clientId, userId, SeededRedirect, ["openid"]);
+        var stored = new AuthorizationCode(tenantId, Hash(code), clientId, userId, SeededRedirect, ["openid"]);
         await codeRepo.AddAsync(stored);
         await codeRepo.MarkAsUsedAsync(stored.Id);
         using var keyMaterial = new KeyMaterialService(new SigningKeyRepository(context));
@@ -119,13 +122,14 @@ public sealed class TokenServiceTests : IClassFixture<DatabaseFixture<TokenServi
     [Fact]
     public async Task ProcessAuthorizationCodeAsyncRejectsExpiredCode()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var clientId = await _fixture.GetSeededClientIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
         var code = $"code-{Guid.NewGuid():N}";
 
         await using var context = _fixture.CreateContext();
         var codeRepo = new AuthorizationCodeRepository(context);
-        await codeRepo.AddAsync(new AuthorizationCode(Hash(code), clientId, userId, SeededRedirect, ["openid"], lifetimeSeconds: 0));
+        await codeRepo.AddAsync(new AuthorizationCode(tenantId, Hash(code), clientId, userId, SeededRedirect, ["openid"], lifetimeSeconds: 0));
         using var keyMaterial = new KeyMaterialService(new SigningKeyRepository(context));
         var service = CreateService(context, keyMaterial);
 
@@ -138,15 +142,16 @@ public sealed class TokenServiceTests : IClassFixture<DatabaseFixture<TokenServi
     [Fact]
     public async Task ProcessAuthorizationCodeAsyncRejectsClientMismatch()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
         var code = $"code-{Guid.NewGuid():N}";
 
         await using var context = _fixture.CreateContext();
         var clientRepo = new ClientRepository(context);
-        var otherClient = CreateOtherClient($"other-{Guid.NewGuid():N}", "secret", "openid");
+        var otherClient = CreateOtherClient(tenantId, $"other-{Guid.NewGuid():N}", "secret", "openid");
         await clientRepo.AddAsync(otherClient);
         var codeRepo = new AuthorizationCodeRepository(context);
-        await codeRepo.AddAsync(new AuthorizationCode(Hash(code), otherClient.Id, userId, SeededRedirect, ["openid"]));
+        await codeRepo.AddAsync(new AuthorizationCode(tenantId, Hash(code), otherClient.Id, userId, SeededRedirect, ["openid"]));
         using var keyMaterial = new KeyMaterialService(new SigningKeyRepository(context));
         var service = CreateService(context, keyMaterial);
 
@@ -159,6 +164,7 @@ public sealed class TokenServiceTests : IClassFixture<DatabaseFixture<TokenServi
     [Fact]
     public async Task ProcessAuthorizationCodeAsyncRejectsRedirectMismatch()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var clientId = await _fixture.GetSeededClientIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
         var code = $"code-{Guid.NewGuid():N}";
@@ -166,7 +172,7 @@ public sealed class TokenServiceTests : IClassFixture<DatabaseFixture<TokenServi
 
         await using var context = _fixture.CreateContext();
         var codeRepo = new AuthorizationCodeRepository(context);
-        await codeRepo.AddAsync(new AuthorizationCode(Hash(code), clientId, userId, otherRedirect, ["openid"]));
+        await codeRepo.AddAsync(new AuthorizationCode(tenantId, Hash(code), clientId, userId, otherRedirect, ["openid"]));
         using var keyMaterial = new KeyMaterialService(new SigningKeyRepository(context));
         var service = CreateService(context, keyMaterial);
 
@@ -179,13 +185,14 @@ public sealed class TokenServiceTests : IClassFixture<DatabaseFixture<TokenServi
     [Fact]
     public async Task ProcessAuthorizationCodeAsyncRejectsInvalidVerifier()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var clientId = await _fixture.GetSeededClientIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
         var code = $"code-{Guid.NewGuid():N}";
 
         await using var context = _fixture.CreateContext();
         var codeRepo = new AuthorizationCodeRepository(context);
-        await codeRepo.AddAsync(new AuthorizationCode(Hash(code), clientId, userId, SeededRedirect, ["openid"],
+        await codeRepo.AddAsync(new AuthorizationCode(tenantId, Hash(code), clientId, userId, SeededRedirect, ["openid"],
             ComputePkceChallenge("original-verifier"), "S256"));
         using var keyMaterial = new KeyMaterialService(new SigningKeyRepository(context));
         var service = CreateService(context, keyMaterial);
@@ -199,6 +206,7 @@ public sealed class TokenServiceTests : IClassFixture<DatabaseFixture<TokenServi
     [Fact]
     public async Task ProcessRefreshTokenAsyncRotatesTokenAndRevokesPrevious()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var clientId = await _fixture.GetSeededClientIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
 
@@ -209,7 +217,7 @@ public sealed class TokenServiceTests : IClassFixture<DatabaseFixture<TokenServi
 
         var oldValue = $"rt-{Guid.NewGuid():N}";
         var refreshRepo = new RefreshTokenRepository(context);
-        var oldToken = new RefreshToken(Hash(oldValue), clientId, userId, session.Id, ["openid", "profile"]);
+        var oldToken = new RefreshToken(tenantId, Hash(oldValue), clientId, userId, session.Id, ["openid", "profile"]);
         await refreshRepo.AddAsync(oldToken);
         using var keyMaterial = new KeyMaterialService(new SigningKeyRepository(context));
         var service = CreateService(context, keyMaterial);
@@ -247,6 +255,7 @@ public sealed class TokenServiceTests : IClassFixture<DatabaseFixture<TokenServi
     [Fact]
     public async Task ProcessRefreshTokenAsyncRejectsRevokedToken()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var clientId = await _fixture.GetSeededClientIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
 
@@ -257,7 +266,7 @@ public sealed class TokenServiceTests : IClassFixture<DatabaseFixture<TokenServi
 
         var oldValue = $"rt-{Guid.NewGuid():N}";
         var refreshRepo = new RefreshTokenRepository(context);
-        var oldToken = new RefreshToken(Hash(oldValue), clientId, userId, session.Id, ["openid"]);
+        var oldToken = new RefreshToken(tenantId, Hash(oldValue), clientId, userId, session.Id, ["openid"]);
         await refreshRepo.AddAsync(oldToken);
         await refreshRepo.RevokeAsync(oldToken.Id);
         using var keyMaterial = new KeyMaterialService(new SigningKeyRepository(context));
@@ -272,6 +281,7 @@ public sealed class TokenServiceTests : IClassFixture<DatabaseFixture<TokenServi
     [Fact]
     public async Task ProcessDeviceCodeAsyncReturnsTokensForAuthorizedDevice()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var clientId = await _fixture.GetSeededClientIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
         var deviceCodeValue = $"dc-{Guid.NewGuid():N}";
@@ -280,7 +290,7 @@ public sealed class TokenServiceTests : IClassFixture<DatabaseFixture<TokenServi
         var deviceRepo = new DeviceCodeRepository(context);
         var stored = new DeviceCode(Hash(deviceCodeValue), Hash($"uc-{Guid.NewGuid():N}"), clientId, ["openid"]);
         await deviceRepo.AddAsync(stored);
-        await deviceRepo.AuthorizeAsync(stored.Id, userId);
+        await deviceRepo.AuthorizeAsync(stored.Id, tenantId, userId);
         using var keyMaterial = new KeyMaterialService(new SigningKeyRepository(context));
         var service = CreateService(context, keyMaterial);
 

@@ -25,5 +25,7 @@ public sealed class DeviceCodeConfiguration : IEntityTypeConfiguration<DeviceCod
 
         builder.HasOne<Client>().WithMany().HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict).IsRequired(false);
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict).IsRequired(false);
+        builder.HasIndex(x => x.TenantId);
     }
 }

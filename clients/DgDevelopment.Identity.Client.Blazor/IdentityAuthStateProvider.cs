@@ -85,9 +85,9 @@ public class IdentityAuthStateProvider(IdentityClient client, ITokenStore tokenS
         return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
     }
 
-    public Uri GetLoginUrl(string? state = null, string? codeChallenge = null)
+    public Uri GetLoginUrl(string? state = null, string? codeChallenge = null, string? tenant = null)
     {
-        return new Uri(client.GetAuthorizeUrl(state, codeChallenge) + "&nonce=" + Guid.NewGuid().ToString("N"));
+        return new Uri(client.GetAuthorizeUrl(state, codeChallenge, tenant) + "&nonce=" + Guid.NewGuid().ToString("N"));
     }
 
     public async Task CompleteLoginAsync(string code, string codeVerifier, Uri? redirectUri = null)

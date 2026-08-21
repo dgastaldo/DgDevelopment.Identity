@@ -23,9 +23,9 @@ public sealed class AuthorizationServiceTests : IClassFixture<DatabaseFixture<Au
     private static string HashSecret(string secret)
         => Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(secret)));
 
-    private static Client CreateClient(string clientId, string secret, ClientType clientType, string redirectUri, params string[] scopes)
+    private static Client CreateClient(Guid tenantId, string clientId, string secret, ClientType clientType, string redirectUri, params string[] scopes)
     {
-        var client = new Client(clientId, HashSecret(secret), $"Test {clientId}", clientType);
+        var client = new Client(tenantId, Guid.NewGuid(), HashSecret(secret), $"Test {clientId}", clientType);
         client.AddGrantType("authorization_code");
         client.AddRedirectUri(new Uri(redirectUri));
         foreach (var scope in scopes)
@@ -50,7 +50,7 @@ public sealed class AuthorizationServiceTests : IClassFixture<DatabaseFixture<Au
 
         Assert.True(result.IsValid);
         Assert.NotNull(result.Client);
-        Assert.Equal(TestConstants.AdminClientId, result.Client.ClientId);
+        Assert.Equal(Guid.Parse(TestConstants.AdminClientId), result.Client.ClientId);
         Assert.Equal(TestConstants.AdminClientRedirectUri, result.RedirectUri);
         Assert.Null(result.Error);
     }
@@ -88,13 +88,13 @@ public sealed class AuthorizationServiceTests : IClassFixture<DatabaseFixture<Au
     {
         await using var context = _fixture.CreateContext();
         var repo = new ClientRepository(context);
-        var client = CreateClient($"deact-{Guid.NewGuid():N}", "secret", ClientType.Confidential, ClientRedirectUri, "openid");
+        var client = CreateClient(await _fixture.GetSeededTenantIdAsync(), $"deact-{Guid.NewGuid():N}", "secret", ClientType.Confidential, ClientRedirectUri, "openid");
         await repo.AddAsync(client);
         client.Deactivate();
         await repo.UpdateAsync(client);
 
         var service = CreateService(context);
-        var result = await service.ValidateAsync(CreateRequest(client.ClientId, ClientRedirectUri));
+        var result = await service.ValidateAsync(CreateRequest(client.ClientId.ToString(), ClientRedirectUri));
 
         Assert.False(result.IsValid);
         Assert.Equal("invalid_client", result.Error);
@@ -148,11 +148,11 @@ public sealed class AuthorizationServiceTests : IClassFixture<DatabaseFixture<Au
     {
         await using var context = _fixture.CreateContext();
         var repo = new ClientRepository(context);
-        var client = CreateClient($"public-{Guid.NewGuid():N}", "secret", ClientType.Public, ClientRedirectUri, "openid");
+        var client = CreateClient(await _fixture.GetSeededTenantIdAsync(), $"public-{Guid.NewGuid():N}", "secret", ClientType.Public, ClientRedirectUri, "openid");
         await repo.AddAsync(client);
 
         var service = CreateService(context);
-        var result = await service.ValidateAsync(CreateRequest(client.ClientId, ClientRedirectUri));
+        var result = await service.ValidateAsync(CreateRequest(client.ClientId.ToString(), ClientRedirectUri));
 
         Assert.False(result.IsValid);
         Assert.Equal("invalid_request", result.Error);
@@ -176,6 +176,7 @@ public sealed class AuthorizationServiceTests : IClassFixture<DatabaseFixture<Au
     [Fact]
     public async Task CreateAuthorizationCodeAsyncPersistsHashedCode()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
         await using var context = _fixture.CreateContext();
         var clientRepo = new ClientRepository(context);
@@ -184,7 +185,7 @@ public sealed class AuthorizationServiceTests : IClassFixture<DatabaseFixture<Au
         var codeRepo = new AuthorizationCodeRepository(context);
         var service = new AuthorizationService(clientRepo, codeRepo);
 
-        var code = await service.CreateAuthorizationCodeAsync(client!, user!, ["openid", "profile"], TestConstants.AdminClientRedirectUri, "challenge-123", "S256");
+        var code = await service.CreateAuthorizationCodeAsync(tenantId, client!, user!, ["openid", "profile"], TestConstants.AdminClientRedirectUri, "challenge-123", "S256");
 
         Assert.False(string.IsNullOrWhiteSpace(code));
         var codeHash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(code)));

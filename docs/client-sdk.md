@@ -26,7 +26,7 @@ Base library providing OIDC/OAuth communication with the Identity Server. All pl
 var options = new OidcOptions
 {
     Authority = "https://identity.dgdevelopment.local",
-    ClientId = "admin-ui",
+    ClientId = "<client-guid>",
     ClientSecret = "...",
     RedirectUri = "https://myapp.local/callback",
     PostLogoutRedirectUri = "https://myapp.local/signout-callback",
@@ -82,7 +82,7 @@ Razor Class Library for Blazor (WASM and Hybrid) providing authentication state,
 builder.Services.AddIdentityAuthentication(new OidcOptions
 {
     Authority = "https://identity.dgdevelopment.local",
-    ClientId = "admin-ui",
+    ClientId = "<client-guid>",
     ClientSecret = "...",
     RedirectUri = builder.HostEnvironment.BaseAddress + "callback",
     PostLogoutRedirectUri = builder.HostEnvironment.BaseAddress + "signout-callback"

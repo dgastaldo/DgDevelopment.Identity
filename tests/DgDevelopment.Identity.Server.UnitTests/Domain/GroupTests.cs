@@ -5,10 +5,12 @@ using Xunit;
 
 public sealed class GroupTests
 {
+    private static readonly Guid TenantId = Guid.NewGuid();
+
     [Fact]
     public void ConstructorSetsFields()
     {
-        var group = new Group("Team", "Team group");
+        var group = new Group(TenantId, "Team", "Team group");
 
         Assert.False(string.IsNullOrWhiteSpace(group.Id.ToString()));
         Assert.Equal("Team", group.Name);
@@ -21,7 +23,7 @@ public sealed class GroupTests
     public void ConstructorSetsParentGroup()
     {
         var parentId = Guid.NewGuid();
-        var group = new Group("Child", "desc", parentId);
+        var group = new Group(TenantId, "Child", "desc", parentId);
 
         Assert.Equal(parentId, group.ParentGroupId);
     }
@@ -29,8 +31,8 @@ public sealed class GroupTests
     [Fact]
     public void AddRoleAddsOnceAndRemoveRoleClears()
     {
-        var group = new Group("Team", "desc");
-        var role = new Role("Admin", "desc");
+        var group = new Group(TenantId, "Team", "desc");
+        var role = new Role(TenantId, "Admin", "desc");
 
         group.AddRole(role);
         group.AddRole(role);
@@ -46,7 +48,7 @@ public sealed class GroupTests
     [Fact]
     public void SetParentUpdatesParentGroupId()
     {
-        var group = new Group("Team", "desc");
+        var group = new Group(TenantId, "Team", "desc");
         var parentId = Guid.NewGuid();
 
         group.SetParent(parentId);

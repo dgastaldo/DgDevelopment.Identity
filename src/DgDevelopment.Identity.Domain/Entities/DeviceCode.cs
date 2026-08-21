@@ -3,6 +3,7 @@ namespace DgDevelopment.Identity.Domain.Entities;
 public sealed class DeviceCode
 {
     public Guid Id { get; private set; }
+    public Guid? TenantId { get; private set; }
     public string DeviceCodeHash { get; private set; }
     public string UserCodeHash { get; private set; }
     public Guid ClientId { get; private set; }
@@ -29,8 +30,9 @@ public sealed class DeviceCode
         ExpiresAt = DateTime.UtcNow.AddSeconds(lifetimeSeconds);
     }
 
-    public void Authorize(Guid userId)
+    public void Authorize(Guid tenantId, Guid userId)
     {
+        TenantId = tenantId;
         UserId = userId;
         IsAuthorized = true;
     }

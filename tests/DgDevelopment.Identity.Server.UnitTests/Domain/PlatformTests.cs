@@ -5,10 +5,12 @@ using Xunit;
 
 public sealed class PlatformTests
 {
+    private static readonly Guid TenantId = Guid.NewGuid();
+
     [Fact]
     public void ConstructorSetsFields()
     {
-        var platform = new Platform("IdentityAdmin", "Admin platform", PermissionMode.IdentityManaged);
+        var platform = new Platform(TenantId,"IdentityAdmin", "Admin platform", PermissionMode.IdentityManaged);
 
         Assert.False(string.IsNullOrWhiteSpace(platform.Id.ToString()));
         Assert.Equal("IdentityAdmin", platform.Name);
@@ -19,7 +21,7 @@ public sealed class PlatformTests
     [Fact]
     public void ConstructorDefaultsToIdentityManagedMode()
     {
-        var platform = new Platform("Reporting", "Reporting platform", PermissionMode.AuthOnly);
+        var platform = new Platform(TenantId,"Reporting", "Reporting platform", PermissionMode.AuthOnly);
 
         Assert.Equal(PermissionMode.AuthOnly, platform.PermissionMode);
     }

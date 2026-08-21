@@ -34,12 +34,12 @@ public sealed class DeviceCodeRepository : IDeviceCodeRepository
         await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
-    public async Task AuthorizeAsync(Guid id, Guid userId, CancellationToken ct = default)
+    public async Task AuthorizeAsync(Guid id, Guid tenantId, Guid userId, CancellationToken ct = default)
     {
         var code = await _context.DeviceCodes.FindAsync([id], ct).ConfigureAwait(false);
         if (code is not null)
         {
-            code.Authorize(userId);
+            code.Authorize(tenantId, userId);
             await _context.SaveChangesAsync(ct).ConfigureAwait(false);
         }
     }

@@ -42,12 +42,12 @@ public sealed class TokenRevocationServiceTests : IClassFixture<DatabaseFixture<
     private static async Task<string> CreateAccessTokenAsync(IdentityDbContext context, KeyMaterialService keyMaterial, Client client, User user)
     {
         var jwt = new JwtService(keyMaterial, new FakeIssuerProvider());
-        return await jwt.CreateAccessTokenAsync(new AccessTokenRequest(user, client, ["openid", "profile"], null));
+        return await jwt.CreateAccessTokenAsync(new AccessTokenRequest(client.TenantId, user, client, ["openid", "profile"], null));
     }
 
-    private static Client CreateOtherClient(string clientId, string secret)
+    private static Client CreateOtherClient(Guid tenantId, string clientId, string secret)
     {
-        var client = new Client(clientId, Hash(secret), $"Other {clientId}", ClientType.Confidential);
+        var client = new Client(tenantId, Guid.NewGuid(), Hash(secret), $"Other {clientId}", ClientType.Confidential);
         client.AddGrantType("client_credentials");
         client.AddScope("openid");
         return client;
@@ -61,6 +61,7 @@ public sealed class TokenRevocationServiceTests : IClassFixture<DatabaseFixture<
     [Fact]
     public async Task RevokeAsyncRevokesRefreshToken()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var clientId = await _fixture.GetSeededClientIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
 
@@ -71,7 +72,7 @@ public sealed class TokenRevocationServiceTests : IClassFixture<DatabaseFixture<
 
         var value = $"rt-{Guid.NewGuid():N}";
         var refreshRepo = new RefreshTokenRepository(context);
-        var stored = new RefreshToken(Hash(value), clientId, userId, session.Id, ["openid"]);
+        var stored = new RefreshToken(tenantId, Hash(value), clientId, userId, session.Id, ["openid"]);
         await refreshRepo.AddAsync(stored);
 
         var clientRepo = new ClientRepository(context);
@@ -89,6 +90,7 @@ public sealed class TokenRevocationServiceTests : IClassFixture<DatabaseFixture<
     [Fact]
     public async Task RevokeAsyncRevokesRefreshTokenFamily()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var clientId = await _fixture.GetSeededClientIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
 
@@ -100,9 +102,9 @@ public sealed class TokenRevocationServiceTests : IClassFixture<DatabaseFixture<
         var firstValue = $"rt-{Guid.NewGuid():N}";
         var secondValue = $"rt-{Guid.NewGuid():N}";
         var refreshRepo = new RefreshTokenRepository(context);
-        var first = new RefreshToken(Hash(firstValue), clientId, userId, session.Id, ["openid"]);
+        var first = new RefreshToken(tenantId, Hash(firstValue), clientId, userId, session.Id, ["openid"]);
         await refreshRepo.AddAsync(first);
-        var second = new RefreshToken(Hash(secondValue), clientId, userId, session.Id, ["openid"], first.Id);
+        var second = new RefreshToken(tenantId, Hash(secondValue), clientId, userId, session.Id, ["openid"], first.Id);
         await refreshRepo.AddAsync(second);
 
         var clientRepo = new ClientRepository(context);
@@ -123,6 +125,7 @@ public sealed class TokenRevocationServiceTests : IClassFixture<DatabaseFixture<
     [Fact]
     public async Task RevokeAsyncDoesNotRevokeForeignRefreshToken()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
 
         await using var context = _fixture.CreateContext();
@@ -131,12 +134,12 @@ public sealed class TokenRevocationServiceTests : IClassFixture<DatabaseFixture<
         await sessionRepo.AddAsync(session);
 
         var clientRepo = new ClientRepository(context);
-        var otherClient = CreateOtherClient($"other-{Guid.NewGuid():N}", "secret");
+        var otherClient = CreateOtherClient(tenantId, $"other-{Guid.NewGuid():N}", "secret");
         await clientRepo.AddAsync(otherClient);
 
         var value = $"rt-{Guid.NewGuid():N}";
         var refreshRepo = new RefreshTokenRepository(context);
-        var stored = new RefreshToken(Hash(value), otherClient.Id, userId, session.Id, ["openid"]);
+        var stored = new RefreshToken(tenantId, Hash(value), otherClient.Id, userId, session.Id, ["openid"]);
         await refreshRepo.AddAsync(stored);
 
         var adminClient = await clientRepo.GetByClientIdAsync(TestConstants.AdminClientId);
@@ -182,7 +185,7 @@ public sealed class TokenRevocationServiceTests : IClassFixture<DatabaseFixture<
         await using var context = _fixture.CreateContext();
         var clientRepo = new ClientRepository(context);
         var userRepo = new UserRepository(context);
-        var otherClient = CreateOtherClient($"other-{Guid.NewGuid():N}", "secret");
+        var otherClient = CreateOtherClient(await _fixture.GetSeededTenantIdAsync(), $"other-{Guid.NewGuid():N}", "secret");
         await clientRepo.AddAsync(otherClient);
         var userId = await _fixture.GetSeededUserIdAsync();
         var user = await userRepo.GetByIdAsync(userId);

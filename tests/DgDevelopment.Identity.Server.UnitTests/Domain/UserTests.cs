@@ -7,6 +7,7 @@ using Xunit;
 public sealed class UserTests
 {
     private static readonly EmailAddress Email = EmailAddress.FromString("user@example.com");
+    private static readonly Guid TenantId = Guid.NewGuid();
 
     private static User CreateUser() => new($"user-{Guid.NewGuid():N}", "hash", Email);
 
@@ -238,7 +239,7 @@ public sealed class UserTests
     public void AssignRoleAddsOnceAndRemoveRoleClears()
     {
         var user = CreateUser();
-        var role = new Role("Tester", "desc");
+        var role = new Role(TenantId, "Tester", "desc");
 
         user.AssignRole(role);
         user.AssignRole(role);
@@ -256,8 +257,8 @@ public sealed class UserTests
         var user = CreateUser();
         var permission = new Permission("role:read", "desc", "Role");
 
-        user.GrantPermission(permission);
-        user.GrantPermission(permission);
+        user.GrantPermission(TenantId, permission);
+        user.GrantPermission(TenantId, permission);
 
         Assert.Single(user.Permissions);
         Assert.Equal(permission.Id, Assert.Single(user.Permissions).PermissionId);
@@ -270,7 +271,7 @@ public sealed class UserTests
     public void AddToGroupAddsOnceAndRemoveFromGroupClears()
     {
         var user = CreateUser();
-        var group = new Group("G", "desc");
+        var group = new Group(TenantId, "G", "desc");
 
         user.AddToGroup(group);
         user.AddToGroup(group);

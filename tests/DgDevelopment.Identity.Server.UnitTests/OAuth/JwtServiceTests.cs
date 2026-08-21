@@ -64,7 +64,7 @@ public sealed class JwtServiceTests : IClassFixture<DatabaseFixture<JwtServiceTe
         using var keyMaterial = new KeyMaterialService(new SigningKeyRepository(context));
         var service = CreateService(context, keyMaterial);
 
-        var token = await service.CreateIdTokenAsync(new(user, client, ["openid", "profile"], "nonce-123", ["pwd", "otp"], "session-1"));
+        var token = await service.CreateIdTokenAsync(new(client.TenantId, user, client, ["openid", "profile"], "nonce-123", ["pwd", "otp"], "session-1"));
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
 
         Assert.Equal(user.Id.ToString(), jwt.Subject);
@@ -75,6 +75,7 @@ public sealed class JwtServiceTests : IClassFixture<DatabaseFixture<JwtServiceTe
         Assert.Equal(user.Username, jwt.Claims.First(c => c.Type == "name").Value);
         Assert.Equal("nonce-123", jwt.Claims.First(c => c.Type == JwtRegisteredClaimNames.Nonce).Value);
         Assert.Equal("session-1", jwt.Claims.First(c => c.Type == "sid").Value);
+        Assert.Equal(client.TenantId.ToString(), jwt.Claims.First(c => c.Type == "tid").Value);
         Assert.Contains("pwd", jwt.Claims.Where(c => c.Type == "amr").Select(c => c.Value));
         Assert.Contains("otp", jwt.Claims.Where(c => c.Type == "amr").Select(c => c.Value));
         Assert.NotNull(jwt.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.AuthTime));
@@ -89,7 +90,7 @@ public sealed class JwtServiceTests : IClassFixture<DatabaseFixture<JwtServiceTe
         using var keyMaterial = new KeyMaterialService(new SigningKeyRepository(context));
         var service = CreateService(context, keyMaterial);
 
-        var token = await service.CreateIdTokenAsync(new(user, client, ["openid"], null, ["pwd"], "session-1"));
+        var token = await service.CreateIdTokenAsync(new(client.TenantId, user, client, ["openid"], null, ["pwd"], "session-1"));
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
 
         Assert.DoesNotContain(jwt.Claims, c => c.Type == JwtRegisteredClaimNames.Nonce);
@@ -104,7 +105,7 @@ public sealed class JwtServiceTests : IClassFixture<DatabaseFixture<JwtServiceTe
         using var keyMaterial = new KeyMaterialService(new SigningKeyRepository(context));
         var service = CreateService(context, keyMaterial);
 
-        var token = await service.CreateAccessTokenAsync(new(user, client, ["openid", "profile"], ["user:read", "role:read"]));
+        var token = await service.CreateAccessTokenAsync(new(client.TenantId, user, client, ["openid", "profile"], ["user:read", "role:read"]));
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
 
         Assert.Equal(user.Id.ToString(), jwt.Subject);
@@ -114,6 +115,7 @@ public sealed class JwtServiceTests : IClassFixture<DatabaseFixture<JwtServiceTe
         Assert.Equal("openid profile", jwt.Claims.First(c => c.Type == "scope").Value);
         Assert.Equal("user:read role:read", jwt.Claims.First(c => c.Type == "permission").Value);
         Assert.NotNull(jwt.Claims.First(c => c.Type == JwtRegisteredClaimNames.Jti));
+        Assert.Equal(client.TenantId.ToString(), jwt.Claims.First(c => c.Type == "tid").Value);
     }
 
     [Fact]
@@ -125,7 +127,7 @@ public sealed class JwtServiceTests : IClassFixture<DatabaseFixture<JwtServiceTe
         using var keyMaterial = new KeyMaterialService(new SigningKeyRepository(context));
         var service = CreateService(context, keyMaterial);
 
-        var token = await service.CreateAccessTokenAsync(new(user, client, ["openid"], null));
+        var token = await service.CreateAccessTokenAsync(new(client.TenantId, user, client, ["openid"], null));
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
 
         Assert.DoesNotContain(jwt.Claims, c => c.Type == "permission");
@@ -140,7 +142,7 @@ public sealed class JwtServiceTests : IClassFixture<DatabaseFixture<JwtServiceTe
         using var keyMaterial = new KeyMaterialService(new SigningKeyRepository(context));
         var service = CreateService(context, keyMaterial);
 
-        var token = await service.CreateIdTokenAsync(new(user, client, ["openid"], null, ["pwd"], "session-1"));
+        var token = await service.CreateIdTokenAsync(new(client.TenantId, user, client, ["openid"], null, ["pwd"], "session-1"));
         var parameters = await CreateValidationParametersAsync(keyMaterial);
 
         var principal = await service.ValidateTokenAsync(token, parameters);

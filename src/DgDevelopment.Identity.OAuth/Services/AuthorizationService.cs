@@ -42,14 +42,14 @@ public sealed class AuthorizationService(IClientRepository clientRepository, IAu
         return new(true, client, null, null, request.RedirectUri);
     }
 
-    public async Task<string> CreateAuthorizationCodeAsync(Client client, User user, string[] scopes, string redirectUri, string? codeChallenge, string? codeChallengeMethod, CancellationToken ct = default)
+    public async Task<string> CreateAuthorizationCodeAsync(Guid tenantId, Client client, User user, string[] scopes, string redirectUri, string? codeChallenge, string? codeChallengeMethod, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(user);
         var code = Secret.Generate(32);
         var codeHash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(code)));
 
-        var authCode = new AuthorizationCode(codeHash, client.Id, user.Id, new Uri(redirectUri), scopes, codeChallenge, codeChallengeMethod);
+        var authCode = new AuthorizationCode(tenantId, codeHash, client.Id, user.Id, new Uri(redirectUri), scopes, codeChallenge, codeChallengeMethod);
         await codeRepository.AddAsync(authCode, ct).ConfigureAwait(false);
 
         return code;

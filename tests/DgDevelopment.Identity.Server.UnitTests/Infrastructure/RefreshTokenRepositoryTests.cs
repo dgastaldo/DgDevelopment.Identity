@@ -28,10 +28,11 @@ public sealed class RefreshTokenRepositoryTests : IClassFixture<DatabaseFixture<
     [Fact]
     public async Task AddAndGetByTokenHashRoundTrips()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var clientId = await _fixture.GetSeededClientIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
         var sessionId = await CreateSessionAsync(userId);
-        var token = new RefreshToken(UniqueHash("token"), clientId, userId, sessionId, ["openid", "profile"]);
+        var token = new RefreshToken(tenantId, UniqueHash("token"), clientId, userId, sessionId, ["openid", "profile"]);
         await using var context = _fixture.CreateContext();
         var repo = new RefreshTokenRepository(context);
         await repo.AddAsync(token);
@@ -60,10 +61,11 @@ public sealed class RefreshTokenRepositoryTests : IClassFixture<DatabaseFixture<
     [Fact]
     public async Task RevokePersistsFlag()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var clientId = await _fixture.GetSeededClientIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
         var sessionId = await CreateSessionAsync(userId);
-        var token = new RefreshToken(UniqueHash("token"), clientId, userId, sessionId, ["openid"]);
+        var token = new RefreshToken(tenantId, UniqueHash("token"), clientId, userId, sessionId, ["openid"]);
         await using var context = _fixture.CreateContext();
         var repo = new RefreshTokenRepository(context);
         await repo.AddAsync(token);
@@ -78,17 +80,18 @@ public sealed class RefreshTokenRepositoryTests : IClassFixture<DatabaseFixture<
     [Fact]
     public async Task RevokeChainRevokesTheEntireFamily()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var clientId = await _fixture.GetSeededClientIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
         var sessionId = await CreateSessionAsync(userId);
         await using var context = _fixture.CreateContext();
         var repo = new RefreshTokenRepository(context);
 
-        var first = new RefreshToken(UniqueHash("chain"), clientId, userId, sessionId, ["openid"]);
+        var first = new RefreshToken(tenantId, UniqueHash("chain"), clientId, userId, sessionId, ["openid"]);
         await repo.AddAsync(first);
-        var second = new RefreshToken(UniqueHash("chain"), clientId, userId, sessionId, ["openid"], first.Id);
+        var second = new RefreshToken(tenantId, UniqueHash("chain"), clientId, userId, sessionId, ["openid"], first.Id);
         await repo.AddAsync(second);
-        var third = new RefreshToken(UniqueHash("chain"), clientId, userId, sessionId, ["openid"], second.Id);
+        var third = new RefreshToken(tenantId, UniqueHash("chain"), clientId, userId, sessionId, ["openid"], second.Id);
         await repo.AddAsync(third);
 
         await repo.RevokeChainAsync(third.TokenHash);
@@ -101,13 +104,14 @@ public sealed class RefreshTokenRepositoryTests : IClassFixture<DatabaseFixture<
     [Fact]
     public async Task DeleteExpiredRemovesOnlyExpiredTokens()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var clientId = await _fixture.GetSeededClientIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
         var sessionId = await CreateSessionAsync(userId);
         await using var context = _fixture.CreateContext();
         var repo = new RefreshTokenRepository(context);
-        var expired = new RefreshToken(UniqueHash("expired"), clientId, userId, sessionId, ["openid"], lifetimeDays: 0);
-        var valid = new RefreshToken(UniqueHash("valid"), clientId, userId, sessionId, ["openid"]);
+        var expired = new RefreshToken(tenantId, UniqueHash("expired"), clientId, userId, sessionId, ["openid"], lifetimeDays: 0);
+        var valid = new RefreshToken(tenantId, UniqueHash("valid"), clientId, userId, sessionId, ["openid"]);
         await repo.AddAsync(expired);
         await repo.AddAsync(valid);
 

@@ -10,7 +10,7 @@ public sealed class TokenResponse
     [JsonPropertyName("id_token")] public string? IdToken { get; init; }
     [JsonPropertyName("refresh_token")] public string? RefreshToken { get; init; }
     [JsonPropertyName("scope")] public string Scope { get; init; } = string.Empty;
-    [JsonPropertyName("issued_at")] public DateTime IssuedAt { get; init; } = DateTime.UtcNow;
+    [JsonPropertyName("issued_at")] public DateTime IssuedAt { get; set; } = DateTime.UtcNow;
 
     public bool IsExpired() => DateTime.UtcNow >= IssuedAt.AddSeconds(ExpiresIn - 30);
 }

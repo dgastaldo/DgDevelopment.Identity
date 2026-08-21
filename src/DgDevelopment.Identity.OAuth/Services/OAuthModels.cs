@@ -57,6 +57,7 @@ public sealed record ClientValidationResult(
     string? ErrorDescription);
 
 public sealed record IdTokenRequest(
+    Guid TenantId,
     User User,
     Client Client,
     IReadOnlyCollection<string> Scopes,
@@ -65,6 +66,7 @@ public sealed record IdTokenRequest(
     string SessionId);
 
 public sealed record AccessTokenRequest(
+    Guid TenantId,
     User User,
     Client Client,
     IReadOnlyCollection<string> Scopes,

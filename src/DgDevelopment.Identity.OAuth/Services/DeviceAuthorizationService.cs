@@ -60,7 +60,7 @@ public sealed class DeviceAuthorizationService(
         return new DeviceApprovalInfo(stored.Id, client.Name, stored.GetScopes());
     }
 
-    public async Task<bool> ApproveAsync(string userCode, Guid userId, CancellationToken ct = default)
+    public async Task<bool> ApproveAsync(string userCode, Guid tenantId, Guid userId, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(userCode))
             return false;
@@ -69,7 +69,7 @@ public sealed class DeviceAuthorizationService(
         if (stored is null || stored.IsExpired() || stored.IsUsed)
             return false;
 
-        await deviceCodeRepository.AuthorizeAsync(stored.Id, userId, ct).ConfigureAwait(false);
+        await deviceCodeRepository.AuthorizeAsync(stored.Id, tenantId, userId, ct).ConfigureAwait(false);
         return true;
     }
 

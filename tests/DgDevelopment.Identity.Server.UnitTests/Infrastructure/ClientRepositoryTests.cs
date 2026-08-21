@@ -17,9 +17,9 @@ public sealed class ClientRepositoryTests : IClassFixture<DatabaseFixture<Client
         _fixture = fixture;
     }
 
-    private static Client CreateClient(string? clientId = null, string host = "one.example")
+    private static Client CreateClient(Guid tenantId, string? clientId = null, string host = "one.example")
     {
-        var client = new Client(clientId ?? $"test-client-{Guid.NewGuid():N}", "secret-hash", "Test Client", ClientType.Confidential);
+        var client = new Client(tenantId, clientId is null ? Guid.NewGuid() : Guid.Parse(clientId), "secret-hash", "Test Client", ClientType.Confidential);
         client.AddGrantType("authorization_code");
         client.AddGrantType("refresh_token");
         client.AddScope("openid");
@@ -33,12 +33,12 @@ public sealed class ClientRepositoryTests : IClassFixture<DatabaseFixture<Client
     [Fact]
     public async Task AddAndGetByClientIdRoundTripsOwnedCollections()
     {
-        var client = CreateClient();
+        var client = CreateClient(await _fixture.GetSeededTenantIdAsync());
         await using var context = _fixture.CreateContext();
         var repo = new ClientRepository(context);
         await repo.AddAsync(client);
 
-        var stored = await repo.GetByClientIdAsync(client.ClientId);
+        var stored = await repo.GetByClientIdAsync(client.ClientId.ToString());
 
         Assert.NotNull(stored);
         Assert.True(stored.IsActive);
@@ -56,7 +56,7 @@ public sealed class ClientRepositoryTests : IClassFixture<DatabaseFixture<Client
     [Fact]
     public async Task AddAndGetByIdRoundTripsOwnedCollections()
     {
-        var client = CreateClient();
+        var client = CreateClient(await _fixture.GetSeededTenantIdAsync());
         await using var context = _fixture.CreateContext();
         var repo = new ClientRepository(context);
         await repo.AddAsync(client);
@@ -92,7 +92,7 @@ public sealed class ClientRepositoryTests : IClassFixture<DatabaseFixture<Client
     [Fact]
     public async Task UpdateAsyncPersistsScalarChanges()
     {
-        var client = CreateClient();
+        var client = CreateClient(await _fixture.GetSeededTenantIdAsync());
         await using var context = _fixture.CreateContext();
         var repo = new ClientRepository(context);
         await repo.AddAsync(client);
@@ -102,7 +102,7 @@ public sealed class ClientRepositoryTests : IClassFixture<DatabaseFixture<Client
         tracked.Deactivate();
         await repo.UpdateAsync(tracked);
 
-        var stored = await repo.GetByClientIdAsync(client.ClientId);
+        var stored = await repo.GetByClientIdAsync(client.ClientId.ToString());
         Assert.NotNull(stored);
         Assert.Equal("updated-hash", stored.ClientSecretHash);
         Assert.False(stored.IsActive);
@@ -111,14 +111,14 @@ public sealed class ClientRepositoryTests : IClassFixture<DatabaseFixture<Client
     [Fact]
     public async Task DeleteRemovesClientAndOwnedCollections()
     {
-        var client = CreateClient();
+        var client = CreateClient(await _fixture.GetSeededTenantIdAsync());
         await using var context = _fixture.CreateContext();
         var repo = new ClientRepository(context);
         await repo.AddAsync(client);
 
         await repo.DeleteAsync(client.Id);
 
-        Assert.Null(await repo.GetByClientIdAsync(client.ClientId));
+        Assert.Null(await repo.GetByClientIdAsync(client.ClientId.ToString()));
         Assert.Equal(0, await context.Clients.CountAsync(c => c.Id == client.Id));
         Assert.Equal(0, await CountOwnedAsync(context, "ClientGrantTypes", client.Id));
         Assert.Equal(0, await CountOwnedAsync(context, "ClientScopes", client.Id));
@@ -146,8 +146,9 @@ public sealed class ClientRepositoryTests : IClassFixture<DatabaseFixture<Client
     [Fact]
     public async Task GetAllActiveClientIdsExcludesDeactivatedClients()
     {
-        var active = CreateClient();
-        var deactivated = CreateClient();
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
+        var active = CreateClient(tenantId);
+        var deactivated = CreateClient(tenantId);
         await using var context = _fixture.CreateContext();
         var repo = new ClientRepository(context);
         await repo.AddAsync(active);
@@ -159,15 +160,16 @@ public sealed class ClientRepositoryTests : IClassFixture<DatabaseFixture<Client
 
         var ids = await repo.GetAllActiveClientIdsAsync();
 
-        Assert.Contains(active.ClientId, ids);
-        Assert.DoesNotContain(deactivated.ClientId, ids);
+        Assert.Contains(active.ClientId.ToString(), ids);
+        Assert.DoesNotContain(deactivated.ClientId.ToString(), ids);
     }
 
     [Fact]
     public async Task GetAllActiveRedirectUrisExcludesDeactivatedClients()
     {
-        var active = CreateClient(host: "one.example");
-        var deactivated = CreateClient(host: "two.example");
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
+        var active = CreateClient(tenantId, host: "one.example");
+        var deactivated = CreateClient(tenantId, host: "two.example");
         await using var context = _fixture.CreateContext();
         var repo = new ClientRepository(context);
         await repo.AddAsync(active);

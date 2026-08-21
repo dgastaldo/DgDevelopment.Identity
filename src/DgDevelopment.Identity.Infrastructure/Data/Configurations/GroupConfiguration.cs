@@ -15,6 +15,8 @@ public sealed class GroupConfiguration : IEntityTypeConfiguration<Group>
         builder.Property(x => x.Description).HasMaxLength(500);
 
         builder.HasOne<Group>().WithMany().HasForeignKey(x => x.ParentGroupId).OnDelete(DeleteBehavior.Restrict).IsRequired(false);
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(x => x.TenantId);
 
         builder.HasMany(x => x.Roles).WithOne().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Restrict);
     }

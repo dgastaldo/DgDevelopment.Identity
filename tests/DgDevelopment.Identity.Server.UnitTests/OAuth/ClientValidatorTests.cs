@@ -21,9 +21,9 @@ public sealed class ClientValidatorTests : IClassFixture<DatabaseFixture<ClientV
     private static string HashSecret(string secret)
         => Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(secret)));
 
-    private static Client CreateClient(string clientId, string secret, ClientType clientType, params string[] grantTypes)
+    private static Client CreateClient(Guid tenantId, string clientId, string secret, ClientType clientType, params string[] grantTypes)
     {
-        var client = new Client(clientId, HashSecret(secret), $"Test {clientId}", clientType);
+        var client = new Client(tenantId, Guid.NewGuid(), HashSecret(secret), $"Test {clientId}", clientType);
         foreach (var grantType in grantTypes)
             client.AddGrantType(grantType);
         return client;
@@ -42,7 +42,7 @@ public sealed class ClientValidatorTests : IClassFixture<DatabaseFixture<ClientV
 
         Assert.True(result.IsValid);
         Assert.NotNull(result.Client);
-        Assert.Equal(TestConstants.AdminClientId, result.Client.ClientId);
+        Assert.Equal(Guid.Parse(TestConstants.AdminClientId), result.Client.ClientId);
         Assert.Null(result.ErrorDescription);
     }
 
@@ -77,13 +77,13 @@ public sealed class ClientValidatorTests : IClassFixture<DatabaseFixture<ClientV
     {
         await using var context = _fixture.CreateContext();
         var repo = new ClientRepository(context);
-        var client = CreateClient($"deact-{Guid.NewGuid():N}", "secret", ClientType.Confidential, "authorization_code");
+        var client = CreateClient(await _fixture.GetSeededTenantIdAsync(), $"deact-{Guid.NewGuid():N}", "secret", ClientType.Confidential, "authorization_code");
         await repo.AddAsync(client);
         client.Deactivate();
         await repo.UpdateAsync(client);
 
         var validator = CreateValidator(context);
-        var result = await validator.ValidateAsync(client.ClientId, "secret", "authorization_code");
+        var result = await validator.ValidateAsync(client.ClientId.ToString(), "secret", "authorization_code");
 
         Assert.False(result.IsValid);
         Assert.Null(result.Client);
@@ -134,11 +134,11 @@ public sealed class ClientValidatorTests : IClassFixture<DatabaseFixture<ClientV
     {
         await using var context = _fixture.CreateContext();
         var repo = new ClientRepository(context);
-        var client = CreateClient($"public-{Guid.NewGuid():N}", "secret", ClientType.Public, "authorization_code");
+        var client = CreateClient(await _fixture.GetSeededTenantIdAsync(), $"public-{Guid.NewGuid():N}", "secret", ClientType.Public, "authorization_code");
         await repo.AddAsync(client);
 
         var validator = CreateValidator(context);
-        var result = await validator.ValidateAsync(client.ClientId, null, "authorization_code");
+        var result = await validator.ValidateAsync(client.ClientId.ToString(), null, "authorization_code");
 
         Assert.True(result.IsValid);
         Assert.NotNull(result.Client);

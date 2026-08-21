@@ -20,8 +20,9 @@ public sealed class PlatformRepositoryTests : IClassFixture<DatabaseFixture<Plat
     [Fact]
     public async Task AddAndGetByIdRoundTrips()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var name = UniqueName();
-        var platform = new Platform(name, "desc", PermissionMode.AuthOnly);
+        var platform = new Platform(tenantId, name, "desc", PermissionMode.AuthOnly);
         await using var context = _fixture.CreateContext();
         var repo = new PlatformRepository(context);
         await repo.AddAsync(platform);
@@ -38,9 +39,10 @@ public sealed class PlatformRepositoryTests : IClassFixture<DatabaseFixture<Plat
     [Fact]
     public async Task GetAllReturnsSeededAndNewPlatforms()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         await using var context = _fixture.CreateContext();
         var repo = new PlatformRepository(context);
-        await repo.AddAsync(new Platform(UniqueName(), "desc", PermissionMode.IdentityManaged));
+        await repo.AddAsync(new Platform(tenantId, UniqueName(), "desc", PermissionMode.IdentityManaged));
 
         var stored = await repo.GetAllAsync();
 
@@ -50,8 +52,9 @@ public sealed class PlatformRepositoryTests : IClassFixture<DatabaseFixture<Plat
     [Fact]
     public async Task UpdateAsyncDoesNotRemoveExistingData()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var name = UniqueName();
-        var platform = new Platform(name, "desc", PermissionMode.AuthOnly);
+        var platform = new Platform(tenantId, name, "desc", PermissionMode.AuthOnly);
         await using var context = _fixture.CreateContext();
         var repo = new PlatformRepository(context);
         await repo.AddAsync(platform);
@@ -66,8 +69,9 @@ public sealed class PlatformRepositoryTests : IClassFixture<DatabaseFixture<Plat
     [Fact]
     public async Task DeleteAsyncRemovesPlatform()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var name = UniqueName();
-        var platform = new Platform(name, "desc", PermissionMode.AuthOnly);
+        var platform = new Platform(tenantId, name, "desc", PermissionMode.AuthOnly);
         await using var context = _fixture.CreateContext();
         var repo = new PlatformRepository(context);
         await repo.AddAsync(platform);
