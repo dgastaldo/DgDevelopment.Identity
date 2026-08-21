@@ -1,8 +1,10 @@
 ﻿@inherits LayoutComponentBase
 @using DgDevelopment.Identity.Client.Blazor
+@using DgDevelopment.Identity.IdentityPlatform.Client.State
 @using Microsoft.AspNetCore.Components.Authorization
 @inject IdentityAuthStateProvider AuthStateProvider
 @inject NavigationManager Navigation
+@inject TenantState TenantState
 
 <div class="flex min-h-screen flex-col">
     <div class="relative flex flex-1 flex-col md:flex-row">
@@ -15,6 +17,26 @@
                 <div class="flex items-center gap-4">
                     <AuthorizeView>
                         <Authorized>
+                            @if (TenantState.Loaded && TenantState.Tenants.Count > 1)
+                            {
+                                <select class="rounded-md border-gray-300 text-sm" value="@TenantState.ActiveTenantId" @onchange="SwitchTenantAsync">
+                                    @foreach (var tenant in TenantState.Tenants)
+                                    {
+                                        <option value="@tenant.Id">@tenant.Name</option>
+                                    }
+                                </select>
+                            }
+                            else if (TenantState.Loaded && TenantState.ActiveTenant is not null)
+                            {
+                                <span class="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">@TenantState.ActiveTenant.Name</span>
+                            }
+                            @if (TenantState.IsGlobalAdministrator)
+                            {
+                                <label class="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+                                    <input type="checkbox" @bind="TenantState.AllTenants" @bind:after="StateHasChanged" />
+                                    All tenants
+                                </label>
+                            }
                             <span class="avatar flex h-8 w-8 items-center justify-center rounded-full bg-[#3a0647] text-xs font-semibold text-white uppercase">@GetInitials(context.User.Identity?.Name)</span>
                             <span class="font-semibold">@context.User.Identity?.Name</span>
                             <button type="button" class="btn-link" @onclick="LogoutAsync">Logout</button>
@@ -44,6 +66,35 @@
 </div>
 
 @code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || !OperatingSystem.IsBrowser())
+            return;
+
+        try
+        {
+            await TenantState.LoadAsync().ConfigureAwait(false);
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (HttpRequestException)
+        {
+            // Anonymous or unauthenticated requests fail here; the tenant bar simply stays hidden.
+        }
+    }
+
+    private async Task SwitchTenantAsync(ChangeEventArgs args)
+    {
+        if (args.Value is not string value || !Guid.TryParse(value, out var tenantId))
+            return;
+
+        var tenant = TenantState.Tenants.FirstOrDefault(t => t.Id == tenantId);
+        if (tenant is null || tenant.Id == TenantState.ActiveTenantId)
+            return;
+
+        await AuthStateProvider.LogoutAsync();
+        Navigation.NavigateTo($"/login?tenant={Uri.EscapeDataString(tenant.Slug)}", forceLoad: true);
+    }
+
     private static string GetInitials(string? name)
     {
         if (string.IsNullOrWhiteSpace(name))

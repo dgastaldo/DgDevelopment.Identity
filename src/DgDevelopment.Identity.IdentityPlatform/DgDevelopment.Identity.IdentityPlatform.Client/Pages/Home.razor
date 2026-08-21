@@ -1,6 +1,8 @@
 ﻿@page "/"
+@using DgDevelopment.Identity.IdentityPlatform.Client.State
 @inject IdentityClient Api
 @inject NavigationManager Navigation
+@inject TenantState TenantState
 
 <PageTitle>Overview | IdentityPlatform</PageTitle>
 
@@ -71,7 +73,7 @@ else if (_summary is not null)
 
         try
         {
-            _summary = await Api.GetDashboardSummaryAsync().ConfigureAwait(false);
+            _summary = await Api.GetDashboardSummaryAsync(TenantState.AllTenants).ConfigureAwait(false);
             if (_summary is null)
                 _error = "The dashboard did not return any data.";
         }

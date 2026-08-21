@@ -1,4 +1,5 @@
 using DgDevelopment.Identity.IdentityPlatform;
+using DgDevelopment.Identity.IdentityPlatform.Client.State;
 using DgDevelopment.Identity.IdentityPlatform.Components;
 using DgDevelopment.Identity.Client.Blazor;
 using DgDevelopment.Identity.Client.Core;
@@ -36,6 +37,7 @@ builder.Services.AddScoped<IdentityAuthStateProvider>(sp => sp.GetRequiredServic
 builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<ServerIdentityAuthStateProvider>());
 
 builder.Services.AddHttpClient<IdentityClient>().AddHttpMessageHandler<IdentityRefreshHandler>();
+builder.Services.AddScoped<TenantState>();
 
 var app = builder.Build();
 

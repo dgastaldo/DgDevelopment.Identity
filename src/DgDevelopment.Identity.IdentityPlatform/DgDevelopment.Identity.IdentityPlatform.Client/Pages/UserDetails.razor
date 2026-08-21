@@ -1,6 +1,8 @@
 @page "/users/{Id:guid}"
+@using DgDevelopment.Identity.IdentityPlatform.Client.State
 @inject IdentityClient Api
 @inject NavigationManager Navigation
+@inject TenantState TenantState
 
 <PageTitle>User details | IdentityPlatform</PageTitle>
 
@@ -35,7 +37,7 @@ else
     {
         if (firstRender && OperatingSystem.IsBrowser())
         {
-            try { User = await Api.GetUserAsync(Id).ConfigureAwait(false); if (User is null) Error = "User not found."; }
+            try { User = await Api.GetUserAsync(Id, TenantState.AllTenants).ConfigureAwait(false); if (User is null) Error = "User not found."; }
             catch (HttpRequestException) { Error = "The user could not be loaded."; }
             finally { Loading = false; await InvokeAsync(StateHasChanged); }
         }
@@ -44,7 +46,7 @@ else
     private async Task ToggleLock()
     {
         Busy = true;
-        try { using var response = User!.IsLocked ? await Api.UnlockUserAsync(Id) : await Api.LockUserAsync(Id); response.EnsureSuccessStatusCode(); User = await Api.GetUserAsync(Id); }
+        try { using var response = User!.IsLocked ? await Api.UnlockUserAsync(Id, TenantState.AllTenants) : await Api.LockUserAsync(Id, TenantState.AllTenants); response.EnsureSuccessStatusCode(); User = await Api.GetUserAsync(Id, TenantState.AllTenants); }
         catch (HttpRequestException) { Error = "The account status could not be changed."; }
         finally { Busy = false; }
     }
@@ -52,7 +54,7 @@ else
     private async Task Deactivate()
     {
         Busy = true;
-        try { using var response = await Api.DeactivateUserAsync(Id); response.EnsureSuccessStatusCode(); Navigation.NavigateTo("/users"); }
+        try { using var response = await Api.DeactivateUserAsync(Id, TenantState.AllTenants); response.EnsureSuccessStatusCode(); Navigation.NavigateTo("/users"); }
         catch (HttpRequestException) { Error = "The account could not be deactivated."; }
         finally { Busy = false; }
     }
@@ -60,7 +62,7 @@ else
     private async Task ResetPassword()
     {
         Busy = true;
-        try { using var response = await Api.ResetPasswordAsync(Id, NewPassword); response.EnsureSuccessStatusCode(); NewPassword = string.Empty; }
+        try { using var response = await Api.ResetPasswordAsync(Id, NewPassword, TenantState.AllTenants); response.EnsureSuccessStatusCode(); NewPassword = string.Empty; }
         catch (HttpRequestException) { Error = "The password could not be reset."; }
         finally { Busy = false; }
     }

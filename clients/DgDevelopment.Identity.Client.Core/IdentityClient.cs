@@ -5,7 +5,7 @@ namespace DgDevelopment.Identity.Client.Core;
 
 public sealed class IdentityClient(HttpClient http, OidcOptions options)
 {
-    public Uri GetAuthorizeUrl(string? state = null, string? codeChallenge = null)
+    public Uri GetAuthorizeUrl(string? state = null, string? codeChallenge = null, string? tenant = null)
     {
         var url = $"{options.Authority}/connect/authorize" +
                   $"?client_id={Uri.EscapeDataString(options.ClientId)}" +
@@ -18,6 +18,9 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
 
         if (codeChallenge != null)
             url += $"&code_challenge={Uri.EscapeDataString(codeChallenge)}&code_challenge_method=S256";
+
+        if (!string.IsNullOrWhiteSpace(tenant))
+            url += $"&tenant={Uri.EscapeDataString(tenant)}";
 
         return new Uri(url);
     }
@@ -49,7 +52,8 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
         await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
 
         var result = await response.Content.ReadFromJsonAsync(TokenResponseJsonContext.Default.TokenResponse, ct).ConfigureAwait(false);
-        return result!;
+        result!.IssuedAt = DateTime.UtcNow;
+        return result;
     }
 
     public async Task<TokenResponse> RefreshTokenAsync(string refreshTokenValue, CancellationToken ct = default)
@@ -66,7 +70,8 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
         await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
 
         var result = await response.Content.ReadFromJsonAsync(TokenResponseJsonContext.Default.TokenResponse, ct).ConfigureAwait(false);
-        return result!;
+        result!.IssuedAt = DateTime.UtcNow;
+        return result;
     }
 
     public async Task<UserInfo?> GetUserInfoAsync(string accessToken, CancellationToken ct = default)
@@ -80,20 +85,23 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
         return await response.Content.ReadFromJsonAsync(UserInfoJsonContext.Default.UserInfo, ct).ConfigureAwait(false);
     }
 
-    public Task<DashboardSummary?> GetDashboardSummaryAsync(CancellationToken ct = default)
-        => http.GetFromJsonAsync<DashboardSummary>($"{options.Authority}/api/v1/dashboard/summary", ct);
+    public Task<MyTenantsResponse?> GetMyTenantsAsync(CancellationToken ct = default)
+        => http.GetFromJsonAsync<MyTenantsResponse>($"{options.Authority}/api/v1/me/tenants", ct);
 
-    public Task<PagedUsersResponse?> GetUsersAsync(string? search, int page, int pageSize, CancellationToken ct = default)
+    public Task<DashboardSummary?> GetDashboardSummaryAsync(bool allTenants = false, CancellationToken ct = default)
+        => http.GetFromJsonAsync<DashboardSummary>($"{options.Authority}/api/v1/dashboard/summary?allTenants={allTenants}", ct);
+
+    public Task<PagedUsersResponse?> GetUsersAsync(string? search, int page, int pageSize, bool allTenants = false, CancellationToken ct = default)
     {
-        var query = $"?page={page}&pageSize={pageSize}";
+        var query = $"?page={page}&pageSize={pageSize}&allTenants={allTenants}";
         if (!string.IsNullOrWhiteSpace(search))
             query += $"&search={Uri.EscapeDataString(search)}";
 
         return http.GetFromJsonAsync<PagedUsersResponse>($"{options.Authority}/api/v1/users{query}", ct);
     }
 
-    public Task<UserResponse?> GetUserAsync(Guid id, CancellationToken ct = default)
-        => http.GetFromJsonAsync<UserResponse>($"{options.Authority}/api/v1/users/{id}", ct);
+    public Task<UserResponse?> GetUserAsync(Guid id, bool allTenants = false, CancellationToken ct = default)
+        => http.GetFromJsonAsync<UserResponse>($"{options.Authority}/api/v1/users/{id}?allTenants={allTenants}", ct);
 
     public async Task<UserResponse?> CreateUserAsync(CreateUserRequest request, CancellationToken ct = default)
     {
@@ -102,17 +110,17 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
         return await response.Content.ReadFromJsonAsync<UserResponse>(ct).ConfigureAwait(false);
     }
 
-    public Task<HttpResponseMessage> LockUserAsync(Guid id, CancellationToken ct = default)
-        => http.PostAsync(new Uri($"{options.Authority}/api/v1/users/{id}/lock"), null, ct);
+    public Task<HttpResponseMessage> LockUserAsync(Guid id, bool allTenants = false, CancellationToken ct = default)
+        => http.PostAsync(new Uri($"{options.Authority}/api/v1/users/{id}/lock?allTenants={allTenants}"), null, ct);
 
-    public Task<HttpResponseMessage> UnlockUserAsync(Guid id, CancellationToken ct = default)
-        => http.PostAsync(new Uri($"{options.Authority}/api/v1/users/{id}/unlock"), null, ct);
+    public Task<HttpResponseMessage> UnlockUserAsync(Guid id, bool allTenants = false, CancellationToken ct = default)
+        => http.PostAsync(new Uri($"{options.Authority}/api/v1/users/{id}/unlock?allTenants={allTenants}"), null, ct);
 
-    public Task<HttpResponseMessage> DeactivateUserAsync(Guid id, CancellationToken ct = default)
-        => http.DeleteAsync(new Uri($"{options.Authority}/api/v1/users/{id}"), ct);
+    public Task<HttpResponseMessage> DeactivateUserAsync(Guid id, bool allTenants = false, CancellationToken ct = default)
+        => http.DeleteAsync(new Uri($"{options.Authority}/api/v1/users/{id}?allTenants={allTenants}"), ct);
 
-    public Task<HttpResponseMessage> ResetPasswordAsync(Guid id, string password, CancellationToken ct = default)
-        => http.PostAsJsonAsync(new Uri($"{options.Authority}/api/v1/users/{id}/reset-password"), new { password }, ct);
+    public Task<HttpResponseMessage> ResetPasswordAsync(Guid id, string password, bool allTenants = false, CancellationToken ct = default)
+        => http.PostAsJsonAsync(new Uri($"{options.Authority}/api/v1/users/{id}/reset-password?allTenants={allTenants}"), new { password }, ct);
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken ct)
     {
@@ -150,6 +158,16 @@ public sealed record UserResponse(
     [property: JsonPropertyName("updatedAt")] DateTime UpdatedAt);
 
 public sealed record CreateUserRequest(string Username, string Password, string Email, bool IsSystemAccount = false);
+
+public sealed record TenantResponse(
+    [property: JsonPropertyName("id")] Guid Id,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("slug")] string Slug);
+
+public sealed record MyTenantsResponse(
+    [property: JsonPropertyName("tenants")] IReadOnlyCollection<TenantResponse> Tenants,
+    [property: JsonPropertyName("activeTenantId")] Guid ActiveTenantId,
+    [property: JsonPropertyName("isGlobalAdministrator")] bool IsGlobalAdministrator);
 
 [JsonSerializable(typeof(TokenResponse))]
 internal sealed partial class TokenResponseJsonContext : JsonSerializerContext;

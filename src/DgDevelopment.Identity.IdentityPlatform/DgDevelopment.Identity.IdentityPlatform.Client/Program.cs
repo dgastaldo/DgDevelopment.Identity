@@ -1,6 +1,7 @@
 using DgDevelopment.Identity.Client.Blazor;
 using DgDevelopment.Identity.Client.Core;
 using DgDevelopment.Identity.IdentityPlatform.Client;
+using DgDevelopment.Identity.IdentityPlatform.Client.State;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
@@ -29,5 +30,6 @@ builder.Services.AddIdentityAuthentication(new OidcOptions
 });
 
 builder.Services.AddHttpClient<IdentityClient>().AddHttpMessageHandler<IdentityRefreshHandler>();
+builder.Services.AddScoped<TenantState>();
 
 await builder.Build().RunAsync().ConfigureAwait(false);
