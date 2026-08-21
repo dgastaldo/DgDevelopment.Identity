@@ -22,6 +22,14 @@ public sealed class Group
         ParentGroupId = parentGroupId;
     }
 
+    public void Rename(string name, string description)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(description);
+        Name = name;
+        Description = description;
+    }
+
     public void AddRole(Role role, string? scopeType = null, string? scopeValue = null)
     {
         ArgumentNullException.ThrowIfNull(role);
