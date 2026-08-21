@@ -41,7 +41,7 @@ public sealed class JwtService(IKeyMaterialService keyMaterial, IOidcIssuerProvi
 
         var token = new JwtSecurityToken(
             issuer: issuer,
-            audience: request.Client.ClientId,
+            audience: request.Client.ClientId.ToString(),
             claims: claims,
             notBefore: now,
             expires: now.AddMinutes(5),
@@ -60,7 +60,7 @@ public sealed class JwtService(IKeyMaterialService keyMaterial, IOidcIssuerProvi
         {
             new(JwtRegisteredClaimNames.Sub, request.User.Id.ToString(null, CultureInfo.InvariantCulture)),
             new(JwtRegisteredClaimNames.Iss, issuer),
-            new("client_id", request.Client.ClientId),
+            new("client_id", request.Client.ClientId.ToString()),
             new(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString(CultureInfo.InvariantCulture)),
             new(JwtRegisteredClaimNames.Exp, EpochTime.GetIntDate(now.AddSeconds(request.LifetimeSeconds)).ToString(CultureInfo.InvariantCulture)),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
@@ -72,7 +72,7 @@ public sealed class JwtService(IKeyMaterialService keyMaterial, IOidcIssuerProvi
 
         var token = new JwtSecurityToken(
             issuer: issuer,
-            audience: request.Client.ClientId,
+            audience: request.Client.ClientId.ToString(),
             claims: claims,
             notBefore: now,
             expires: now.AddSeconds(request.LifetimeSeconds),

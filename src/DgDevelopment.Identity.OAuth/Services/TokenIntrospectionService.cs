@@ -46,7 +46,7 @@ public sealed class TokenIntrospectionService(
         return new(
             Active: !stored.IsRevoked && !stored.IsExpired(),
             Scope: stored.Scopes,
-            ClientId: client?.ClientId,
+            ClientId: client?.ClientId.ToString(),
             Sub: stored.UserId.ToString(null, CultureInfo.InvariantCulture),
             TokenType: "refresh_token",
             Exp: new DateTimeOffset(stored.ExpiresAt).ToUnixTimeSeconds(),

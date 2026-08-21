@@ -19,7 +19,7 @@ public sealed class ClientRepositoryTests : IClassFixture<DatabaseFixture<Client
 
     private static Client CreateClient(string? clientId = null, string host = "one.example")
     {
-        var client = new Client(clientId ?? $"test-client-{Guid.NewGuid():N}", "secret-hash", "Test Client", ClientType.Confidential);
+        var client = new Client(clientId is null ? Guid.NewGuid() : Guid.Parse(clientId), "secret-hash", "Test Client", ClientType.Confidential);
         client.AddGrantType("authorization_code");
         client.AddGrantType("refresh_token");
         client.AddScope("openid");
@@ -38,7 +38,7 @@ public sealed class ClientRepositoryTests : IClassFixture<DatabaseFixture<Client
         var repo = new ClientRepository(context);
         await repo.AddAsync(client);
 
-        var stored = await repo.GetByClientIdAsync(client.ClientId);
+        var stored = await repo.GetByClientIdAsync(client.ClientId.ToString());
 
         Assert.NotNull(stored);
         Assert.True(stored.IsActive);
@@ -102,7 +102,7 @@ public sealed class ClientRepositoryTests : IClassFixture<DatabaseFixture<Client
         tracked.Deactivate();
         await repo.UpdateAsync(tracked);
 
-        var stored = await repo.GetByClientIdAsync(client.ClientId);
+        var stored = await repo.GetByClientIdAsync(client.ClientId.ToString());
         Assert.NotNull(stored);
         Assert.Equal("updated-hash", stored.ClientSecretHash);
         Assert.False(stored.IsActive);
@@ -118,7 +118,7 @@ public sealed class ClientRepositoryTests : IClassFixture<DatabaseFixture<Client
 
         await repo.DeleteAsync(client.Id);
 
-        Assert.Null(await repo.GetByClientIdAsync(client.ClientId));
+        Assert.Null(await repo.GetByClientIdAsync(client.ClientId.ToString()));
         Assert.Equal(0, await context.Clients.CountAsync(c => c.Id == client.Id));
         Assert.Equal(0, await CountOwnedAsync(context, "ClientGrantTypes", client.Id));
         Assert.Equal(0, await CountOwnedAsync(context, "ClientScopes", client.Id));
@@ -159,8 +159,8 @@ public sealed class ClientRepositoryTests : IClassFixture<DatabaseFixture<Client
 
         var ids = await repo.GetAllActiveClientIdsAsync();
 
-        Assert.Contains(active.ClientId, ids);
-        Assert.DoesNotContain(deactivated.ClientId, ids);
+        Assert.Contains(active.ClientId.ToString(), ids);
+        Assert.DoesNotContain(deactivated.ClientId.ToString(), ids);
     }
 
     [Fact]

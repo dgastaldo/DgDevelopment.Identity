@@ -91,13 +91,13 @@ public sealed class DeviceAuthorizationServiceTests : IClassFixture<DatabaseFixt
     {
         await using var context = _fixture.CreateContext();
         var repo = new ClientRepository(context);
-        var client = new Client($"no-device-{Guid.NewGuid():N}", Hash("secret"), "No Device", ClientType.Confidential);
+        var client = new Client(Guid.NewGuid(), Hash("secret"), "No Device", ClientType.Confidential);
         client.AddGrantType("authorization_code");
         await repo.AddAsync(client);
         var service = CreateService(context);
 
         var exception = await Assert.ThrowsAsync<DeviceAuthorizationException>(() =>
-            service.IssueAsync(client.ClientId, "secret", ["openid"], DeviceUri));
+            service.IssueAsync(client.ClientId.ToString(), "secret", ["openid"], DeviceUri));
 
         Assert.Equal("invalid_client", exception.ErrorCode);
     }
@@ -123,7 +123,7 @@ public sealed class DeviceAuthorizationServiceTests : IClassFixture<DatabaseFixt
         var result = await service.GetApprovalAsync(issued.UserCode);
 
         Assert.NotNull(result);
-        Assert.Equal("Admin UI", result.ClientName);
+        Assert.Equal("identity-platform", result.ClientName);
         Assert.Equal(["openid", "profile"], result.Scopes);
     }
 
@@ -167,6 +167,6 @@ public sealed class DeviceAuthorizationServiceTests : IClassFixture<DatabaseFixt
         var result = await service.GetApprovalAsync(withoutDash);
 
         Assert.NotNull(result);
-        Assert.Equal("Admin UI", result.ClientName);
+        Assert.Equal("identity-platform", result.ClientName);
     }
 }

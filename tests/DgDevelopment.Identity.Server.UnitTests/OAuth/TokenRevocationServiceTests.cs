@@ -47,7 +47,7 @@ public sealed class TokenRevocationServiceTests : IClassFixture<DatabaseFixture<
 
     private static Client CreateOtherClient(string clientId, string secret)
     {
-        var client = new Client(clientId, Hash(secret), $"Other {clientId}", ClientType.Confidential);
+        var client = new Client(Guid.NewGuid(), Hash(secret), $"Other {clientId}", ClientType.Confidential);
         client.AddGrantType("client_credentials");
         client.AddScope("openid");
         return client;

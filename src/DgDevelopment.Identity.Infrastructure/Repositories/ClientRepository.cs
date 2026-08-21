@@ -21,6 +21,9 @@ public sealed class ClientRepository(IdentityDbContext context) : IClientReposit
 
     public async Task<Client?> GetByClientIdAsync(string clientId, CancellationToken ct = default)
     {
+        if (!Guid.TryParse(clientId, out var parsedClientId))
+            return null;
+
         return await context.Clients
             .AsNoTracking()
             .Include(c => c.GrantTypes)
@@ -28,16 +31,17 @@ public sealed class ClientRepository(IdentityDbContext context) : IClientReposit
             .Include(c => c.AdminConsentScopes)
             .Include(c => c.RedirectUris)
             .Include(c => c.PostLogoutRedirectUris)
-            .FirstOrDefaultAsync(c => c.ClientId == clientId, ct).ConfigureAwait(false);
+            .FirstOrDefaultAsync(c => c.ClientId == parsedClientId, ct).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyCollection<string>> GetAllActiveClientIdsAsync(CancellationToken ct = default)
     {
-        return await context.Clients
+        var clientIds = await context.Clients
             .AsNoTracking()
             .Where(c => c.IsActive)
-            .Select(c => c.ClientId)
             .ToListAsync(ct).ConfigureAwait(false);
+
+        return clientIds.Select(c => c.ClientId.ToString()).ToArray();
     }
 
     public async Task<IReadOnlyCollection<Uri>> GetAllActiveRedirectUrisAsync(CancellationToken ct = default)

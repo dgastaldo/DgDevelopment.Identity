@@ -67,8 +67,8 @@ DgDevelopment.Identity/
 │   ├── DgDevelopment.Identity.Server/            # ASP.NET Core host (API + Razor Pages)
 │   ├── DgDevelopment.Identity.OAuth/             # Custom OAuth 2.0 / OIDC engine
 │   ├── DgDevelopment.Identity.Saml/              # Custom SAML 2.0 engine (planned)
-│   ├── DgDevelopment.Identity.AdminUi/           # Blazor Server host (prerender)
-│   └── DgDevelopment.Identity.AdminUi.Client/    # Blazor WASM interactive pages/layout
+│   ├── DgDevelopment.Identity.IdentityPlatform/        # Blazor Server host (prerender)
+│   └── DgDevelopment.Identity.IdentityPlatform.Client/ # Blazor WASM interactive pages/layout
 ├── clients/
 │   ├── DgDevelopment.Identity.Client.Core/       # Base .NET SDK (OIDC client)
 │   ├── DgDevelopment.Identity.Client.Blazor/     # Blazor auth components + DI

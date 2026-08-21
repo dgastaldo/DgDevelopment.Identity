@@ -10,17 +10,19 @@ var server = builder
     .WithReference(sqlServer)
     .WithReference(redis);
 
+var adminClientId = builder.Configuration["Identity:AdminClientId"] ?? "";
 var adminClientSecret = builder.Configuration["Identity:AdminClientSecret"] ?? "";
 
-var adminUi = builder
-    .AddProject<Projects.DgDevelopment_Identity_AdminUi>("admin-ui", launchProfileName: "https")
+var identityPlatform = builder
+    .AddProject<Projects.DgDevelopment_Identity_IdentityPlatform>("identity-platform", launchProfileName: "https")
     .WithEndpoint("https", endpoint => endpoint.IsProxied = false)
     .WithEndpoint("http", endpoint => endpoint.IsProxied = false)
     .WithReference(server)
     .WithEnvironment("IdentityBaseUrl", server.GetEndpoint("https"))
+    .WithEnvironment("Identity__AdminClientId", adminClientId)
     .WithEnvironment("Identity__AdminClientSecret", adminClientSecret);
 
-adminUi.WithEnvironment("AdminBaseUrl", adminUi.GetEndpoint("https"));
+identityPlatform.WithEnvironment("AdminBaseUrl", identityPlatform.GetEndpoint("https"));
 
 var app = builder.Build();
 

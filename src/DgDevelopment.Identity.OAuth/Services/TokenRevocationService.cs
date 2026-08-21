@@ -80,7 +80,7 @@ public sealed class TokenRevocationService(
 
         var tokenClientId = principal.FindFirst("client_id")?.Value
             ?? principal.FindFirst(JwtRegisteredClaimNames.Aud)?.Value;
-        if (tokenClientId != client.Client?.ClientId)
+        if (tokenClientId != client.Client?.ClientId.ToString())
             return true;
 
         var jti = principal.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;

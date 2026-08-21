@@ -13,7 +13,7 @@ public sealed class ClientConfiguration : IEntityTypeConfiguration<Client>
 
         builder.HasIndex(x => x.ClientId).IsUnique();
 
-        builder.Property(x => x.ClientId).HasMaxLength(200);
+        builder.Property(x => x.ClientId);
         builder.Property(x => x.ClientSecretHash);
         builder.Property(x => x.Name).HasMaxLength(200);
         builder.Property(x => x.ClientType).HasConversion<string>().HasMaxLength(50);

@@ -31,7 +31,7 @@ public sealed class TokenServiceTests : IClassFixture<DatabaseFixture<TokenServi
 
     private static Client CreateOtherClient(string clientId, string secret, params string[] scopes)
     {
-        var client = new Client(clientId, Hash(secret), $"Other {clientId}", ClientType.Confidential);
+        var client = new Client(Guid.NewGuid(), Hash(secret), $"Other {clientId}", ClientType.Confidential);
         client.AddGrantType("authorization_code");
         foreach (var scope in scopes)
             client.AddScope(scope);

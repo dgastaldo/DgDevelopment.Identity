@@ -25,7 +25,7 @@ public sealed class AuthorizationServiceTests : IClassFixture<DatabaseFixture<Au
 
     private static Client CreateClient(string clientId, string secret, ClientType clientType, string redirectUri, params string[] scopes)
     {
-        var client = new Client(clientId, HashSecret(secret), $"Test {clientId}", clientType);
+        var client = new Client(Guid.NewGuid(), HashSecret(secret), $"Test {clientId}", clientType);
         client.AddGrantType("authorization_code");
         client.AddRedirectUri(new Uri(redirectUri));
         foreach (var scope in scopes)
@@ -50,7 +50,7 @@ public sealed class AuthorizationServiceTests : IClassFixture<DatabaseFixture<Au
 
         Assert.True(result.IsValid);
         Assert.NotNull(result.Client);
-        Assert.Equal(TestConstants.AdminClientId, result.Client.ClientId);
+        Assert.Equal(Guid.Parse(TestConstants.AdminClientId), result.Client.ClientId);
         Assert.Equal(TestConstants.AdminClientRedirectUri, result.RedirectUri);
         Assert.Null(result.Error);
     }
@@ -94,7 +94,7 @@ public sealed class AuthorizationServiceTests : IClassFixture<DatabaseFixture<Au
         await repo.UpdateAsync(client);
 
         var service = CreateService(context);
-        var result = await service.ValidateAsync(CreateRequest(client.ClientId, ClientRedirectUri));
+        var result = await service.ValidateAsync(CreateRequest(client.ClientId.ToString(), ClientRedirectUri));
 
         Assert.False(result.IsValid);
         Assert.Equal("invalid_client", result.Error);
@@ -152,7 +152,7 @@ public sealed class AuthorizationServiceTests : IClassFixture<DatabaseFixture<Au
         await repo.AddAsync(client);
 
         var service = CreateService(context);
-        var result = await service.ValidateAsync(CreateRequest(client.ClientId, ClientRedirectUri));
+        var result = await service.ValidateAsync(CreateRequest(client.ClientId.ToString(), ClientRedirectUri));
 
         Assert.False(result.IsValid);
         Assert.Equal("invalid_request", result.Error);

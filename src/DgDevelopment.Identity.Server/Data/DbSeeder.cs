@@ -26,17 +26,19 @@ public sealed class DbSeeder(IServiceProvider serviceProvider)
         await SeedRolesAsync(db).ConfigureAwait(false);
         await SeedGroupsAsync(db).ConfigureAwait(false);
         await SeedPlatformsAsync(db).ConfigureAwait(false);
-        clientSecret ??= await SeedClientsAsync(db).ConfigureAwait(false);
+        var clientCredentials = clientSecret is null
+            ? await SeedClientsAsync(db).ConfigureAwait(false)
+            : null;
         var hasher = scope.ServiceProvider.GetRequiredService<Domain.Services.IPasswordHasher>();
         var superadminPassword = await SeedUsersAsync(db, hasher).ConfigureAwait(false);
 
         if (superadminPassword != null)
             WriteSuperadminCredentials(contentRoot, superadminPassword);
 
-        if (clientSecret != null)
+        if (clientCredentials is { } credentials)
         {
-            WriteClientCredentials(contentRoot, clientSecret);
-            await SyncClientSecretToAppHostAsync(contentRoot, clientSecret).ConfigureAwait(false);
+            WriteClientCredentials(contentRoot, credentials.ClientId, credentials.ClientSecret);
+            await SyncClientSecretToAppHostAsync(contentRoot, credentials.ClientId, credentials.ClientSecret).ConfigureAwait(false);
         }
     }
 
@@ -117,7 +119,7 @@ public sealed class DbSeeder(IServiceProvider serviceProvider)
         await db.SaveChangesAsync().ConfigureAwait(false);
     }
 
-    private static async Task<string?> SeedClientsAsync(IdentityDbContext db)
+    private static async Task<(Guid ClientId, string ClientSecret)?> SeedClientsAsync(IdentityDbContext db)
     {
         if (await db.Clients.AnyAsync().ConfigureAwait(false)) return null;
 
@@ -125,7 +127,7 @@ public sealed class DbSeeder(IServiceProvider serviceProvider)
         var clientSecret = Secret.Generate(32);
         var clientSecretHash = Convert.ToBase64String(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(clientSecret)));
 
-        var client = new Client("admin-ui", clientSecretHash, "Admin UI", ClientType.Confidential, platform.Id);
+        var client = new Client(Guid.NewGuid(), clientSecretHash, "identity-platform", ClientType.Confidential, platform.Id);
         client.AddGrantType("authorization_code");
         client.AddGrantType("client_credentials");
         client.AddGrantType("refresh_token");
@@ -140,8 +142,9 @@ public sealed class DbSeeder(IServiceProvider serviceProvider)
         db.Clients.Add(client);
         await db.SaveChangesAsync().ConfigureAwait(false);
 
-        Console.WriteLine($"--- Admin UI Client Secret: {clientSecret} ---");
-        return clientSecret;
+        Console.WriteLine($"--- IdentityPlatform Client ID: {client.ClientId} ---");
+        Console.WriteLine($"--- IdentityPlatform Client Secret: {clientSecret} ---");
+        return (client.ClientId, clientSecret);
     }
 
     private static async Task<string?> SeedUsersAsync(IdentityDbContext db, Domain.Services.IPasswordHasher hasher)
@@ -191,14 +194,14 @@ public sealed class DbSeeder(IServiceProvider serviceProvider)
         Console.WriteLine($"SuperAdmin credentials saved to: {path}");
     }
 
-    private static void WriteClientCredentials(string contentRoot, string clientSecret)
+    private static void WriteClientCredentials(string contentRoot, Guid clientId, string clientSecret)
     {
         var path = Path.Combine(contentRoot, "admin-client-credentials.txt");
         var content = $"""
         ==============================================
           DgDevelopment Identity - Admin Client Credentials
         ==============================================
-          Client ID: admin-ui
+          Client ID: {clientId}
           Client Secret: {clientSecret}
         ==============================================
           Store this file in a secure location.
@@ -210,7 +213,7 @@ public sealed class DbSeeder(IServiceProvider serviceProvider)
         Console.WriteLine($"Admin client credentials saved to: {path}");
     }
 
-    private static async Task SyncClientSecretToAppHostAsync(string contentRoot, string clientSecret, CancellationToken ct = default)
+    private static async Task SyncClientSecretToAppHostAsync(string contentRoot, Guid clientId, string clientSecret, CancellationToken ct = default)
     {
         var appHostDir = Path.GetFullPath(Path.Combine(contentRoot, "..", "DgDevelopment.Identity.AppHost"));
 
@@ -220,28 +223,35 @@ public sealed class DbSeeder(IServiceProvider serviceProvider)
             return;
         }
 
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "dotnet",
-            Arguments = $"user-secrets set \"Identity:AdminClientSecret\" \"{clientSecret}\" --project \"{appHostDir}\"",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false
-        };
-
         try
         {
-            using var process = Process.Start(startInfo);
-            if (process is null)
-                return;
+            foreach (var (key, value) in new[]
+                     {
+                         ("Identity:AdminClientId", clientId.ToString()),
+                         ("Identity:AdminClientSecret", clientSecret)
+                     })
+            {
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "dotnet",
+                    Arguments = $"user-secrets set \"{key}\" \"{value}\" --project \"{appHostDir}\"",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false
+                };
 
-            var output = await process.StandardOutput.ReadToEndAsync(ct).ConfigureAwait(false);
-            var error = await process.StandardError.ReadToEndAsync(ct).ConfigureAwait(false);
-            await process.WaitForExitAsync(ct).ConfigureAwait(false);
+                using var process = Process.Start(startInfo);
+                if (process is null)
+                    return;
 
-            Console.WriteLine(output.Trim());
-            if (!string.IsNullOrWhiteSpace(error))
-                Console.WriteLine(error.Trim());
+                var output = await process.StandardOutput.ReadToEndAsync(ct).ConfigureAwait(false);
+                var error = await process.StandardError.ReadToEndAsync(ct).ConfigureAwait(false);
+                await process.WaitForExitAsync(ct).ConfigureAwait(false);
+
+                Console.WriteLine(output.Trim());
+                if (!string.IsNullOrWhiteSpace(error))
+                    Console.WriteLine(error.Trim());
+            }
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException or OperationCanceledException)
         {

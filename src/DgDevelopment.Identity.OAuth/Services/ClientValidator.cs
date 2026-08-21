@@ -24,6 +24,9 @@ public sealed class ClientValidator(IClientRepository repository) : IClientValid
         if (string.IsNullOrWhiteSpace(clientId))
             return new(false, null, "Missing client_id.");
 
+        if (!Guid.TryParse(clientId, out _))
+            return new(false, null, "Invalid client_id.");
+
         var client = await repository.GetByClientIdAsync(clientId, ct).ConfigureAwait(false);
         if (client == null)
             return new(false, null, "Invalid client_id.");

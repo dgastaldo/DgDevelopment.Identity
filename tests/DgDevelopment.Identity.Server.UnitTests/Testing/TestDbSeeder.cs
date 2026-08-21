@@ -103,7 +103,7 @@ public static class TestDbSeeder
         var platform = await db.Platforms.FirstAsync(p => p.Name == "IdentityAdmin").ConfigureAwait(false);
         var clientSecretHash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(TestConstants.AdminClientSecret)));
 
-        var client = new Client(TestConstants.AdminClientId, clientSecretHash, "Admin UI", ClientType.Confidential, platform.Id);
+        var client = new Client(Guid.Parse(TestConstants.AdminClientId), clientSecretHash, "identity-platform", ClientType.Confidential, platform.Id);
         client.AddGrantType("authorization_code");
         client.AddGrantType("client_credentials");
         client.AddGrantType("refresh_token");

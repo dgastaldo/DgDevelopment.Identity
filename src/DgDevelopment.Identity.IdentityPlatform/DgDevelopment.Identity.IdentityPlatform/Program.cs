@@ -1,5 +1,5 @@
-using DgDevelopment.Identity.AdminUi;
-using DgDevelopment.Identity.AdminUi.Components;
+using DgDevelopment.Identity.IdentityPlatform;
+using DgDevelopment.Identity.IdentityPlatform.Components;
 using DgDevelopment.Identity.Client.Blazor;
 using DgDevelopment.Identity.Client.Core;
 using DgDevelopment.Identity.ServiceDefaults;
@@ -17,12 +17,13 @@ builder.Services.AddHealthChecks();
 
 string identityBaseUriString = builder.Configuration.GetValue<string>("IdentityBaseUrl") ?? "https://localhost:7157";
 string adminBaseUriString = builder.Configuration.GetValue<string>("AdminBaseUrl") ?? "https://localhost:7018";
+string adminClientId = builder.Configuration.GetValue<string>("Identity:AdminClientId") ?? "";
 string adminClientSecret = builder.Configuration.GetValue<string>("Identity:AdminClientSecret") ?? "";
 
 builder.Services.AddIdentityAuthentication(new OidcOptions
 {
     Authority = identityBaseUriString,
-    ClientId = "admin-ui",
+    ClientId = adminClientId,
     ClientSecret = adminClientSecret,
     RedirectUri = new Uri(adminBaseUriString + "/callback"),
     PostLogoutRedirectUri = new Uri(adminBaseUriString + "/"),
@@ -57,8 +58,13 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .AddInteractiveWebAssemblyRenderMode()
-    .AddAdditionalAssemblies(typeof(DgDevelopment.Identity.AdminUi.Client._Imports).Assembly);
+     .AddAdditionalAssemblies(typeof(DgDevelopment.Identity.IdentityPlatform.Client._Imports).Assembly);
 
 app.MapHealthChecks("/health");
+app.MapGet("/config/identity.json", () => Results.Json(new
+{
+    IdentityBaseUrl = identityBaseUriString,
+    AdminClientId = adminClientId
+}));
 
 app.Run();

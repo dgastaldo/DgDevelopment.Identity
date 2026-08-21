@@ -23,7 +23,7 @@ public sealed class ClientValidatorTests : IClassFixture<DatabaseFixture<ClientV
 
     private static Client CreateClient(string clientId, string secret, ClientType clientType, params string[] grantTypes)
     {
-        var client = new Client(clientId, HashSecret(secret), $"Test {clientId}", clientType);
+        var client = new Client(Guid.NewGuid(), HashSecret(secret), $"Test {clientId}", clientType);
         foreach (var grantType in grantTypes)
             client.AddGrantType(grantType);
         return client;
@@ -42,7 +42,7 @@ public sealed class ClientValidatorTests : IClassFixture<DatabaseFixture<ClientV
 
         Assert.True(result.IsValid);
         Assert.NotNull(result.Client);
-        Assert.Equal(TestConstants.AdminClientId, result.Client.ClientId);
+        Assert.Equal(Guid.Parse(TestConstants.AdminClientId), result.Client.ClientId);
         Assert.Null(result.ErrorDescription);
     }
 
@@ -83,7 +83,7 @@ public sealed class ClientValidatorTests : IClassFixture<DatabaseFixture<ClientV
         await repo.UpdateAsync(client);
 
         var validator = CreateValidator(context);
-        var result = await validator.ValidateAsync(client.ClientId, "secret", "authorization_code");
+        var result = await validator.ValidateAsync(client.ClientId.ToString(), "secret", "authorization_code");
 
         Assert.False(result.IsValid);
         Assert.Null(result.Client);
@@ -138,7 +138,7 @@ public sealed class ClientValidatorTests : IClassFixture<DatabaseFixture<ClientV
         await repo.AddAsync(client);
 
         var validator = CreateValidator(context);
-        var result = await validator.ValidateAsync(client.ClientId, null, "authorization_code");
+        var result = await validator.ValidateAsync(client.ClientId.ToString(), null, "authorization_code");
 
         Assert.True(result.IsValid);
         Assert.NotNull(result.Client);

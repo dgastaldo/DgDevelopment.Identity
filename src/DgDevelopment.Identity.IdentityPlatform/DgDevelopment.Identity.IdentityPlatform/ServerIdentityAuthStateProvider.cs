@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Http;
 using System.Security.Claims;
 
-namespace DgDevelopment.Identity.AdminUi;
+namespace DgDevelopment.Identity.IdentityPlatform;
 
 public sealed class ServerIdentityAuthStateProvider(
     IdentityClient client,

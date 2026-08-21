@@ -11,7 +11,7 @@ public enum ClientType
 public sealed class Client
 {
     public Guid Id { get; private set; }
-    public string ClientId { get; private set; }
+    public Guid ClientId { get; private set; }
     public string ClientSecretHash { get; private set; }
     public Guid? PlatformId { get; private set; }
     public string Name { get; private set; }
@@ -36,7 +36,7 @@ public sealed class Client
 
     private Client() { }
 
-    public Client(string clientId, string clientSecretHash, string name, ClientType clientType, Guid? platformId = null, bool requireConsent = true)
+    public Client(Guid clientId, string clientSecretHash, string name, ClientType clientType, Guid? platformId = null, bool requireConsent = true)
     {
         Id = Guid.NewGuid();
         ClientId = clientId;

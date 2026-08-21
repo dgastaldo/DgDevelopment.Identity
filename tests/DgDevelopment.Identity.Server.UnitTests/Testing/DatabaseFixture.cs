@@ -39,7 +39,7 @@ public class DatabaseFixture<TTestClass> : IAsyncLifetime
     {
         await using var context = CreateContext();
         return await context.Clients
-            .Where(c => c.ClientId == TestConstants.AdminClientId)
+            .Where(c => c.ClientId == Guid.Parse(TestConstants.AdminClientId))
             .Select(c => c.Id)
             .SingleAsync(ct);
     }

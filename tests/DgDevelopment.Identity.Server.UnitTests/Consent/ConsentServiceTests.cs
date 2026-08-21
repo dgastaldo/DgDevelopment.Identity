@@ -25,7 +25,7 @@ public sealed class ConsentServiceTests : IClassFixture<DatabaseFixture<ConsentS
 
     private static Client CreateClient(bool requireConsent = true, params string[] adminScopes)
     {
-        var client = new Client("test-client", "secret-hash", "Test Client", ClientType.Confidential, requireConsent: requireConsent);
+        var client = new Client(Guid.NewGuid(), "secret-hash", "Test Client", ClientType.Confidential, requireConsent: requireConsent);
         foreach (var scope in adminScopes)
             client.AddAdminConsentScope(scope);
         return client;
