@@ -21,9 +21,10 @@ public sealed class AuthorizationCodeRepositoryTests : IClassFixture<DatabaseFix
     [Fact]
     public async Task AddAndGetByCodeHashRoundTrips()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var clientId = await _fixture.GetSeededClientIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
-        var code = new AuthorizationCode(UniqueHash("code"), clientId, userId, RedirectUri, ["openid", "profile"],
+        var code = new AuthorizationCode(tenantId, UniqueHash("code"), clientId, userId, RedirectUri, ["openid", "profile"],
             codeChallengeHash: "challenge-hash", codeChallengeMethod: "S256");
         await using var context = _fixture.CreateContext();
         var repo = new AuthorizationCodeRepository(context);
@@ -56,9 +57,10 @@ public sealed class AuthorizationCodeRepositoryTests : IClassFixture<DatabaseFix
     [Fact]
     public async Task MarkAsUsedPersistsFlag()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var clientId = await _fixture.GetSeededClientIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
-        var code = new AuthorizationCode(UniqueHash("code"), clientId, userId, RedirectUri, ["openid"]);
+        var code = new AuthorizationCode(tenantId, UniqueHash("code"), clientId, userId, RedirectUri, ["openid"]);
         await using var context = _fixture.CreateContext();
         var repo = new AuthorizationCodeRepository(context);
         await repo.AddAsync(code);
@@ -73,12 +75,13 @@ public sealed class AuthorizationCodeRepositoryTests : IClassFixture<DatabaseFix
     [Fact]
     public async Task DeleteExpiredRemovesOnlyExpiredCodes()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var clientId = await _fixture.GetSeededClientIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
         await using var context = _fixture.CreateContext();
         var repo = new AuthorizationCodeRepository(context);
-        var expired = new AuthorizationCode(UniqueHash("expired"), clientId, userId, RedirectUri, ["openid"], lifetimeSeconds: 0);
-        var valid = new AuthorizationCode(UniqueHash("valid"), clientId, userId, RedirectUri, ["openid"]);
+        var expired = new AuthorizationCode(tenantId, UniqueHash("expired"), clientId, userId, RedirectUri, ["openid"], lifetimeSeconds: 0);
+        var valid = new AuthorizationCode(tenantId, UniqueHash("valid"), clientId, userId, RedirectUri, ["openid"]);
         await repo.AddAsync(expired);
         await repo.AddAsync(valid);
 

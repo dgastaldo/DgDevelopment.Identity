@@ -7,7 +7,9 @@ namespace DgDevelopment.Identity.Infrastructure.Repositories;
 
 public sealed class UserAuthorizationRepository(IdentityDbContext context) : IUserAuthorizationRepository
 {
-    public async Task<IReadOnlyCollection<EffectivePermission>> GetEffectivePermissionsAsync(Guid userId, CancellationToken ct = default)
+    private sealed record RawGrant(string PermissionName, string? ScopeType, string? ScopeValue, Guid GrantTenantId, bool IsGlobal);
+
+    public async Task<IReadOnlyCollection<EffectivePermission>> GetEffectivePermissionsAsync(Guid userId, Guid tenantId, CancellationToken ct = default)
     {
         var user = await context.Users
             .AsNoTracking()
@@ -33,7 +35,9 @@ public sealed class UserAuthorizationRepository(IdentityDbContext context) : IUs
                     : null;
         }
 
-        var grants = new List<EffectivePermission>();
+        var groupTenants = groups.Where(g => visitedGroups.Contains(g.Id)).ToDictionary(g => g.Id, g => g.TenantId);
+
+        var grants = new List<RawGrant>();
 
         var directPermissionIds = user.Permissions.Select(p => p.PermissionId).ToHashSet();
         var directPermissions = await context.Permissions
@@ -45,10 +49,10 @@ public sealed class UserAuthorizationRepository(IdentityDbContext context) : IUs
         foreach (var assignment in user.Permissions)
         {
             if (directPermissions.TryGetValue(assignment.PermissionId, out var permission))
-                grants.Add(new(permission.Name, assignment.ScopeType, assignment.ScopeValue));
+                grants.Add(new(permission.Name, assignment.ScopeType, assignment.ScopeValue, assignment.TenantId, permission.IsGlobal));
         }
 
-        var userRoleAssignments = user.Roles.ToDictionary(r => r.RoleId, r => (r.ScopeType, r.ScopeValue));
+        var userRoleAssignments = user.Roles.ToDictionary(r => r.RoleId, r => (r.TenantId, r.ScopeType, r.ScopeValue));
         var groupRoleAssignments = await context.GroupRoles
             .AsNoTracking()
             .Where(gr => visitedGroups.Contains(gr.GroupId))
@@ -76,16 +80,31 @@ public sealed class UserAuthorizationRepository(IdentityDbContext context) : IUs
             if (!permissions.TryGetValue(rolePermission.PermissionId, out var permission))
                 continue;
 
-            if (userRoleAssignments.TryGetValue(rolePermission.RoleId, out var userScope))
-                grants.Add(new(permission.Name, rolePermission.ScopeType ?? userScope.ScopeType, rolePermission.ScopeValue ?? userScope.ScopeValue));
+            if (userRoleAssignments.TryGetValue(rolePermission.RoleId, out var userAssignment))
+            {
+                grants.Add(new(
+                    permission.Name,
+                    rolePermission.ScopeType ?? userAssignment.ScopeType,
+                    rolePermission.ScopeValue ?? userAssignment.ScopeValue,
+                    userAssignment.TenantId,
+                    permission.IsGlobal));
+            }
             else
             {
                 var groupScope = groupRoleAssignments.FirstOrDefault(gr => gr.RoleId == rolePermission.RoleId);
-                grants.Add(new(permission.Name, rolePermission.ScopeType ?? groupScope?.ScopeType, rolePermission.ScopeValue ?? groupScope?.ScopeValue));
+                var grantTenantId = groupScope is not null && groupTenants.TryGetValue(groupScope.GroupId, out var gt) ? gt : tenantId;
+                grants.Add(new(
+                    permission.Name,
+                    rolePermission.ScopeType ?? groupScope?.ScopeType,
+                    rolePermission.ScopeValue ?? groupScope?.ScopeValue,
+                    grantTenantId,
+                    permission.IsGlobal));
             }
         }
 
         return grants
+            .Where(g => g.IsGlobal || g.GrantTenantId == tenantId)
+            .Select(g => new EffectivePermission(g.PermissionName, g.ScopeType, g.ScopeValue))
             .Distinct()
             .ToArray();
     }

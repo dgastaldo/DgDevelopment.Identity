@@ -71,9 +71,11 @@ public sealed class UserRepository : IUserRepository
             .FirstOrDefaultAsync(ct).ConfigureAwait(false);
     }
 
-    public async Task<IReadOnlyCollection<User>> GetPagedAsync(string? search, int skip, int take, CancellationToken ct = default)
+    public async Task<IReadOnlyCollection<User>> GetPagedAsync(string? search, int skip, int take, Guid tenantId, bool allTenants, CancellationToken ct = default)
     {
         var query = BuildQuery();
+        if (!allTenants)
+            query = query.Where(u => _context.TenantMemberships.Any(m => m.UserId == u.Id && m.TenantId == tenantId));
         if (!string.IsNullOrWhiteSpace(search))
             query = query.Where(u => EF.Functions.Like(u.Username, $"%{search}%")
                 || u.Emails.Any(e => EF.Functions.Like(e.Email.Value, $"%{search}%")));
@@ -86,9 +88,11 @@ public sealed class UserRepository : IUserRepository
             .ConfigureAwait(false);
     }
 
-    public async Task<int> CountAsync(string? search, CancellationToken ct = default)
+    public async Task<int> CountAsync(string? search, Guid tenantId, bool allTenants, CancellationToken ct = default)
     {
         var query = _context.Users.AsNoTracking();
+        if (!allTenants)
+            query = query.Where(u => _context.TenantMemberships.Any(m => m.UserId == u.Id && m.TenantId == tenantId));
         if (!string.IsNullOrWhiteSpace(search))
             query = query.Where(u => EF.Functions.Like(u.Username, $"%{search}%")
                 || u.Emails.Any(e => EF.Functions.Like(e.Email.Value, $"%{search}%")));
@@ -96,14 +100,20 @@ public sealed class UserRepository : IUserRepository
         return await query.CountAsync(ct).ConfigureAwait(false);
     }
 
-    public async Task<UserStatistics> GetStatisticsAsync(CancellationToken ct = default)
+    public async Task<UserStatistics> GetStatisticsAsync(Guid tenantId, bool allTenants, CancellationToken ct = default)
     {
         var since = DateTime.UtcNow.AddDays(-30);
-        var total = await _context.Users.CountAsync(ct).ConfigureAwait(false);
-        var active = await _context.Users.CountAsync(u => u.IsActive, ct).ConfigureAwait(false);
-        var locked = await _context.Users.CountAsync(u => u.IsLocked, ct).ConfigureAwait(false);
-        var createdLast30Days = await _context.Users.CountAsync(u => u.CreatedAt >= since, ct).ConfigureAwait(false);
-        var mfaEnabled = await _context.TotpSecrets.CountAsync(s => s.IsEnabled, ct).ConfigureAwait(false);
+        var users = _context.Users.AsNoTracking();
+        if (!allTenants)
+            users = users.Where(u => _context.TenantMemberships.Any(m => m.UserId == u.Id && m.TenantId == tenantId));
+
+        var total = await users.CountAsync(ct).ConfigureAwait(false);
+        var active = await users.CountAsync(u => u.IsActive, ct).ConfigureAwait(false);
+        var locked = await users.CountAsync(u => u.IsLocked, ct).ConfigureAwait(false);
+        var createdLast30Days = await users.CountAsync(u => u.CreatedAt >= since, ct).ConfigureAwait(false);
+        var mfaEnabled = await _context.TotpSecrets
+            .CountAsync(s => s.IsEnabled && (allTenants || _context.TenantMemberships.Any(m => m.UserId == s.UserId && m.TenantId == tenantId)), ct)
+            .ConfigureAwait(false);
         return new(total, active, locked, createdLast30Days, mfaEnabled);
     }
 

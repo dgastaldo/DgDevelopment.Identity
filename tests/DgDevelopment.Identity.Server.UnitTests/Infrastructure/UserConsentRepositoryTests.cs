@@ -29,9 +29,10 @@ public sealed class UserConsentRepositoryTests : IClassFixture<DatabaseFixture<U
     [Fact]
     public async Task AddOrUpdateAddsNewConsent()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var userId = await CreateUserAsync();
         var clientId = Guid.NewGuid();
-        var consent = new UserConsent(userId, clientId, ["openid", "profile"], DateTime.UtcNow.AddDays(30));
+        var consent = new UserConsent(tenantId, userId, clientId, ["openid", "profile"], DateTime.UtcNow.AddDays(30));
         await using var context = _fixture.CreateContext();
         var repo = new UserConsentRepository(context);
         await repo.AddOrUpdateAsync(consent);
@@ -46,13 +47,14 @@ public sealed class UserConsentRepositoryTests : IClassFixture<DatabaseFixture<U
     [Fact]
     public async Task AddOrUpdateUpdatesExistingConsentInPlace()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var userId = await CreateUserAsync();
         var clientId = Guid.NewGuid();
         await using var context = _fixture.CreateContext();
         var repo = new UserConsentRepository(context);
 
-        await repo.AddOrUpdateAsync(new UserConsent(userId, clientId, ["openid"], DateTime.UtcNow.AddDays(10)));
-        await repo.AddOrUpdateAsync(new UserConsent(userId, clientId, ["openid", "profile"], DateTime.UtcNow.AddDays(180)));
+        await repo.AddOrUpdateAsync(new UserConsent(tenantId, userId, clientId, ["openid"], DateTime.UtcNow.AddDays(10)));
+        await repo.AddOrUpdateAsync(new UserConsent(tenantId, userId, clientId, ["openid", "profile"], DateTime.UtcNow.AddDays(180)));
 
         var consents = await repo.GetByUserAsync(userId);
         var stored = Assert.Single(consents);
@@ -63,13 +65,14 @@ public sealed class UserConsentRepositoryTests : IClassFixture<DatabaseFixture<U
     [Fact]
     public async Task GetByUserReturnsOnlyThatUsersConsents()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var aliId = await CreateUserAsync();
         var bobId = await CreateUserAsync();
         await using var context = _fixture.CreateContext();
         var repo = new UserConsentRepository(context);
-        await repo.AddOrUpdateAsync(new UserConsent(aliId, Guid.NewGuid(), ["openid"], null));
-        await repo.AddOrUpdateAsync(new UserConsent(aliId, Guid.NewGuid(), ["profile"], null));
-        await repo.AddOrUpdateAsync(new UserConsent(bobId, Guid.NewGuid(), ["openid"], null));
+        await repo.AddOrUpdateAsync(new UserConsent(tenantId, aliId, Guid.NewGuid(), ["openid"], null));
+        await repo.AddOrUpdateAsync(new UserConsent(tenantId, aliId, Guid.NewGuid(), ["profile"], null));
+        await repo.AddOrUpdateAsync(new UserConsent(tenantId, bobId, Guid.NewGuid(), ["openid"], null));
 
         var aliConsents = await repo.GetByUserAsync(aliId);
 
@@ -80,11 +83,12 @@ public sealed class UserConsentRepositoryTests : IClassFixture<DatabaseFixture<U
     [Fact]
     public async Task RevokeRemovesTheConsent()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var userId = await CreateUserAsync();
         var clientId = Guid.NewGuid();
         await using var context = _fixture.CreateContext();
         var repo = new UserConsentRepository(context);
-        await repo.AddOrUpdateAsync(new UserConsent(userId, clientId, ["openid"], null));
+        await repo.AddOrUpdateAsync(new UserConsent(tenantId, userId, clientId, ["openid"], null));
 
         await repo.RevokeAsync(userId, clientId);
 
@@ -94,13 +98,14 @@ public sealed class UserConsentRepositoryTests : IClassFixture<DatabaseFixture<U
     [Fact]
     public async Task DeleteExpiredRemovesOnlyExpiredConsents()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var userId = await CreateUserAsync();
         await using var context = _fixture.CreateContext();
         var repo = new UserConsentRepository(context);
         var expiredClientId = Guid.NewGuid();
         var validClientId = Guid.NewGuid();
-        await repo.AddOrUpdateAsync(new UserConsent(userId, expiredClientId, ["openid"], DateTime.UtcNow.AddDays(-1)));
-        await repo.AddOrUpdateAsync(new UserConsent(userId, validClientId, ["openid"], DateTime.UtcNow.AddDays(30)));
+        await repo.AddOrUpdateAsync(new UserConsent(tenantId, userId, expiredClientId, ["openid"], DateTime.UtcNow.AddDays(-1)));
+        await repo.AddOrUpdateAsync(new UserConsent(tenantId, userId, validClientId, ["openid"], DateTime.UtcNow.AddDays(30)));
 
         await repo.DeleteExpiredAsync();
 

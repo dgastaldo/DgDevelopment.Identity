@@ -4,6 +4,6 @@ namespace DgDevelopment.Identity.Application.Authorization;
 
 public interface IPermissionEvaluator
 {
-    Task<IReadOnlyCollection<EffectivePermission>> GetEffectivePermissionsAsync(Guid userId, CancellationToken ct = default);
-    Task<bool> HasPermissionAsync(Guid userId, string permission, string? scopeType = null, string? scopeValue = null, CancellationToken ct = default);
+    Task<IReadOnlyCollection<EffectivePermission>> GetEffectivePermissionsAsync(Guid userId, Guid tenantId, CancellationToken ct = default);
+    Task<bool> HasPermissionAsync(Guid userId, Guid tenantId, string permission, string? scopeType = null, string? scopeValue = null, CancellationToken ct = default);
 }

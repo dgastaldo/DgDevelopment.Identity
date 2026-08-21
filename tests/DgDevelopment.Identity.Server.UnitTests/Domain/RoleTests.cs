@@ -5,10 +5,12 @@ using Xunit;
 
 public sealed class RoleTests
 {
+    private static readonly Guid TenantId = Guid.NewGuid();
+
     [Fact]
     public void ConstructorSetsFields()
     {
-        var role = new Role("Admin", "Admin role");
+        var role = new Role(TenantId,"Admin", "Admin role");
 
         Assert.False(string.IsNullOrWhiteSpace(role.Id.ToString()));
         Assert.Equal("Admin", role.Name);
@@ -19,7 +21,7 @@ public sealed class RoleTests
     [Fact]
     public void AddPermissionAddsOnceAndRemovePermissionClears()
     {
-        var role = new Role("Admin", "desc");
+        var role = new Role(TenantId,"Admin", "desc");
         var permission = new Permission("user:read", "desc", "User");
 
         role.AddPermission(permission);
@@ -36,7 +38,7 @@ public sealed class RoleTests
     [Fact]
     public void AddPermissionStoresScope()
     {
-        var role = new Role("Admin", "desc");
+        var role = new Role(TenantId,"Admin", "desc");
         var permission = new Permission("user:read", "desc", "User");
 
         role.AddPermission(permission, scopeType: "Platform", scopeValue: "app-1");

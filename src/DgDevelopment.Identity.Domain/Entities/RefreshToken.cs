@@ -3,6 +3,7 @@ namespace DgDevelopment.Identity.Domain.Entities;
 public sealed class RefreshToken
 {
     public Guid Id { get; private set; }
+    public Guid TenantId { get; private set; }
     public string TokenHash { get; private set; }
     public Guid ClientId { get; private set; }
     public Guid UserId { get; private set; }
@@ -15,10 +16,11 @@ public sealed class RefreshToken
 
     private RefreshToken() { }
 
-    public RefreshToken(string tokenHash, Guid clientId, Guid userId, Guid sessionId, string[] scopes,
+    public RefreshToken(Guid tenantId, string tokenHash, Guid clientId, Guid userId, Guid sessionId, string[] scopes,
         Guid? previousTokenId = null, int lifetimeDays = 30)
     {
         Id = Guid.NewGuid();
+        TenantId = tenantId;
         TokenHash = tokenHash;
         ClientId = clientId;
         UserId = userId;

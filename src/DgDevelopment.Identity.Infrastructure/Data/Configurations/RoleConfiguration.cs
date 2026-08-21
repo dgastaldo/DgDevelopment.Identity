@@ -11,10 +11,12 @@ public sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
         System.ArgumentNullException.ThrowIfNull(builder);
         builder.HasKey(x => x.Id);
 
-        builder.HasIndex(x => x.Name).IsUnique();
+        builder.HasIndex(x => new { x.TenantId, x.Name }).IsUnique();
 
         builder.Property(x => x.Name).HasMaxLength(200);
         builder.Property(x => x.Description).HasMaxLength(500);
+
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
 
         builder.HasMany(x => x.Permissions).WithOne().HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Restrict);
     }

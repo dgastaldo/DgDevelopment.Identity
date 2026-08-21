@@ -9,6 +9,7 @@ public enum AuditOutcome
 public sealed class AuditLog
 {
     public Guid Id { get; private set; }
+    public Guid TenantId { get; private set; }
     public Guid? ActorId { get; private set; }
     public string? ActorType { get; private set; }
     public string Action { get; private set; }
@@ -22,11 +23,12 @@ public sealed class AuditLog
 
     private AuditLog() { }
 
-    public AuditLog(string action, AuditOutcome outcome, Guid? actorId = null, string? actorType = null,
+    public AuditLog(Guid tenantId, string action, AuditOutcome outcome, Guid? actorId = null, string? actorType = null,
         string? targetId = null, string? targetType = null, string? details = null,
         string? ipAddress = null, string? userAgent = null)
     {
         Id = Guid.NewGuid();
+        TenantId = tenantId;
         Action = action;
         Outcome = outcome;
         ActorId = actorId;

@@ -22,6 +22,8 @@ public sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
         builder.Property(x => x.UserAgent).HasMaxLength(500);
         builder.Property(x => x.Timestamp).HasColumnType("datetime2");
 
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(x => x.TenantId);
         builder.HasIndex(x => x.ActorType);
         builder.HasIndex(x => x.Action);
         builder.HasIndex(x => x.Timestamp);

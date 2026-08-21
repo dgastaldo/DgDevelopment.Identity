@@ -14,6 +14,8 @@ public sealed class UserConsentConfiguration : IEntityTypeConfiguration<UserCons
         builder.HasIndex(x => new { x.UserId, x.ClientId }).IsUnique();
 
         builder.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(x => x.TenantId);
 
         builder.Property(x => x.GrantedScopes);
         builder.Property(x => x.CreatedAt).HasColumnType("datetime2");

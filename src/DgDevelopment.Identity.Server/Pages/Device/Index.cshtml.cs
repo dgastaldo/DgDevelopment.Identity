@@ -1,6 +1,7 @@
 namespace DgDevelopment.Identity.Server.Pages.Device;
 
 using System.Security.Claims;
+using DgDevelopment.Identity.Application.Authorization;
 using DgDevelopment.Identity.OAuth.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -9,11 +10,13 @@ public sealed class IndexModel : PageModel
 {
     private readonly IDeviceAuthorizationService _deviceAuthorizationService;
     private readonly IUserInteractionService _interaction;
+    private readonly ITenantSelectionService _tenantSelectionService;
 
-    public IndexModel(IDeviceAuthorizationService deviceAuthorizationService, IUserInteractionService interaction)
+    public IndexModel(IDeviceAuthorizationService deviceAuthorizationService, IUserInteractionService interaction, ITenantSelectionService tenantSelectionService)
     {
         _deviceAuthorizationService = deviceAuthorizationService;
         _interaction = interaction;
+        _tenantSelectionService = tenantSelectionService;
     }
 
     [BindProperty]
@@ -57,7 +60,15 @@ public sealed class IndexModel : PageModel
         if (!Guid.TryParse(userIdValue, out var userId))
             return RedirectToPage("/Error", new { errorCode = "invalid_user" });
 
-        var approved = await _deviceAuthorizationService.ApproveAsync(UserCode, userId).ConfigureAwait(false);
+        var selection = await _tenantSelectionService.ResolveAsync(userId, null).ConfigureAwait(false);
+        if (selection.Denied)
+            return RedirectToPage("/Error", new { errorCode = "access_denied", errorDescription = "The user does not belong to any active tenant." });
+
+        // A device belonging to a user with several tenant memberships approves into the first tenant
+        // (by name) for now; a full tenant picker for this page is left for a follow-up PR.
+        var tenantId = selection.TenantId ?? selection.Choices.OrderBy(t => t.Name, StringComparer.Ordinal).First().Id;
+
+        var approved = await _deviceAuthorizationService.ApproveAsync(UserCode, tenantId, userId).ConfigureAwait(false);
         if (!approved)
         {
             Message = "This code is no longer valid. It may have expired or been used.";

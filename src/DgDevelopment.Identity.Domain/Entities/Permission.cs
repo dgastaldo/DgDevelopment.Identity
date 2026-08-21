@@ -6,14 +6,16 @@ public sealed class Permission
     public string Name { get; private set; }
     public string Description { get; private set; }
     public string ResourceType { get; private set; }
+    public bool IsGlobal { get; private set; }
 
     private Permission() { }
 
-    public Permission(string name, string description, string resourceType)
+    public Permission(string name, string description, string resourceType, bool isGlobal = false)
     {
         Id = Guid.NewGuid();
         Name = name;
         Description = description;
         ResourceType = resourceType;
+        IsGlobal = isGlobal;
     }
 }

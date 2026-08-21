@@ -181,7 +181,7 @@ public sealed class User
         if (_roles.Any(r => r.RoleId == role.Id))
             return;
 
-        _roles.Add(new UserRole(Id, role.Id, scopeType, scopeValue));
+        _roles.Add(new UserRole(role.TenantId, Id, role.Id, scopeType, scopeValue));
         UpdatedAt = DateTime.UtcNow;
     }
 
@@ -191,13 +191,13 @@ public sealed class User
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public void GrantPermission(Permission permission, string? scopeType = null, string? scopeValue = null)
+    public void GrantPermission(Guid tenantId, Permission permission, string? scopeType = null, string? scopeValue = null)
     {
         ArgumentNullException.ThrowIfNull(permission);
         if (_permissions.Any(p => p.PermissionId == permission.Id))
             return;
 
-        _permissions.Add(new UserPermission(Id, permission.Id, scopeType, scopeValue));
+        _permissions.Add(new UserPermission(tenantId, Id, permission.Id, scopeType, scopeValue));
         UpdatedAt = DateTime.UtcNow;
     }
 

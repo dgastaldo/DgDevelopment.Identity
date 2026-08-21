@@ -14,5 +14,8 @@ public sealed class PlatformConfiguration : IEntityTypeConfiguration<Platform>
         builder.Property(x => x.Name).HasMaxLength(200);
         builder.Property(x => x.Description).HasMaxLength(500);
         builder.Property(x => x.PermissionMode).HasConversion<string>().HasMaxLength(50);
+
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(x => x.TenantId);
     }
 }

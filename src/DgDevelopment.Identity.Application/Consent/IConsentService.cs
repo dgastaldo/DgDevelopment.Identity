@@ -6,5 +6,5 @@ public interface IConsentService
 {
     IReadOnlyCollection<string> GetScopesRequiringUserConsent(Client client, IReadOnlyCollection<string> requestedScopes);
     bool NeedsConsent(Client client, UserConsent? stored, IReadOnlyCollection<string> requestedScopes, DateTime now);
-    Task RecordConsentAsync(Guid userId, Guid clientId, IReadOnlyCollection<string> scopes, TimeSpan lifetime, CancellationToken ct = default);
+    Task RecordConsentAsync(Guid userId, Client client, IReadOnlyCollection<string> scopes, TimeSpan lifetime, CancellationToken ct = default);
 }

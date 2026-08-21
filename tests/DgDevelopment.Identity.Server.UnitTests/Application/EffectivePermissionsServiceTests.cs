@@ -12,7 +12,7 @@ public sealed class EffectivePermissionsServiceTests
         var permission = new EffectivePermission("identity-platform.user.read", null, null);
         var service = new EffectivePermissionsService(new StubRepository(permission));
 
-        Assert.True(await service.HasPermissionAsync(Guid.NewGuid(), permission.Name));
+        Assert.True(await service.HasPermissionAsync(Guid.NewGuid(), Guid.NewGuid(), permission.Name));
     }
 
     [Fact]
@@ -20,9 +20,10 @@ public sealed class EffectivePermissionsServiceTests
     {
         var permission = new EffectivePermission("identity-platform.user.read", "department", "finance");
         var service = new EffectivePermissionsService(new StubRepository(permission));
+        var tenantId = Guid.NewGuid();
 
-        Assert.True(await service.HasPermissionAsync(Guid.NewGuid(), permission.Name, "department", "finance"));
-        Assert.False(await service.HasPermissionAsync(Guid.NewGuid(), permission.Name, "department", "sales"));
+        Assert.True(await service.HasPermissionAsync(Guid.NewGuid(), tenantId, permission.Name, "department", "finance"));
+        Assert.False(await service.HasPermissionAsync(Guid.NewGuid(), tenantId, permission.Name, "department", "sales"));
     }
 
     [Fact]
@@ -31,12 +32,12 @@ public sealed class EffectivePermissionsServiceTests
         var service = new EffectivePermissionsService(new StubRepository(
             new EffectivePermission("identity-platform.user.read", null, null)));
 
-        Assert.False(await service.HasPermissionAsync(Guid.NewGuid(), "identity-platform.user.update"));
+        Assert.False(await service.HasPermissionAsync(Guid.NewGuid(), Guid.NewGuid(), "identity-platform.user.update"));
     }
 
     private sealed class StubRepository(params EffectivePermission[] permissions) : IUserAuthorizationRepository
     {
-        public Task<IReadOnlyCollection<EffectivePermission>> GetEffectivePermissionsAsync(Guid userId, CancellationToken ct = default)
+        public Task<IReadOnlyCollection<EffectivePermission>> GetEffectivePermissionsAsync(Guid userId, Guid tenantId, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyCollection<EffectivePermission>>(permissions);
     }
 }

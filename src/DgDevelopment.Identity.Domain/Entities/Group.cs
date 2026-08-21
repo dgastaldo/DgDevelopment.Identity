@@ -3,6 +3,7 @@ namespace DgDevelopment.Identity.Domain.Entities;
 public sealed class Group
 {
     public Guid Id { get; private set; }
+    public Guid TenantId { get; private set; }
     public string Name { get; private set; }
     public string Description { get; private set; }
     public Guid? ParentGroupId { get; private set; }
@@ -12,9 +13,10 @@ public sealed class Group
 
     private Group() { }
 
-    public Group(string name, string description, Guid? parentGroupId = null)
+    public Group(Guid tenantId, string name, string description, Guid? parentGroupId = null)
     {
         Id = Guid.NewGuid();
+        TenantId = tenantId;
         Name = name;
         Description = description;
         ParentGroupId = parentGroupId;

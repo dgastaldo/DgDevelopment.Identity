@@ -5,7 +5,7 @@ using DgDevelopment.Identity.Domain.Entities;
 public sealed class ClientTests
 {
     private static Client CreateClient(ClientType clientType = ClientType.Confidential, bool requireConsent = true)
-        => new(Guid.NewGuid(), "secret-hash", "Test Client", clientType, requireConsent: requireConsent);
+        => new(Guid.NewGuid(), Guid.NewGuid(), "secret-hash", "Test Client", clientType, requireConsent: requireConsent);
 
     [Fact]
     public void ConstructorDefaultsAreActiveAndEmpty()

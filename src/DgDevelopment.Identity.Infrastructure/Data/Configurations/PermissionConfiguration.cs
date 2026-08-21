@@ -16,5 +16,6 @@ public sealed class PermissionConfiguration : IEntityTypeConfiguration<Permissio
         builder.Property(x => x.Name).HasMaxLength(200);
         builder.Property(x => x.Description).HasMaxLength(500);
         builder.Property(x => x.ResourceType).HasMaxLength(100);
+        builder.Property(x => x.IsGlobal);
     }
 }

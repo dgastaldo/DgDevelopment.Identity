@@ -7,11 +7,12 @@ public sealed class RefreshTokenTests
     private static readonly Guid ClientId = Guid.NewGuid();
     private static readonly Guid UserId = Guid.NewGuid();
     private static readonly Guid SessionId = Guid.NewGuid();
+    private static readonly Guid TenantId = Guid.NewGuid();
 
     [Fact]
     public void ConstructorStoresFieldsWithDefaults()
     {
-        var token = new RefreshToken("hash", ClientId, UserId, SessionId, ["openid"]);
+        var token = new RefreshToken(TenantId,"hash", ClientId, UserId, SessionId, ["openid"]);
 
         Assert.Equal("hash", token.TokenHash);
         Assert.Equal(ClientId, token.ClientId);
@@ -28,7 +29,7 @@ public sealed class RefreshTokenTests
     {
         var previousId = Guid.NewGuid();
 
-        var token = new RefreshToken("h", ClientId, UserId, SessionId, ["openid"], previousId);
+        var token = new RefreshToken(TenantId,"h", ClientId, UserId, SessionId, ["openid"], previousId);
 
         Assert.Equal(previousId, token.PreviousTokenId);
     }
@@ -36,7 +37,7 @@ public sealed class RefreshTokenTests
     [Fact]
     public void RevokeSetsRevokedFlag()
     {
-        var token = new RefreshToken("h", ClientId, UserId, SessionId, ["openid"]);
+        var token = new RefreshToken(TenantId,"h", ClientId, UserId, SessionId, ["openid"]);
 
         token.Revoke();
 
@@ -46,7 +47,7 @@ public sealed class RefreshTokenTests
     [Fact]
     public void IsExpiredFalseForDefaultLifetime()
     {
-        var token = new RefreshToken("h", ClientId, UserId, SessionId, ["openid"]);
+        var token = new RefreshToken(TenantId,"h", ClientId, UserId, SessionId, ["openid"]);
 
         Assert.False(token.IsExpired());
     }
@@ -54,7 +55,7 @@ public sealed class RefreshTokenTests
     [Fact]
     public void IsExpiredTrueForZeroDayLifetime()
     {
-        var token = new RefreshToken("h", ClientId, UserId, SessionId, ["openid"], lifetimeDays: 0);
+        var token = new RefreshToken(TenantId,"h", ClientId, UserId, SessionId, ["openid"], lifetimeDays: 0);
 
         Assert.True(token.IsExpired());
     }
@@ -62,7 +63,7 @@ public sealed class RefreshTokenTests
     [Fact]
     public void GetScopesRoundTripsTheStoredScopes()
     {
-        var token = new RefreshToken("h", ClientId, UserId, SessionId, ["openid", "profile"]);
+        var token = new RefreshToken(TenantId,"h", ClientId, UserId, SessionId, ["openid", "profile"]);
 
         Assert.Equal(["openid", "profile"], token.GetScopes());
     }

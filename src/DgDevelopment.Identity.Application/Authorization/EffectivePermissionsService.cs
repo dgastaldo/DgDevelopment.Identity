@@ -5,14 +5,14 @@ namespace DgDevelopment.Identity.Application.Authorization;
 
 public sealed class EffectivePermissionsService(IUserAuthorizationRepository repository) : IPermissionEvaluator
 {
-    public Task<IReadOnlyCollection<EffectivePermission>> GetEffectivePermissionsAsync(Guid userId, CancellationToken ct = default)
-        => repository.GetEffectivePermissionsAsync(userId, ct);
+    public Task<IReadOnlyCollection<EffectivePermission>> GetEffectivePermissionsAsync(Guid userId, Guid tenantId, CancellationToken ct = default)
+        => repository.GetEffectivePermissionsAsync(userId, tenantId, ct);
 
-    public async Task<bool> HasPermissionAsync(Guid userId, string permission, string? scopeType = null, string? scopeValue = null, CancellationToken ct = default)
+    public async Task<bool> HasPermissionAsync(Guid userId, Guid tenantId, string permission, string? scopeType = null, string? scopeValue = null, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(permission);
 
-        var permissions = await GetEffectivePermissionsAsync(userId, ct).ConfigureAwait(false);
+        var permissions = await GetEffectivePermissionsAsync(userId, tenantId, ct).ConfigureAwait(false);
         return permissions.Any(p => string.Equals(p.Name, permission, StringComparison.Ordinal)
             && (scopeType is null
                 || p.ScopeType is null

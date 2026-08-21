@@ -33,15 +33,16 @@ public sealed class ConsentService(IUserConsentRepository consentRepository) : I
         return needUser.Any(scope => !granted.Contains(scope));
     }
 
-    public async Task RecordConsentAsync(Guid userId, Guid clientId, IReadOnlyCollection<string> scopes, TimeSpan lifetime, CancellationToken ct = default)
+    public async Task RecordConsentAsync(Guid userId, Client client, IReadOnlyCollection<string> scopes, TimeSpan lifetime, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(scopes);
 
-        var existing = await consentRepository.GetAsync(userId, clientId, ct).ConfigureAwait(false);
+        var existing = await consentRepository.GetAsync(userId, client.Id, ct).ConfigureAwait(false);
         var merged = existing?.GetScopes().Concat(scopes).Distinct(StringComparer.Ordinal).ToArray()
             ?? scopes.Distinct(StringComparer.Ordinal).ToArray();
 
-        var consent = new UserConsent(userId, clientId, merged, DateTime.UtcNow.Add(lifetime));
+        var consent = new UserConsent(client.TenantId, userId, client.Id, merged, DateTime.UtcNow.Add(lifetime));
         await consentRepository.AddOrUpdateAsync(consent, ct).ConfigureAwait(false);
     }
 }

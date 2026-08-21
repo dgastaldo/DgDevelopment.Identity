@@ -91,7 +91,7 @@ public sealed class DeviceAuthorizationServiceTests : IClassFixture<DatabaseFixt
     {
         await using var context = _fixture.CreateContext();
         var repo = new ClientRepository(context);
-        var client = new Client(Guid.NewGuid(), Hash("secret"), "No Device", ClientType.Confidential);
+        var client = new Client(await _fixture.GetSeededTenantIdAsync(), Guid.NewGuid(), Hash("secret"), "No Device", ClientType.Confidential);
         client.AddGrantType("authorization_code");
         await repo.AddAsync(client);
         var service = CreateService(context);
@@ -130,13 +130,14 @@ public sealed class DeviceAuthorizationServiceTests : IClassFixture<DatabaseFixt
     [Fact]
     public async Task ApproveAsyncAuthorizesDeviceCodeWithUser()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
         await using var context = _fixture.CreateContext();
         var service = CreateService(context);
         var repo = new DeviceCodeRepository(context);
         var issued = await service.IssueAsync(TestConstants.AdminClientId, TestConstants.AdminClientSecret, ["openid"], DeviceUri);
 
-        var approved = await service.ApproveAsync(issued.UserCode, userId);
+        var approved = await service.ApproveAsync(issued.UserCode, tenantId, userId);
 
         Assert.True(approved);
         var stored = await repo.GetByDeviceCodeHashAsync(Hash(issued.DeviceCode));
@@ -151,7 +152,7 @@ public sealed class DeviceAuthorizationServiceTests : IClassFixture<DatabaseFixt
         await using var context = _fixture.CreateContext();
         var service = CreateService(context);
 
-        var approved = await service.ApproveAsync("UNKN-0WN0", Guid.NewGuid());
+        var approved = await service.ApproveAsync("UNKN-0WN0", Guid.NewGuid(), Guid.NewGuid());
 
         Assert.False(approved);
     }

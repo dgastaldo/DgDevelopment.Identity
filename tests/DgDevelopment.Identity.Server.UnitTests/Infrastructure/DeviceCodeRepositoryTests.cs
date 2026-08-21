@@ -63,6 +63,7 @@ public sealed class DeviceCodeRepositoryTests : IClassFixture<DatabaseFixture<De
     [Fact]
     public async Task AuthorizePersistsUserAssociation()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var clientId = await _fixture.GetSeededClientIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
         var code = new DeviceCode(UniqueHash("device"), UniqueHash("user"), clientId, ["openid"]);
@@ -70,11 +71,12 @@ public sealed class DeviceCodeRepositoryTests : IClassFixture<DatabaseFixture<De
         var repo = new DeviceCodeRepository(context);
         await repo.AddAsync(code);
 
-        await repo.AuthorizeAsync(code.Id, userId);
+        await repo.AuthorizeAsync(code.Id, tenantId, userId);
 
         var stored = await repo.GetByDeviceCodeHashAsync(code.DeviceCodeHash);
         Assert.NotNull(stored);
         Assert.True(stored.IsAuthorized);
+        Assert.Equal(tenantId, stored.TenantId);
         Assert.Equal(userId, stored.UserId);
     }
 

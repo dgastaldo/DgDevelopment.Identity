@@ -24,6 +24,8 @@ public sealed class ClientConfiguration : IEntityTypeConfiguration<Client>
         builder.Property(x => x.UpdatedAt).HasColumnType("datetime2");
 
         builder.HasOne<Platform>().WithMany().HasForeignKey(x => x.PlatformId).OnDelete(DeleteBehavior.Restrict).IsRequired(false);
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(x => x.TenantId);
 
         builder.OwnsMany(x => x.GrantTypes, gt =>
         {

@@ -52,4 +52,13 @@ public class DatabaseFixture<TTestClass> : IAsyncLifetime
             .Select(u => u.Id)
             .SingleAsync(ct);
     }
+
+    public async Task<Guid> GetSeededTenantIdAsync(CancellationToken ct = default)
+    {
+        await using var context = CreateContext();
+        return await context.Tenants
+            .Where(t => t.Slug == TestConstants.DefaultTenantSlug)
+            .Select(t => t.Id)
+            .SingleAsync(ct);
+    }
 }

@@ -36,7 +36,7 @@ public sealed class TokenIntrospectionServiceTests : IClassFixture<DatabaseFixtu
     private static async Task<string> CreateAccessTokenAsync(IdentityDbContext context, KeyMaterialService keyMaterial, Client client, User user, int lifetimeSeconds = 3600)
     {
         var jwt = new JwtService(keyMaterial, new FakeIssuerProvider());
-        return await jwt.CreateAccessTokenAsync(new AccessTokenRequest(user, client, ["openid", "profile"], null, lifetimeSeconds));
+        return await jwt.CreateAccessTokenAsync(new AccessTokenRequest(client.TenantId, user, client, ["openid", "profile"], null, lifetimeSeconds));
     }
 
     private sealed class FakeIssuerProvider : IOidcIssuerProvider
@@ -47,6 +47,7 @@ public sealed class TokenIntrospectionServiceTests : IClassFixture<DatabaseFixtu
     [Fact]
     public async Task IntrospectAsyncReturnsActiveForValidRefreshToken()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var clientId = await _fixture.GetSeededClientIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
 
@@ -57,7 +58,7 @@ public sealed class TokenIntrospectionServiceTests : IClassFixture<DatabaseFixtu
 
         var value = $"rt-{Guid.NewGuid():N}";
         var refreshRepo = new RefreshTokenRepository(context);
-        await refreshRepo.AddAsync(new RefreshToken(Hash(value), clientId, userId, session.Id, ["openid", "profile"]));
+        await refreshRepo.AddAsync(new RefreshToken(tenantId, Hash(value), clientId, userId, session.Id, ["openid", "profile"]));
         using var keyMaterial = new KeyMaterialService(new SigningKeyRepository(context));
         var service = CreateService(context, keyMaterial);
 
@@ -75,6 +76,7 @@ public sealed class TokenIntrospectionServiceTests : IClassFixture<DatabaseFixtu
     [Fact]
     public async Task IntrospectAsyncReturnsInactiveForRevokedRefreshToken()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var clientId = await _fixture.GetSeededClientIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
 
@@ -85,7 +87,7 @@ public sealed class TokenIntrospectionServiceTests : IClassFixture<DatabaseFixtu
 
         var value = $"rt-{Guid.NewGuid():N}";
         var refreshRepo = new RefreshTokenRepository(context);
-        var stored = new RefreshToken(Hash(value), clientId, userId, session.Id, ["openid"]);
+        var stored = new RefreshToken(tenantId, Hash(value), clientId, userId, session.Id, ["openid"]);
         await refreshRepo.AddAsync(stored);
         await refreshRepo.RevokeAsync(stored.Id);
         using var keyMaterial = new KeyMaterialService(new SigningKeyRepository(context));
@@ -205,6 +207,7 @@ public sealed class TokenIntrospectionServiceTests : IClassFixture<DatabaseFixtu
     [Fact]
     public async Task IntrospectAsyncHonorsAccessTokenHintForRefreshToken()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
         var clientId = await _fixture.GetSeededClientIdAsync();
         var userId = await _fixture.GetSeededUserIdAsync();
 
@@ -215,7 +218,7 @@ public sealed class TokenIntrospectionServiceTests : IClassFixture<DatabaseFixtu
 
         var value = $"rt-{Guid.NewGuid():N}";
         var refreshRepo = new RefreshTokenRepository(context);
-        await refreshRepo.AddAsync(new RefreshToken(Hash(value), clientId, userId, session.Id, ["openid"]));
+        await refreshRepo.AddAsync(new RefreshToken(tenantId, Hash(value), clientId, userId, session.Id, ["openid"]));
         using var keyMaterial = new KeyMaterialService(new SigningKeyRepository(context));
         var service = CreateService(context, keyMaterial);
 

@@ -9,7 +9,7 @@ public sealed class AuditService(
     IAuditLogRepository repository,
     IHttpContextAccessor httpContextAccessor) : IAuditService
 {
-    public async Task RecordAsync(string action, AuditOutcome outcome, Guid? actorId = null, string? actorType = null,
+    public async Task RecordAsync(string action, AuditOutcome outcome, Guid tenantId, Guid? actorId = null, string? actorType = null,
         string? targetId = null, string? targetType = null, string? details = null, CancellationToken ct = default)
     {
         var context = httpContextAccessor.HttpContext;
@@ -17,6 +17,7 @@ public sealed class AuditService(
             ?? context?.User.FindFirstValue("sub"), out var parsedActorId) ? parsedActorId : null;
 
         var entry = new AuditLog(
+            tenantId,
             action,
             outcome,
             actorId,

@@ -26,8 +26,9 @@ public sealed class RequirePermissionAttribute(string permission, string? scopeT
             return;
         }
 
+        var tenantContext = context.HttpContext.RequestServices.GetRequiredService<ITenantContext>();
         var evaluator = context.HttpContext.RequestServices.GetRequiredService<IPermissionEvaluator>();
-        if (await evaluator.HasPermissionAsync(userId, Permission, ScopeType, ScopeValue, context.HttpContext.RequestAborted).ConfigureAwait(false))
+        if (await evaluator.HasPermissionAsync(userId, tenantContext.TenantId, Permission, ScopeType, ScopeValue, context.HttpContext.RequestAborted).ConfigureAwait(false))
             return;
 
         context.Result = new ObjectResult(new ProblemDetails
