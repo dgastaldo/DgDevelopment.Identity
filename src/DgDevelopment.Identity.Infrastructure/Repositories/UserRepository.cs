@@ -135,7 +135,46 @@ public sealed class UserRepository : IUserRepository
 
     public async Task UpdateAsync(User user, CancellationToken ct = default)
     {
-        _context.Users.Update(user);
+        ArgumentNullException.ThrowIfNull(user);
+
+        // User is loaded AsNoTracking; attaching the whole graph via Update() would mark
+        // client-generated-key children (UserRole/UserPermission/UserGroup) as Modified
+        // instead of Added, since EF can't tell new rows from existing ones by key alone.
+        // Attach only the root and reconcile each child collection explicitly against
+        // what's in the database.
+        _context.Entry(user).State = EntityState.Modified;
+
+        var existingRoleIds = await _context.UserRoles
+            .Where(ur => ur.UserId == user.Id)
+            .Select(ur => ur.RoleId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        var currentRoleIds = user.Roles.Select(r => r.RoleId).ToHashSet();
+        foreach (var removedRoleId in existingRoleIds.Where(id => !currentRoleIds.Contains(id)))
+            // TenantId isn't part of UserRole's primary key (UserId+RoleId), so it's irrelevant for a delete stub.
+            _context.UserRoles.Remove(new UserRole(Guid.Empty, user.Id, removedRoleId));
+        foreach (var role in user.Roles.Where(r => !existingRoleIds.Contains(r.RoleId)))
+            _context.UserRoles.Add(role);
+
+        var existingPermissionIds = await _context.UserPermissions
+            .Where(up => up.UserId == user.Id)
+            .Select(up => up.PermissionId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        var currentPermissionIds = user.Permissions.Select(p => p.PermissionId).ToHashSet();
+        foreach (var removedPermissionId in existingPermissionIds.Where(id => !currentPermissionIds.Contains(id)))
+            _context.UserPermissions.Remove(new UserPermission(Guid.Empty, user.Id, removedPermissionId));
+        foreach (var permission in user.Permissions.Where(p => !existingPermissionIds.Contains(p.PermissionId)))
+            _context.UserPermissions.Add(permission);
+
+        var existingGroupIds = await _context.UserGroups
+            .Where(ug => ug.UserId == user.Id)
+            .Select(ug => ug.GroupId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        var currentGroupIds = user.Groups.Select(g => g.GroupId).ToHashSet();
+        foreach (var removedGroupId in existingGroupIds.Where(id => !currentGroupIds.Contains(id)))
+            _context.UserGroups.Remove(new UserGroup(user.Id, removedGroupId));
+        foreach (var group in user.Groups.Where(g => !existingGroupIds.Contains(g.GroupId)))
+            _context.UserGroups.Add(group);
+
         await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 

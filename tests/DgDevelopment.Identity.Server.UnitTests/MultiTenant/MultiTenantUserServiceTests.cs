@@ -162,4 +162,68 @@ public sealed class MultiTenantUserServiceTests : IClassFixture<DatabaseFixture<
         Assert.Equal(2, statsA.Total);
         Assert.Equal(1, statsB.Total);
     }
+
+    [Fact]
+    public async Task AssignRoleAsyncPersistsTheAssignment()
+    {
+        // Regression test: UserRepository.UpdateAsync used to attach the whole User graph via
+        // DbSet.Update(), which marks client-generated-key children like UserRole as Modified
+        // instead of Added, throwing DbUpdateConcurrencyException for a brand new assignment.
+        Guid userId;
+        Guid roleId;
+        Guid tenantId;
+        await using (var setupContext = _fixture.CreateContext())
+        {
+            var tenant = await CreateTenantAsync(setupContext, "AssignRole");
+            var user = await CreateUserInTenantAsync(setupContext, tenant.Id);
+            var role = new Role(tenant.Id, Unique("Role"), "description");
+            setupContext.Roles.Add(role);
+            await setupContext.SaveChangesAsync();
+            tenantId = tenant.Id;
+            userId = user.Id;
+            roleId = role.Id;
+        }
+
+        await using var context = _fixture.CreateContext();
+        var service = CreateService(context);
+
+        await service.AssignRoleAsync(userId, roleId, null, null, tenantId, allTenants: false);
+
+        var stored = await new UserRepository(context).GetByIdAsync(userId);
+        Assert.NotNull(stored);
+        Assert.Contains(stored.Roles, r => r.RoleId == roleId);
+    }
+
+    [Fact]
+    public async Task RemoveRoleAsyncPersistsTheRemoval()
+    {
+        // Regression test: removing a child from a disconnected AsNoTracking graph and calling
+        // DbSet.Update() never generated a DELETE, so the removal silently didn't persist.
+        Guid userId;
+        Guid roleId;
+        Guid tenantId;
+        await using (var setupContext = _fixture.CreateContext())
+        {
+            var tenant = await CreateTenantAsync(setupContext, "RemoveRole");
+            var user = await CreateUserInTenantAsync(setupContext, tenant.Id);
+            var role = new Role(tenant.Id, Unique("Role"), "description");
+            setupContext.Roles.Add(role);
+            await setupContext.SaveChangesAsync();
+            user.AssignRole(role, null, null);
+            setupContext.Users.Update(user);
+            await setupContext.SaveChangesAsync();
+            tenantId = tenant.Id;
+            userId = user.Id;
+            roleId = role.Id;
+        }
+
+        await using var context = _fixture.CreateContext();
+        var service = CreateService(context);
+
+        await service.RemoveRoleAsync(userId, roleId, tenantId, allTenants: false);
+
+        var stored = await new UserRepository(context).GetByIdAsync(userId);
+        Assert.NotNull(stored);
+        Assert.DoesNotContain(stored.Roles, r => r.RoleId == roleId);
+    }
 }
