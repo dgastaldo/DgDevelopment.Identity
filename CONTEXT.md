@@ -6,11 +6,11 @@ This file provides full project context for AI tools and LLMs operating on the r
 
 **DgDevelopment.Identity** is a complete Identity Provider for the DgDevelopment ecosystem. It provides authentication (OAuth 2.0 / OIDC, SAML 2.0), authorization (RBAC + PBAC with permissions, roles, hierarchical groups), user profile management, MFA and multi-client SDKs.
 
-## Current State — 2026-08-20
+## Current State — 2026-08-25
 
-The OAuth 2.0 / OIDC authentication cycle is **fully merged into `develop`** (PRs #1–#33, the whole stack closed). All feature/fix branches are merged and deleted; only `develop`, `docs`, `integration`, `main` remain (local + remote).
+The OAuth 2.0 / OIDC authentication cycle is **fully merged into `develop`** (PRs #1–#33). PRs #34–#38 are also merged: the admin client was renamed `AdminUi` → **`IdentityPlatform`** (with GUID client IDs), an admin authorization foundation landed (`RequirePermissionAttribute`, `IPermissionEvaluator`), a Users administration API + dashboard + Blazor UI shipped, and a **multi-tenant foundation** (`Tenant`/`TenantMembership`, `ITenantContext`, `tid` token claim, tenant switcher UI) made all of the above tenant-aware. PR #40 (`feature/tenant-aware-rbac-api`, in progress) adds the same tenant-aware admin surface for Roles, Permissions, and Groups.
 
-**Milestone M1 is still open**: the OAuth/OIDC foundation, login + consent + device flow, token introspection/revocation, TOTP + Push MFA and the client SDK are functional and merged, but the remaining M1 features (admin APIs, RBAC, user management, audit, integration tests) are not implemented. **No forward merge (`develop` → `docs` → `integration` → `main`) until M1 is complete.**
+**Milestone M1 is still open**: admin APIs for Clients/Platforms and Audit, and integration tests, are not implemented yet. **No forward merge (`develop` → `docs` → `integration` → `main`) until M1 is complete.**
 
 **TOTP + Push MFA** (merged, PR #33): RFC 6238 enrollment/verification with QR code and hashed single-use backup codes, plus push-mfa primitives (device registry, challenge lifecycle, ANH notifier). MFA login step via partial-authentication cookie (`Identity.Partial`) wired into the password page → `Account/Mfa` page. See `docs/mfa.md`.
 
@@ -20,11 +20,13 @@ The OAuth 2.0 / OIDC authentication cycle is **fully merged into `develop`** (PR
 - **OIDC consent** (PR #24): `Account/Consent` page wired into the authorize flow — shows requested scopes with client name → approve/deny (admin-approved scopes allowed without prompt).
 - **Device code flow** (PR #25): `/connect/deviceauthorization` (device + user code issuance, RFC 8628 errors) + `/device` verification/approval UI; `ProcessDeviceCodeAsync` exchanges on poll.
 - **Token introspection + revocation**: `/connect/introspect` (RFC 7662) and `/connect/revoke` (RFC 7009), both with `client_id`/`client_secret` authentication. Refresh tokens revoke the whole rotating family; access tokens go to a `RevokedToken` denylist (jti-hashed table) that is enforced by `/connect/userinfo` and introspection.
-- **Server**: `ConnectController` (`/connect/token`, `/connect/deviceauthorization`, `/connect/introspect`, `/connect/revoke`, `/connect/jwks`, `/connect/userinfo`, `/connect/endsession`, `/.well-known/openid-configuration`), Razor Pages (login, consent, device approval, error), dynamic CORS (per-client origin whitelist), OpenAPI + Scalar + Swagger.
-- **IdentityPlatform** is a Blazor **Server + WASM hybrid**, split into two projects: `DgDevelopment.Identity.IdentityPlatform` (server host) and `DgDevelopment.Identity.IdentityPlatform.Client` (WASM interactive pages/layout).
+- **Server**: `ConnectController` (`/connect/token`, `/connect/deviceauthorization`, `/connect/introspect`, `/connect/revoke`, `/connect/jwks`, `/connect/userinfo`, `/connect/endsession`, `/.well-known/openid-configuration`), Razor Pages (login, consent, device approval, tenant selection, error), dynamic CORS (per-client origin whitelist), OpenAPI + Scalar + Swagger.
+- **Admin API** (`/api/v1/*`, all `[Authorize(AuthenticationSchemes = "Bearer")]` + `[RequirePermission("identity-platform.{entity}.{action}")]`): `UsersController` (paged list, CRUD, lock/unlock, reset-password, role/permission/group assignment, effective-permissions), `DashboardController` (summary stats), `MeController` (`/me/tenants`), `RolesController`/`GroupsController` (tenant-scoped CRUD + role-permission / group-role assignment), `PermissionsController` (read-only global catalog). Every list/mutation endpoint takes an `allTenants` query flag, honored only for callers holding a global (`IsGlobal`) permission via `ITenantContext.IsGlobalAdministratorAsync`.
+- **Multi-tenancy**: `Tenant`/`TenantMembership` entities; `Client`, `Group`, `Role`, `UserRole`, `UserPermission`, `AuditLog`, `UserConsent`, `RefreshToken`, `UserSession`, `AuthorizationCode`, `DeviceCode` all carry a non-nullable `TenantId`. `Permission` stays a global catalog (`IsGlobal` flag instead of a tenant). Active tenant comes from the `tid` access-token claim via `ITenantContext`; switching tenants redoes the OIDC flow (`/login?tenant={slug}`), it's never a client-side variable flip.
+- **IdentityPlatform** is a Blazor **Server + WASM hybrid** (renamed from `AdminUi` in PR #34), split into two projects: `DgDevelopment.Identity.IdentityPlatform` (server host) and `DgDevelopment.Identity.IdentityPlatform.Client` (WASM interactive pages/layout: `Home`, `Users`, `UserDetails`, tenant switcher in `MainLayout`).
 - **Client SDK** (`Client.Core` + `Client.Blazor`): `IdentityClient`, PKCE, token store in `sessionStorage`, refresh handler, `IdentityAuthStateProvider`, `SessionMarkerService` (`identity_marker` cookie) for SSR prerender restore.
-- **Test suite** (PRs #26–#33): `DgDevelopment.Identity.Server.UnitTests` (renamed from `UnitTests`) — 296 tests over domain, application, infrastructure and OAuth layers on a LocalDB fixture. Coverage HTML auto-generated to `TestResults\html` on every Debug build (ReportGenerator 5.5.11).
-- **DB seeding**: 30 permissions, SuperAdmin role, SuperAdmins group, superadmin user, admin client. Stable credentials between runs.
+- **Test suite**: `DgDevelopment.Identity.Server.UnitTests` — 354 tests over domain, application, infrastructure, OAuth, and multi-tenant layers on a LocalDB fixture. Coverage HTML auto-generated to `TestResults\html` on every Debug build (ReportGenerator 5.5.11). `DgDevelopment.Identity.IntegrationTests` (PR #41) — 8 tests driving the real IDP over `WebApplicationFactory<Program>` (login → password → consent → `/connect/token`, scripted with raw `HttpClient`, no Selenium/Aspire), on its own LocalDB (`DgDevelopment.Identity.IntegrationTests`); covers admin API CRUD, cross-tenant 403s, and CORS/auth pipeline end-to-end.
+- **DB seeding**: permissions (incl. `identity-platform.{user,role,permission,group,tenant,dashboard}.*`), SuperAdmin role (all permissions), SuperAdmins group, superadmin user, `identity-platform` client, all owned by a seeded `Identity Tenant` (slug `identity-tenant`). Stable credentials between runs.
 
 ### MFA
 
@@ -38,7 +40,7 @@ The OAuth 2.0 / OIDC authentication cycle is **fully merged into `develop`** (PR
 
 - IdentityPlatform `/login` → IDP `/connect/authorize` (PKCE S256) → IDP login (static SSR Razor Page) → consent (`Account/Consent`) → authorization code → IdentityPlatform `/callback` → `/connect/token` → tokens saved in `sessionStorage` + `identity_marker` cookie
 - Ports are **dynamic** (Aspire binding); `IdentityBaseUrl` / `AdminBaseUrl` / `Identity:AdminClientSecret` come from AppHost/user-secrets
-- IdentityPlatform top bar shows avatar (initials) + username + Logout when authenticated; Home nav is visible only when authenticated
+- IdentityPlatform top bar shows avatar (initials) + username + Logout when authenticated, plus a tenant switcher (dropdown for 2+ memberships, a badge otherwise) and an "All tenants" checkbox for global administrators; Home nav is visible only when authenticated
 - Session restore: `IdentityAuthStateProvider` (WASM) reads stored tokens, refreshes if expired, fetches `/connect/userinfo` once (cached); `ServerIdentityAuthStateProvider` (prerender) reads the `identity_marker` cookie without network calls
 - IDP `/connect/userinfo` returns `sub` / `name` / `email`; client DTOs (`TokenResponse`, `UserInfo`) are aligned to the IDP **snake_case** responses
 
@@ -53,13 +55,12 @@ The OAuth 2.0 / OIDC authentication cycle is **fully merged into `develop`** (PR
 
 Ordered by dependency:
 
-1. **End-to-end verification**: first/all-run smoke test of `/connect/token` (keep the AppHost `Identity:AdminClientId` and `Identity:AdminClientSecret` user-secrets in sync with the seeded values) and of the IdentityPlatform session restore via `userinfo`.
-2. **Admin API `/api/v1/*`**: users, roles, permissions, groups, clients, platforms, audit — none implemented (only `ConnectController` and `MfaController` exist).
-3. **RBAC/PBAC**: effective-permissions algorithm (documented), entity scoping, `permission` claims in access tokens.
-4. **User management**: registration + email verification, password reset, password policy, lockout enforcement. **`INotificationService`** transport layer (email/notification sending) also not implemented.
-5. **Audit Log + Event Store**: entities exist; no implementation.
-6. **UI pages**: `/profile`, `/logout`, `/mfa` (self-service management; login-time enrollment works), `/profile/emails`; rate limiting (login/token/userinfo) and CSP headers on UI pages.
-7. **Tests**: `DgDevelopment.Identity.Server.UnitTests` has 296 tests; `IntegrationTests` project still empty — coverage is written as the features land.
+1. **Admin API `/api/v1/*` — remaining entities**: Clients, Platforms, Audit still have no admin endpoints (Users, Dashboard, Roles, Permissions, Groups are done — see PR-D/#40). Planned as PR-E (tenant-aware clients/platforms) and PR-F (tenant-aware audit/introspection/permission claims) in the roadmap.
+2. **PR-D-UI**: `Roles.razor`/`RoleDetails.razor`, `Groups.razor`/`GroupDetails.razor` in IdentityPlatform.Client, mirroring `Users.razor`/`UserDetails.razor`.
+3. **User management**: registration + email verification, password reset, password policy, lockout enforcement. **`INotificationService`** transport layer (email/notification sending) also not implemented.
+4. **Audit Log + Event Store**: entities exist; no admin-facing implementation yet (writes happen via `IAuditService`, no read/query API).
+5. **UI pages**: `/profile`, `/logout`, `/mfa` (self-service management; login-time enrollment works), `/profile/emails`; rate limiting (login/token/userinfo) and CSP headers on UI pages.
+6. **Tests**: `DgDevelopment.Identity.Server.UnitTests` has 354 tests; `IntegrationTests` now has 8 real-HTTP end-to-end tests (PR #41, brought forward from the original PR-G). A full docs pass is still the planned final step of the RBAC/multi-tenant roadmap.
 
 After M1 is complete: **forward merge** `develop` → `docs` → `integration` → `main`, then milestones M2–M4 (SAML 2.0, React/WPF/MAUI client SDKs, Push MFA + external providers, localization integration).
 
@@ -68,8 +69,8 @@ After M1 is complete: **forward merge** `develop` → `docs` → `integration` �
 ### Clean Architecture — strictly controlled dependencies
 
 ```
-AdminUi ──> Client.Blazor ──> Client.Core
-AdminUi.Client ──> Client.Blazor ──> Client.Core
+IdentityPlatform ──> Client.Blazor ──> Client.Core
+IdentityPlatform.Client ──> Client.Blazor ──> Client.Core
 Server ──> Application ──> Domain <── Infrastructure (implements Domain interfaces)
   │            ▲               ▲
   ├──> OAuth ──┘               │

@@ -45,11 +45,11 @@ public sealed class DbSeeder(IServiceProvider serviceProvider)
 
     private static async Task<Tenant> SeedDefaultTenantAsync(IdentityDbContext db)
     {
-        var existing = await db.Tenants.FirstOrDefaultAsync(t => t.Slug == "default").ConfigureAwait(false);
+        var existing = await db.Tenants.FirstOrDefaultAsync(t => t.Slug == "identity-tenant").ConfigureAwait(false);
         if (existing is not null)
             return existing;
 
-        var tenant = new Tenant("Default", "default");
+        var tenant = new Tenant("Identity Tenant", "identity-tenant");
         db.Tenants.Add(tenant);
         await db.SaveChangesAsync().ConfigureAwait(false);
         return tenant;

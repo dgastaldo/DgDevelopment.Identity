@@ -49,7 +49,27 @@ public sealed class GroupRepository : IGroupRepository
 
     public async Task UpdateAsync(Group group, CancellationToken ct = default)
     {
-        _context.Groups.Update(group);
+        ArgumentNullException.ThrowIfNull(group);
+
+        // Group is loaded AsNoTracking; attaching the whole graph via Update() would mark
+        // client-generated-key children (GroupRole) as Modified instead of Added, since EF
+        // can't tell new rows from existing ones by key alone. Attach only the root and
+        // reconcile the child collection explicitly against what's in the database.
+        _context.Entry(group).State = EntityState.Modified;
+
+        var existingRoleIds = await _context.GroupRoles
+            .Where(gr => gr.GroupId == group.Id)
+            .Select(gr => gr.RoleId)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        var currentRoleIds = group.Roles.Select(r => r.RoleId).ToHashSet();
+
+        foreach (var removedRoleId in existingRoleIds.Where(id => !currentRoleIds.Contains(id)))
+            _context.GroupRoles.Remove(new GroupRole(group.Id, removedRoleId));
+
+        foreach (var role in group.Roles.Where(r => !existingRoleIds.Contains(r.RoleId)))
+            _context.GroupRoles.Add(role);
+
         await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 

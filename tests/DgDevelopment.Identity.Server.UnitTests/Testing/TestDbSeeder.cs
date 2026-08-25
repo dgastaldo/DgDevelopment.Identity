@@ -28,7 +28,7 @@ public static class TestDbSeeder
         if (existing is not null)
             return existing.Id;
 
-        var tenant = new Tenant("Default", TestConstants.DefaultTenantSlug);
+        var tenant = new Tenant("Identity Tenant", TestConstants.DefaultTenantSlug);
         db.Tenants.Add(tenant);
         await db.SaveChangesAsync().ConfigureAwait(false);
         return tenant.Id;

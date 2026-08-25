@@ -1,4 +1,6 @@
 using DgDevelopment.Identity.Application.Consent;
+using DgDevelopment.Identity.Application.Groups;
+using DgDevelopment.Identity.Application.Roles;
 using DgDevelopment.Identity.Application.Services;
 using DgDevelopment.Identity.Application.Users;
 using DgDevelopment.Identity.Infrastructure.Data;
@@ -35,6 +37,8 @@ builder.Services.AddScoped<DgDevelopment.Identity.Application.Authorization.ITen
 builder.Services.AddScoped<DgDevelopment.Identity.Application.Authorization.ITenantSelectionService, DgDevelopment.Identity.Application.Authorization.TenantSelectionService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IRoleService, RoleService>();
+builder.Services.AddScoped<IGroupService, GroupService>();
 builder.Services.AddOAuthEngine();
 builder.Services.AddScoped<IUserInteractionService, UserInteractionService>();
 builder.Services.AddScoped<IConsentService, ConsentService>();
@@ -163,3 +167,5 @@ app.MapRazorPages();
 app.MapHub<DgDevelopment.Identity.Server.Hubs.MfaHub>("/hubs/mfa");
 
 await app.RunAsync();
+
+public partial class Program;

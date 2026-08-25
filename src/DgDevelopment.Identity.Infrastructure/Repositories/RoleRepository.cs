@@ -47,7 +47,27 @@ public sealed class RoleRepository : IRoleRepository
 
     public async Task UpdateAsync(Role role, CancellationToken ct = default)
     {
-        _context.Roles.Update(role);
+        ArgumentNullException.ThrowIfNull(role);
+
+        // Role is loaded AsNoTracking; attaching the whole graph via Update() would mark
+        // client-generated-key children (RolePermission) as Modified instead of Added,
+        // since EF can't tell new rows from existing ones by key alone. Attach only the
+        // root and reconcile the child collection explicitly against what's in the database.
+        _context.Entry(role).State = EntityState.Modified;
+
+        var existingPermissionIds = await _context.RolePermissions
+            .Where(rp => rp.RoleId == role.Id)
+            .Select(rp => rp.PermissionId)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        var currentPermissionIds = role.Permissions.Select(p => p.PermissionId).ToHashSet();
+
+        foreach (var removedPermissionId in existingPermissionIds.Where(id => !currentPermissionIds.Contains(id)))
+            _context.RolePermissions.Remove(new RolePermission(role.Id, removedPermissionId));
+
+        foreach (var permission in role.Permissions.Where(p => !existingPermissionIds.Contains(p.PermissionId)))
+            _context.RolePermissions.Add(permission);
+
         await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 

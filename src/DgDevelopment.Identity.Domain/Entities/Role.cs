@@ -20,6 +20,14 @@ public sealed class Role
         Description = description;
     }
 
+    public void Rename(string name, string description)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(description);
+        Name = name;
+        Description = description;
+    }
+
     public void AddPermission(Permission permission, string? scopeType = null, string? scopeValue = null)
     {
         ArgumentNullException.ThrowIfNull(permission);
