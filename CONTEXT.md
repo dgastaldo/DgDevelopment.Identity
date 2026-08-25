@@ -26,7 +26,7 @@ The OAuth 2.0 / OIDC authentication cycle is **fully merged into `develop`** (PR
 - **IdentityPlatform** is a Blazor **Server + WASM hybrid** (renamed from `AdminUi` in PR #34), split into two projects: `DgDevelopment.Identity.IdentityPlatform` (server host) and `DgDevelopment.Identity.IdentityPlatform.Client` (WASM interactive pages/layout: `Home`, `Users`, `UserDetails`, tenant switcher in `MainLayout`).
 - **Client SDK** (`Client.Core` + `Client.Blazor`): `IdentityClient`, PKCE, token store in `sessionStorage`, refresh handler, `IdentityAuthStateProvider`, `SessionMarkerService` (`identity_marker` cookie) for SSR prerender restore.
 - **Test suite**: `DgDevelopment.Identity.Server.UnitTests` — 354 tests over domain, application, infrastructure, OAuth, and multi-tenant layers on a LocalDB fixture. Coverage HTML auto-generated to `TestResults\html` on every Debug build (ReportGenerator 5.5.11).
-- **DB seeding**: permissions (incl. `identity-platform.{user,role,permission,group,tenant,dashboard}.*`), SuperAdmin role (all permissions), SuperAdmins group, superadmin user, `identity-platform` client, all owned by a seeded `Default` tenant. Stable credentials between runs.
+- **DB seeding**: permissions (incl. `identity-platform.{user,role,permission,group,tenant,dashboard}.*`), SuperAdmin role (all permissions), SuperAdmins group, superadmin user, `identity-platform` client, all owned by a seeded `Identity Tenant` (slug `identity-tenant`). Stable credentials between runs.
 
 ### MFA
 

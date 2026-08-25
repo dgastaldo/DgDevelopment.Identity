@@ -10,6 +10,6 @@ public static class TestConstants
     public const string SuperAdminPassword = "Test-SuperAdmin-Password!2026";
     public const string SuperAdminEmail = "identity.superadmin@dgdevelopment.it";
 
-    public const string DefaultTenantSlug = "default";
+    public const string DefaultTenantSlug = "identity-tenant";
     public const string SecondTenantSlug = "acme";
 }
