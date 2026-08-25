@@ -167,3 +167,5 @@ app.MapRazorPages();
 app.MapHub<DgDevelopment.Identity.Server.Hubs.MfaHub>("/hubs/mfa");
 
 await app.RunAsync();
+
+public partial class Program;
