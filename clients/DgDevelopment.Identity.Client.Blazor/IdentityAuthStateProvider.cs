@@ -67,7 +67,7 @@ public class IdentityAuthStateProvider(IdentityClient client, ITokenStore tokenS
             }
         }
 
-        _currentUser = BuildPrincipal(_userInfo!);
+        _currentUser = BuildPrincipal(_userInfo!, _tokens.AccessToken);
 
         await markerService.SetAsync(_userInfo!).ConfigureAwait(false);
 
@@ -106,7 +106,7 @@ public class IdentityAuthStateProvider(IdentityClient client, ITokenStore tokenS
             throw;
         }
 
-        _currentUser = BuildPrincipal(_userInfo);
+        _currentUser = BuildPrincipal(_userInfo, _tokens.AccessToken);
 
         await markerService.SetAsync(_userInfo!).ConfigureAwait(false);
 
@@ -134,7 +134,7 @@ public class IdentityAuthStateProvider(IdentityClient client, ITokenStore tokenS
         return (verifier, challenge);
     }
 
-    protected static ClaimsPrincipal BuildPrincipal(UserInfo? userInfo)
+    protected static ClaimsPrincipal BuildPrincipal(UserInfo? userInfo, string? accessToken = null)
     {
         var claims = new List<Claim>();
 
@@ -144,6 +144,14 @@ public class IdentityAuthStateProvider(IdentityClient client, ITokenStore tokenS
             claims.Add(new Claim(ClaimTypes.Name, userInfo.Name));
         if (!string.IsNullOrEmpty(userInfo?.Email))
             claims.Add(new Claim(ClaimTypes.Email, userInfo.Email));
+
+        // Read directly off the access token (unverified - see JwtClaimsReader) rather than adding a
+        // round trip: /connect/userinfo doesn't carry permissions, and this is UI-gating only, not a
+        // security boundary (every API call is still enforced server-side). Not available during SSR
+        // prerender (no accessToken there), so permission-gated nav briefly hides until the WASM
+        // client goes interactive and re-runs this with the real token.
+        foreach (var permission in JwtClaimsReader.GetPermissions(accessToken))
+            claims.Add(new Claim("permission", permission));
 
         return new ClaimsPrincipal(new ClaimsIdentity(claims, "oidc"));
     }
