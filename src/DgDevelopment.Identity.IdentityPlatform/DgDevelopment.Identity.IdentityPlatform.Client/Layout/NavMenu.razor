@@ -44,6 +44,30 @@
                         </NavLink>
                     </div>
                 }
+                @if (authState.User.HasPermission("identity-platform.client.read"))
+                {
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="clients">
+                            <span class="mr-3 inline-block w-4 text-center text-xs" aria-hidden="true">◆</span> Clients
+                        </NavLink>
+                    </div>
+                }
+                @if (authState.User.HasPermission("identity-platform.platform.read"))
+                {
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="platforms">
+                            <span class="mr-3 inline-block w-4 text-center text-xs" aria-hidden="true">▧</span> Platforms
+                        </NavLink>
+                    </div>
+                }
+                @if (authState.User.HasPermission("identity-platform.audit.read"))
+                {
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="audit">
+                            <span class="mr-3 inline-block w-4 text-center text-xs" aria-hidden="true">☰</span> Audit log
+                        </NavLink>
+                    </div>
+                }
             </nav>
         </Authorized>
     </AuthorizeView>

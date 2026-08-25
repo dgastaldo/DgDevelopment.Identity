@@ -1,0 +1,201 @@
+@page "/clients/{Id:guid}"
+@using DgDevelopment.Identity.IdentityPlatform.Client.State
+@inject IdentityClient Api
+@inject NavigationManager Navigation
+@inject TenantState TenantState
+
+<PageTitle>Client details | IdentityPlatform</PageTitle>
+
+<RequirePermission Permission="identity-platform.client.read">
+    @if (Loading)
+    {
+        <div class="h-64 animate-pulse rounded-2xl bg-slate-100"></div>
+    }
+    else if (Client is null)
+    {
+        <div class="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">@Error</div>
+    }
+    else
+    {
+        <div class="mb-8 flex items-end justify-between gap-4">
+            <div>
+                <button class="mb-4 text-sm font-semibold text-violet-700" @onclick="Back">← Clients</button>
+                <p class="text-xs font-semibold tracking-[0.2em] text-violet-700 uppercase">Client detail</p>
+                <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">@Client.Name</h1>
+                <p class="mt-2 text-sm text-slate-500 break-all">Client ID: @Client.ClientId</p>
+            </div>
+            <span class="rounded-full px-3 py-1 text-xs font-semibold @(Client.IsActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500")">@(Client.IsActive ? "Active" : "Inactive")</span>
+        </div>
+        @if (Error is not null) { <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">@Error</div> }
+        @if (NewSecret is not null)
+        {
+            <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                <p class="font-semibold">New client secret (shown once)</p>
+                <p class="mt-1 break-all font-mono text-xs">@NewSecret</p>
+            </div>
+        }
+
+        <div class="grid gap-6 lg:grid-cols-[1fr_0.6fr]">
+            <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <p class="text-xs font-semibold tracking-[0.16em] text-slate-400 uppercase">Settings</p>
+                <EditForm Model="EditModel" OnValidSubmit="SaveAsync" class="mt-4 grid gap-4">
+                    <div><label class="mb-1 block text-xs font-semibold text-slate-500 uppercase">Name</label><InputText @bind-Value="EditModel.Name" class="w-full rounded-lg border-slate-300" /></div>
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold text-slate-500 uppercase">Platform</label>
+                        <select @bind="EditModel.PlatformId" class="w-full rounded-lg border-slate-300 text-sm">
+                            <option value="">No platform</option>
+                            @foreach (var platform in Platforms)
+                            {
+                                <option value="@platform.Id">@platform.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2"><InputCheckbox @bind-Value="EditModel.RequireConsent" id="requireConsent" /><label for="requireConsent" class="text-sm text-slate-700">Require consent</label></div>
+                    <div><label class="mb-1 block text-xs font-semibold text-slate-500 uppercase">Grant types (space-separated)</label><InputText @bind-Value="EditModel.GrantTypes" class="w-full rounded-lg border-slate-300" /></div>
+                    <div><label class="mb-1 block text-xs font-semibold text-slate-500 uppercase">Scopes (space-separated)</label><InputText @bind-Value="EditModel.Scopes" class="w-full rounded-lg border-slate-300" /></div>
+                    <div><label class="mb-1 block text-xs font-semibold text-slate-500 uppercase">Redirect URIs (one per line)</label><InputTextArea @bind-Value="EditModel.RedirectUris" class="w-full rounded-lg border-slate-300" rows="3" /></div>
+                    <div><label class="mb-1 block text-xs font-semibold text-slate-500 uppercase">Post-logout redirect URIs (one per line)</label><InputTextArea @bind-Value="EditModel.PostLogoutRedirectUris" class="w-full rounded-lg border-slate-300" rows="2" /></div>
+                    <div><label class="mb-1 block text-xs font-semibold text-slate-500 uppercase">Admin-consent scopes (space-separated)</label><InputText @bind-Value="EditModel.AdminConsentScopes" class="w-full rounded-lg border-slate-300" /></div>
+                    <div><button disabled="@Busy" class="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800">Save changes</button></div>
+                </EditForm>
+            </section>
+
+            <section class="rounded-2xl bg-slate-900 p-6 text-white shadow-sm">
+                <p class="text-xs font-semibold tracking-[0.16em] text-violet-300 uppercase">Actions</p>
+                <div class="mt-5 grid gap-3">
+                    <button disabled="@Busy" @onclick="RegenerateSecretAsync" class="rounded-lg bg-white/10 px-4 py-2 text-left text-sm font-semibold hover:bg-white/20">Regenerate secret</button>
+                    <button disabled="@Busy" @onclick="ToggleActiveAsync" class="rounded-lg bg-white/10 px-4 py-2 text-left text-sm font-semibold hover:bg-white/20">@(Client.IsActive ? "Deactivate client" : "Activate client")</button>
+                    <button disabled="@Busy" @onclick="DeleteAsync" class="rounded-lg bg-rose-400/20 px-4 py-2 text-left text-sm font-semibold text-rose-200 hover:bg-rose-400/30">Delete client</button>
+                </div>
+            </section>
+        </div>
+    }
+</RequirePermission>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private ClientResponse? Client;
+    private IReadOnlyCollection<PlatformResponse> Platforms = [];
+    private bool Loading = true;
+    private bool Busy;
+    private string? Error;
+    private string? NewSecret;
+    private EditClientForm EditModel = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && OperatingSystem.IsBrowser())
+            await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            Client = await Api.GetClientAsync(Id, TenantState.AllTenants).ConfigureAwait(false);
+            if (Client is null) { Error = "Client not found."; return; }
+
+            EditModel = new EditClientForm
+            {
+                Name = Client.Name,
+                PlatformId = Client.PlatformId?.ToString() ?? string.Empty,
+                RequireConsent = Client.RequireConsent,
+                GrantTypes = string.Join(' ', Client.GrantTypes),
+                Scopes = string.Join(' ', Client.Scopes),
+                RedirectUris = string.Join('\n', Client.RedirectUris),
+                PostLogoutRedirectUris = string.Join('\n', Client.PostLogoutRedirectUris),
+                AdminConsentScopes = string.Join(' ', Client.AdminConsentScopes)
+            };
+
+            var platforms = await Api.GetPlatformsAsync(null, 1, 200, TenantState.AllTenants).ConfigureAwait(false);
+            Platforms = platforms?.Items ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            Error = "The client could not be loaded.";
+        }
+        finally
+        {
+            Loading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private static IReadOnlyCollection<string> Split(string value)
+        => value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    private static IReadOnlyCollection<Uri> SplitUris(string value)
+        => value.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(u => new Uri(u)).ToList();
+
+    private async Task SaveAsync()
+    {
+        Busy = true;
+        try
+        {
+            var platformId = Guid.TryParse(EditModel.PlatformId, out var parsed) ? parsed : (Guid?)null;
+            using var response = await Api.UpdateClientAsync(
+                Id, EditModel.Name, EditModel.RequireConsent, platformId,
+                Split(EditModel.GrantTypes), Split(EditModel.Scopes),
+                SplitUris(EditModel.RedirectUris), SplitUris(EditModel.PostLogoutRedirectUris),
+                Split(EditModel.AdminConsentScopes), TenantState.AllTenants).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            await LoadAsync();
+        }
+        catch (HttpRequestException) { Error = "The client could not be updated."; }
+        catch (UriFormatException) { Error = "One of the redirect URIs is not a valid absolute URI."; }
+        finally { Busy = false; }
+    }
+
+    private async Task RegenerateSecretAsync()
+    {
+        Busy = true;
+        try
+        {
+            NewSecret = await Api.RegenerateClientSecretAsync(Id, TenantState.AllTenants).ConfigureAwait(false);
+        }
+        catch (HttpRequestException) { Error = "The client secret could not be regenerated."; }
+        finally { Busy = false; }
+    }
+
+    private async Task ToggleActiveAsync()
+    {
+        Busy = true;
+        try
+        {
+            using var response = await Api.SetClientActiveAsync(Id, !Client!.IsActive, TenantState.AllTenants).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            await LoadAsync();
+        }
+        catch (HttpRequestException) { Error = "The client status could not be changed."; }
+        finally { Busy = false; }
+    }
+
+    private async Task DeleteAsync()
+    {
+        Busy = true;
+        try
+        {
+            using var response = await Api.DeleteClientAsync(Id, TenantState.AllTenants).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            Navigation.NavigateTo("/clients");
+        }
+        catch (HttpRequestException) { Error = "The client could not be deleted."; }
+        finally { Busy = false; }
+    }
+
+    private void Back() => Navigation.NavigateTo("/clients");
+
+    private sealed class EditClientForm
+    {
+        public string Name { get; set; } = string.Empty;
+        public string PlatformId { get; set; } = string.Empty;
+        public bool RequireConsent { get; set; }
+        public string GrantTypes { get; set; } = string.Empty;
+        public string Scopes { get; set; } = string.Empty;
+        public string RedirectUris { get; set; } = string.Empty;
+        public string PostLogoutRedirectUris { get; set; } = string.Empty;
+        public string AdminConsentScopes { get; set; } = string.Empty;
+    }
+}
