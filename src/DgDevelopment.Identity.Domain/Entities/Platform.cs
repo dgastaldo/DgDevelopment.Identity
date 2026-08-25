@@ -24,4 +24,13 @@ public sealed class Platform
         Description = description;
         PermissionMode = permissionMode;
     }
+
+    public void Update(string name, string description, PermissionMode permissionMode)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(description);
+        Name = name;
+        Description = description;
+        PermissionMode = permissionMode;
+    }
 }
