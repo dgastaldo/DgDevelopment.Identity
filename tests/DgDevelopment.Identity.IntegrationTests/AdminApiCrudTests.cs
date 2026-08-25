@@ -88,4 +88,23 @@ public sealed class AdminApiCrudTests(IntegrationTestFixture fixture)
         var afterRemoveBody = await afterRemove.Content.ReadFromJsonAsync<JsonElement>();
         Assert.DoesNotContain(afterRemoveBody.GetProperty("roles").EnumerateArray(), r => r.GetProperty("roleId").GetGuid() == roleId);
     }
+
+    [Fact]
+    public async Task CreatingARoleWritesATenantScopedAuditLogEntryVisibleOverRealHttp()
+    {
+        using var client = fixture.CreateAuthenticatedClient();
+
+        var role = await client.PostAsJsonAsync("/api/v1/roles", new { name = "Audited Role", description = "for audit log test" });
+        role.EnsureSuccessStatusCode();
+        var roleId = (await role.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var audit = await client.GetAsync($"/api/v1/audit?action=role.create&targetId={roleId}");
+        audit.EnsureSuccessStatusCode();
+
+        var body = await audit.Content.ReadFromJsonAsync<JsonElement>();
+        var items = body.GetProperty("items").EnumerateArray().ToList();
+        var entry = Assert.Single(items);
+        Assert.Equal(fixture.DefaultTenantId, entry.GetProperty("tenantId").GetGuid());
+        Assert.Equal(roleId.ToString(), entry.GetProperty("targetId").GetString());
+    }
 }

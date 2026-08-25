@@ -2,6 +2,7 @@ namespace DgDevelopment.Identity.Server.UnitTests.MultiTenant;
 
 using System.Security.Cryptography;
 using System.Text;
+using DgDevelopment.Identity.Application.Authorization;
 using DgDevelopment.Identity.Domain.Entities;
 using DgDevelopment.Identity.Domain.ValueObjects;
 using DgDevelopment.Identity.Infrastructure.Data;
@@ -38,7 +39,8 @@ public sealed class MultiTenantTokenServiceTests : IClassFixture<DatabaseFixture
             new UserRepository(context),
             new UserSessionRepository(context),
             new TenantRepository(context),
-            new JwtService(keyMaterial, new FakeIssuerProvider()));
+            new JwtService(keyMaterial, new FakeIssuerProvider()),
+            new EffectivePermissionsService(new UserAuthorizationRepository(context)));
 
     [Fact]
     public async Task ProcessRefreshTokenAsyncThrowsWhenTenantMembershipWasRemoved()

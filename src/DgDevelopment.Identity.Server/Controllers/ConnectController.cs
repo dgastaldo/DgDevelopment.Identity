@@ -181,6 +181,7 @@ public sealed partial class ConnectController : Controller
         if (response.Iat is not null) body["iat"] = response.Iat;
         if (response.Jti is not null) body["jti"] = response.Jti;
         if (response.Permissions is { Count: > 0 }) body["permission"] = response.Permissions;
+        if (response.Tid is not null) body["tid"] = response.Tid;
         return body;
     }
 
@@ -263,7 +264,8 @@ public sealed partial class ConnectController : Controller
                 return Unauthorized();
         }
 
-        var sub = principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        var sub = principal.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value
+            ?? principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         if (sub == null || !Guid.TryParse(sub, out var userId))
             return Unauthorized();
 

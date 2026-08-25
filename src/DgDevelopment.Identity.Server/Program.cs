@@ -1,3 +1,4 @@
+using DgDevelopment.Identity.Application.Audit;
 using DgDevelopment.Identity.Application.Clients;
 using DgDevelopment.Identity.Application.Consent;
 using DgDevelopment.Identity.Application.Groups;
@@ -43,6 +44,7 @@ builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddScoped<IGroupService, GroupService>();
 builder.Services.AddScoped<IClientService, ClientService>();
 builder.Services.AddScoped<IPlatformService, PlatformService>();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddOAuthEngine();
 builder.Services.AddScoped<IUserInteractionService, UserInteractionService>();
 builder.Services.AddScoped<IConsentService, ConsentService>();

@@ -71,6 +71,7 @@ public sealed class TokenIntrospectionServiceTests : IClassFixture<DatabaseFixtu
         Assert.Equal(userId.ToString(), response.Sub);
         Assert.True(response.Exp > 0);
         Assert.True(response.Iat > 0);
+        Assert.Equal(tenantId.ToString(), response.Tid);
     }
 
     [Fact]
@@ -132,6 +133,7 @@ public sealed class TokenIntrospectionServiceTests : IClassFixture<DatabaseFixtu
         Assert.Equal(TestConstants.AdminClientId, response.ClientId);
         Assert.Equal(userId.ToString(), response.Sub);
         Assert.NotNull(response.Jti);
+        Assert.Equal(client!.TenantId.ToString(), response.Tid);
     }
 
     [Fact]

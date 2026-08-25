@@ -50,7 +50,8 @@ public sealed class TokenIntrospectionService(
             Sub: stored.UserId.ToString(null, CultureInfo.InvariantCulture),
             TokenType: "refresh_token",
             Exp: new DateTimeOffset(stored.ExpiresAt).ToUnixTimeSeconds(),
-            Iat: new DateTimeOffset(stored.CreatedAt).ToUnixTimeSeconds());
+            Iat: new DateTimeOffset(stored.CreatedAt).ToUnixTimeSeconds(),
+            Tid: stored.TenantId.ToString(null, CultureInfo.InvariantCulture));
     }
 
     private async Task<IntrospectionResponse> IntrospectAccessTokenAsync(string token, CancellationToken ct)
@@ -109,6 +110,7 @@ public sealed class TokenIntrospectionService(
             Exp: exp,
             Iat: iat,
             Jti: jti,
-            Permissions: principal.FindAll("permission").Select(c => c.Value).ToArray());
+            Permissions: principal.FindAll("permission").Select(c => c.Value).ToArray(),
+            Tid: principal.FindFirst("tid")?.Value);
     }
 }

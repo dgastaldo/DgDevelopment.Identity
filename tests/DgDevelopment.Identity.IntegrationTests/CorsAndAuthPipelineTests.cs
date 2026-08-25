@@ -4,11 +4,15 @@ using System.Net.Http.Json;
 using System.Text.Json;
 
 /// <summary>
-/// Regression guards for two pipeline bugs found while manually verifying PR #38/#40 with curl:
-/// CORS middleware registered after UseAuthentication/UseAuthorization (dropped CORS headers on
-/// authenticated cross-origin responses), and the default JwtBearer MapInboundClaims silently
-/// renaming the "tid" claim (making ITenantContext.TenantId throw). Both were server-side and
-/// invisible to the service-level unit tests, which is exactly why this project exists.
+/// Regression guards for pipeline bugs found while manually verifying PR #38/#40 with curl, and
+/// while building PR-F's tenant-aware introspection: CORS middleware registered after
+/// UseAuthentication/UseAuthorization (dropped CORS headers on authenticated cross-origin
+/// responses); the default JwtBearer MapInboundClaims silently renaming the "tid" claim (making
+/// ITenantContext.TenantId throw); and the same MapInboundClaims default on JwtService's own
+/// internal re-validation (used by /connect/userinfo, introspect, revoke) silently renaming "sub"
+/// away from ClaimTypes.NameIdentifier once the identically-named ASP.NET Core pipeline fix was
+/// applied there too. All were server-side and invisible to the service-level unit tests, which is
+/// exactly why this project exists.
 /// </summary>
 [Collection(IntegrationCollection.Name)]
 public sealed class CorsAndAuthPipelineTests(IntegrationTestFixture fixture)
@@ -38,5 +42,17 @@ public sealed class CorsAndAuthPipelineTests(IntegrationTestFixture fixture)
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(fixture.DefaultTenantId, body.GetProperty("activeTenantId").GetGuid());
         Assert.True(body.GetProperty("isGlobalAdministrator").GetBoolean());
+    }
+
+    [Fact]
+    public async Task UserinfoResolvesTheSubjectAfterJwtServicesOwnInternalRevalidation()
+    {
+        using var client = fixture.CreateAuthenticatedClient();
+
+        var response = await client.GetAsync("/connect/userinfo");
+
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(fixture.SuperAdminUserId, body.GetProperty("sub").GetGuid());
     }
 }

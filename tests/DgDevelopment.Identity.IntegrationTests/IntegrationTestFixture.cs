@@ -65,7 +65,14 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
 
     public HttpClient CreateAuthenticatedClient()
     {
-        var client = Factory.CreateClient();
+        // Must match the login client's BaseAddress (IssuerBaseAddress): endpoints that re-validate
+        // the bearer token themselves (e.g. /connect/userinfo) compute the expected issuer from the
+        // current request's own scheme+host, so calling through a different scheme than the one the
+        // token was minted under fails issuer validation even though the token itself is valid.
+        var client = Factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri(IdentityWebApplicationFactory.IssuerBaseAddress),
+        });
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
         return client;
     }
