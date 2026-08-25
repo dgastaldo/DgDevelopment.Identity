@@ -83,7 +83,7 @@
     private EditRoleForm EditModel = new();
 
     private IEnumerable<PermissionResponse> AvailablePermissions
-        => AllPermissions.Where(p => Role is not null && Role.Permissions.All(rp => rp.PermissionId != p.Id));
+        => AllPermissions.Where(p => Role is not null && p.PlatformId == Role.PlatformId && Role.Permissions.All(rp => rp.PermissionId != p.Id));
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -102,7 +102,7 @@
 
             EditModel = new EditRoleForm { Name = Role.Name, Description = Role.Description };
 
-            var permissions = await Api.GetPermissionsAsync(pageSize: 200).ConfigureAwait(false);
+            var permissions = await Api.GetPermissionsAsync(pageSize: 200, allTenants: TenantState.AllTenants).ConfigureAwait(false);
             AllPermissions = permissions?.Items ?? [];
         }
         catch (HttpRequestException)

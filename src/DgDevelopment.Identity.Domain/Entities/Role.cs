@@ -4,6 +4,7 @@ public sealed class Role
 {
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
+    public Guid PlatformId { get; private set; }
     public string Name { get; private set; }
     public string Description { get; private set; }
 
@@ -12,10 +13,11 @@ public sealed class Role
 
     private Role() { }
 
-    public Role(Guid tenantId, string name, string description)
+    public Role(Guid tenantId, Guid platformId, string name, string description)
     {
         Id = Guid.NewGuid();
         TenantId = tenantId;
+        PlatformId = platformId;
         Name = name;
         Description = description;
     }

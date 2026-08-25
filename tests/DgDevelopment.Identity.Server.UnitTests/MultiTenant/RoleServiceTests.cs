@@ -19,7 +19,7 @@ public sealed class RoleServiceTests : IClassFixture<DatabaseFixture<RoleService
     private static string Unique(string prefix) => $"{prefix}-{Guid.NewGuid():N}";
 
     private static RoleService CreateService(IdentityDbContext context)
-        => new(new RoleRepository(context), new PermissionRepository(context));
+        => new(new RoleRepository(context), new PermissionRepository(context), new PlatformRepository(context));
 
     private static async Task<Tenant> CreateTenantAsync(IdentityDbContext context, string name)
     {
@@ -29,17 +29,25 @@ public sealed class RoleServiceTests : IClassFixture<DatabaseFixture<RoleService
         return tenant;
     }
 
-    private static async Task<Role> CreateRoleAsync(IdentityDbContext context, Guid tenantId, string name = "Role")
+    private static async Task<Platform> CreatePlatformAsync(IdentityDbContext context, Guid tenantId)
     {
-        var role = new Role(tenantId, Unique(name), "description");
+        var platform = new Platform(tenantId, Unique("Platform"), "description", PermissionMode.AuthOnly);
+        context.Platforms.Add(platform);
+        await context.SaveChangesAsync();
+        return platform;
+    }
+
+    private static async Task<Role> CreateRoleAsync(IdentityDbContext context, Guid tenantId, Guid platformId, string name = "Role")
+    {
+        var role = new Role(tenantId, platformId, Unique(name), "description");
         context.Roles.Add(role);
         await context.SaveChangesAsync();
         return role;
     }
 
-    private static async Task<Permission> CreatePermissionAsync(IdentityDbContext context, bool isGlobal = false)
+    private static async Task<Permission> CreatePermissionAsync(IdentityDbContext context, Guid tenantId, Guid platformId, bool isGlobal = false)
     {
-        var permission = new Permission(Unique("identity-platform.test.permission"), "description", "Test", isGlobal);
+        var permission = new Permission(tenantId, platformId, Unique("identity-platform.test.permission"), "description", "Test", isGlobal);
         context.Permissions.Add(permission);
         await context.SaveChangesAsync();
         return permission;
@@ -50,7 +58,8 @@ public sealed class RoleServiceTests : IClassFixture<DatabaseFixture<RoleService
     {
         await using var context = _fixture.CreateContext();
         var tenant = await CreateTenantAsync(context, "RoleOwn");
-        var role = await CreateRoleAsync(context, tenant.Id);
+        var platform = await CreatePlatformAsync(context, tenant.Id);
+        var role = await CreateRoleAsync(context, tenant.Id, platform.Id);
         var service = CreateService(context);
 
         var result = await service.GetAsync(role.Id, tenant.Id, allTenants: false);
@@ -65,7 +74,8 @@ public sealed class RoleServiceTests : IClassFixture<DatabaseFixture<RoleService
         await using var context = _fixture.CreateContext();
         var homeTenant = await CreateTenantAsync(context, "RoleHome");
         var otherTenant = await CreateTenantAsync(context, "RoleOther");
-        var role = await CreateRoleAsync(context, homeTenant.Id);
+        var platform = await CreatePlatformAsync(context, homeTenant.Id);
+        var role = await CreateRoleAsync(context, homeTenant.Id, platform.Id);
         var service = CreateService(context);
 
         var result = await service.GetAsync(role.Id, otherTenant.Id, allTenants: false);
@@ -79,7 +89,8 @@ public sealed class RoleServiceTests : IClassFixture<DatabaseFixture<RoleService
         await using var context = _fixture.CreateContext();
         var homeTenant = await CreateTenantAsync(context, "RoleUpdHome");
         var otherTenant = await CreateTenantAsync(context, "RoleUpdOther");
-        var role = await CreateRoleAsync(context, homeTenant.Id);
+        var platform = await CreatePlatformAsync(context, homeTenant.Id);
+        var role = await CreateRoleAsync(context, homeTenant.Id, platform.Id);
         var service = CreateService(context);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -89,18 +100,17 @@ public sealed class RoleServiceTests : IClassFixture<DatabaseFixture<RoleService
     }
 
     [Fact]
-    public async Task AssignPermissionAsyncSucceedsRegardlessOfTenantSincePermissionIsGlobal()
+    public async Task AssignPermissionAsyncSucceedsWhenPermissionBelongsToTheRolesPlatform()
     {
-        // Permission has no TenantId by design (global catalog) - assigning one to a role
-        // never throws a tenant-mismatch error, unlike assigning a role to a group.
         Guid roleId;
         Guid permissionId;
         Guid tenantId;
         await using (var setupContext = _fixture.CreateContext())
         {
             var tenant = await CreateTenantAsync(setupContext, "RolePermTenant");
-            var role = await CreateRoleAsync(setupContext, tenant.Id);
-            var permission = await CreatePermissionAsync(setupContext);
+            var platform = await CreatePlatformAsync(setupContext, tenant.Id);
+            var role = await CreateRoleAsync(setupContext, tenant.Id, platform.Id);
+            var permission = await CreatePermissionAsync(setupContext, tenant.Id, platform.Id);
             tenantId = tenant.Id;
             roleId = role.Id;
             permissionId = permission.Id;
@@ -117,6 +127,23 @@ public sealed class RoleServiceTests : IClassFixture<DatabaseFixture<RoleService
     }
 
     [Fact]
+    public async Task AssignPermissionAsyncThrowsWhenPermissionBelongsToDifferentPlatform()
+    {
+        await using var context = _fixture.CreateContext();
+        var tenant = await CreateTenantAsync(context, "RolePermPlatformMismatch");
+        var rolePlatform = await CreatePlatformAsync(context, tenant.Id);
+        var otherPlatform = await CreatePlatformAsync(context, tenant.Id);
+        var role = await CreateRoleAsync(context, tenant.Id, rolePlatform.Id);
+        var permission = await CreatePermissionAsync(context, tenant.Id, otherPlatform.Id);
+        var service = CreateService(context);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.AssignPermissionAsync(role.Id, permission.Id, null, null, tenant.Id, allTenants: false));
+
+        Assert.Equal("The permission does not belong to the role's platform.", exception.Message);
+    }
+
+    [Fact]
     public async Task RemovePermissionAsyncRemovesTheGrant()
     {
         Guid roleId;
@@ -125,8 +152,9 @@ public sealed class RoleServiceTests : IClassFixture<DatabaseFixture<RoleService
         await using (var setupContext = _fixture.CreateContext())
         {
             var tenant = await CreateTenantAsync(setupContext, "RolePermRemove");
-            var role = await CreateRoleAsync(setupContext, tenant.Id);
-            var permission = await CreatePermissionAsync(setupContext);
+            var platform = await CreatePlatformAsync(setupContext, tenant.Id);
+            var role = await CreateRoleAsync(setupContext, tenant.Id, platform.Id);
+            var permission = await CreatePermissionAsync(setupContext, tenant.Id, platform.Id);
             role.AddPermission(permission);
             setupContext.Roles.Update(role);
             await setupContext.SaveChangesAsync();
@@ -151,8 +179,10 @@ public sealed class RoleServiceTests : IClassFixture<DatabaseFixture<RoleService
         await using var context = _fixture.CreateContext();
         var tenantA = await CreateTenantAsync(context, "RolePagedA");
         var tenantB = await CreateTenantAsync(context, "RolePagedB");
-        var roleA = await CreateRoleAsync(context, tenantA.Id);
-        var roleB = await CreateRoleAsync(context, tenantB.Id);
+        var platformA = await CreatePlatformAsync(context, tenantA.Id);
+        var platformB = await CreatePlatformAsync(context, tenantB.Id);
+        var roleA = await CreateRoleAsync(context, tenantA.Id, platformA.Id);
+        var roleB = await CreateRoleAsync(context, tenantB.Id, platformB.Id);
         var service = CreateService(context);
 
         var scopedResult = await service.GetPagedAsync(null, 1, 100, tenantA.Id, allTenants: false);
@@ -165,12 +195,28 @@ public sealed class RoleServiceTests : IClassFixture<DatabaseFixture<RoleService
     }
 
     [Fact]
+    public async Task CreateAsyncThrowsWhenPlatformBelongsToDifferentTenant()
+    {
+        await using var context = _fixture.CreateContext();
+        var tenantA = await CreateTenantAsync(context, "RoleCreateA");
+        var tenantB = await CreateTenantAsync(context, "RoleCreateB");
+        var otherTenantPlatform = await CreatePlatformAsync(context, tenantB.Id);
+        var service = CreateService(context);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.CreateAsync("New role", "description", otherTenantPlatform.Id, tenantA.Id));
+
+        Assert.Equal("The platform does not belong to the active tenant.", exception.Message);
+    }
+
+    [Fact]
     public async Task DeleteAsyncThrowsForRoleInDifferentTenant()
     {
         await using var context = _fixture.CreateContext();
         var homeTenant = await CreateTenantAsync(context, "RoleDelHome");
         var otherTenant = await CreateTenantAsync(context, "RoleDelOther");
-        var role = await CreateRoleAsync(context, homeTenant.Id);
+        var platform = await CreatePlatformAsync(context, homeTenant.Id);
+        var role = await CreateRoleAsync(context, homeTenant.Id, platform.Id);
         var service = CreateService(context);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>

@@ -21,8 +21,9 @@ public sealed class GroupRepositoryTests : IClassFixture<DatabaseFixture<GroupRe
     public async Task AddAndGetByIdRoundTripsWithRoles()
     {
         var tenantId = await _fixture.GetSeededTenantIdAsync();
+        var platformId = await _fixture.GetSeededPlatformIdAsync();
         var name = UniqueName("group");
-        var role = new Role(tenantId, $"role-{Guid.NewGuid():N}", "desc");
+        var role = new Role(tenantId, platformId, $"role-{Guid.NewGuid():N}", "desc");
         var group = new Group(tenantId, name, "desc");
         group.AddRole(role);
         await using var context = _fixture.CreateContext();

@@ -20,8 +20,10 @@ public sealed class PermissionRepositoryTests : IClassFixture<DatabaseFixture<Pe
     [Fact]
     public async Task AddAndGetByIdRoundTrips()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
+        var platformId = await _fixture.GetSeededPlatformIdAsync();
         var name = UniqueName();
-        var permission = new Permission(name, "desc", "User");
+        var permission = new Permission(tenantId, platformId, name, "desc", "User");
         await using var context = _fixture.CreateContext();
         var repo = new PermissionRepository(context);
         await repo.AddAsync(permission);
@@ -38,8 +40,10 @@ public sealed class PermissionRepositoryTests : IClassFixture<DatabaseFixture<Pe
     [Fact]
     public async Task GetByNameRoundTrips()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
+        var platformId = await _fixture.GetSeededPlatformIdAsync();
         var name = UniqueName();
-        var permission = new Permission(name, "desc", "User");
+        var permission = new Permission(tenantId, platformId, name, "desc", "User");
         await using var context = _fixture.CreateContext();
         var repo = new PermissionRepository(context);
         await repo.AddAsync(permission);
@@ -77,8 +81,10 @@ public sealed class PermissionRepositoryTests : IClassFixture<DatabaseFixture<Pe
     [Fact]
     public async Task UpdateAsyncDoesNotRemoveExistingData()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
+        var platformId = await _fixture.GetSeededPlatformIdAsync();
         var name = UniqueName();
-        var permission = new Permission(name, "desc", "User");
+        var permission = new Permission(tenantId, platformId, name, "desc", "User");
         await using var context = _fixture.CreateContext();
         var repo = new PermissionRepository(context);
         await repo.AddAsync(permission);
@@ -93,8 +99,10 @@ public sealed class PermissionRepositoryTests : IClassFixture<DatabaseFixture<Pe
     [Fact]
     public async Task DeleteAsyncRemovesPermission()
     {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
+        var platformId = await _fixture.GetSeededPlatformIdAsync();
         var name = UniqueName();
-        var permission = new Permission(name, "desc", "User");
+        var permission = new Permission(tenantId, platformId, name, "desc", "User");
         await using var context = _fixture.CreateContext();
         var repo = new PermissionRepository(context);
         await repo.AddAsync(permission);

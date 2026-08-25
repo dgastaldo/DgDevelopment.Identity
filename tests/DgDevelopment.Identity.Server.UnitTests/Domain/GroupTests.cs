@@ -32,7 +32,7 @@ public sealed class GroupTests
     public void AddRoleAddsOnceAndRemoveRoleClears()
     {
         var group = new Group(TenantId, "Team", "desc");
-        var role = new Role(TenantId, "Admin", "desc");
+        var role = new Role(TenantId, Guid.NewGuid(), "Admin", "desc");
 
         group.AddRole(role);
         group.AddRole(role);

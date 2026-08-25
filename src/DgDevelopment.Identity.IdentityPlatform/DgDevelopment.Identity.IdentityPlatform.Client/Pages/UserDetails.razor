@@ -155,7 +155,7 @@
             var groups = await Api.GetGroupsAsync(null, 1, 200, TenantState.AllTenants).ConfigureAwait(false);
             AllGroups = groups?.Items ?? [];
 
-            var permissions = await Api.GetPermissionsAsync(pageSize: 200).ConfigureAwait(false);
+            var permissions = await Api.GetPermissionsAsync(pageSize: 200, allTenants: TenantState.AllTenants).ConfigureAwait(false);
             AllPermissions = permissions?.Items ?? [];
         }
         catch (HttpRequestException)

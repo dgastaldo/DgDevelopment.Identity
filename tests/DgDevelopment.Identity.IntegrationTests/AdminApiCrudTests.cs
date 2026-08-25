@@ -38,7 +38,7 @@ public sealed class AdminApiCrudTests(IntegrationTestFixture fixture)
     {
         using var client = fixture.CreateAuthenticatedClient();
 
-        var create = await client.PostAsJsonAsync("/api/v1/roles", new { name = "CRUD Role", description = "created by integration test" });
+        var create = await client.PostAsJsonAsync("/api/v1/roles", new { name = "CRUD Role", description = "created by integration test", platformId = fixture.DefaultPlatformId });
         create.EnsureSuccessStatusCode();
         var created = await create.Content.ReadFromJsonAsync<JsonElement>();
         var roleId = created.GetProperty("id").GetGuid();
@@ -66,7 +66,7 @@ public sealed class AdminApiCrudTests(IntegrationTestFixture fixture)
         // UpdateAsync mismarking client-generated-key child rows).
         using var client = fixture.CreateAuthenticatedClient();
 
-        var role = await client.PostAsJsonAsync("/api/v1/roles", new { name = "Assignable Role", description = "for group assignment" });
+        var role = await client.PostAsJsonAsync("/api/v1/roles", new { name = "Assignable Role", description = "for group assignment", platformId = fixture.DefaultPlatformId });
         role.EnsureSuccessStatusCode();
         var roleId = (await role.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
 
@@ -94,7 +94,7 @@ public sealed class AdminApiCrudTests(IntegrationTestFixture fixture)
     {
         using var client = fixture.CreateAuthenticatedClient();
 
-        var role = await client.PostAsJsonAsync("/api/v1/roles", new { name = "Audited Role", description = "for audit log test" });
+        var role = await client.PostAsJsonAsync("/api/v1/roles", new { name = "Audited Role", description = "for audit log test", platformId = fixture.DefaultPlatformId });
         role.EnsureSuccessStatusCode();
         var roleId = (await role.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
 

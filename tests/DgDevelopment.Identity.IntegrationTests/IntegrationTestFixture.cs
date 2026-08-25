@@ -3,9 +3,11 @@ namespace DgDevelopment.Identity.IntegrationTests;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
+using DgDevelopment.Identity.Application.Tenants;
 using DgDevelopment.Identity.Domain.Entities;
 using DgDevelopment.Identity.Domain.ValueObjects;
 using DgDevelopment.Identity.Infrastructure.Data;
+using DgDevelopment.Identity.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -15,6 +17,7 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
     public IdentityWebApplicationFactory Factory { get; } = new();
 
     public Guid DefaultTenantId { get; private set; }
+    public Guid DefaultPlatformId { get; private set; }
     public Guid SuperAdminUserId { get; private set; }
     public Guid SuperAdminRoleId { get; private set; }
     public Guid SecondTenantId { get; private set; }
@@ -86,7 +89,9 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
         await using var context = CreateContext();
         var tenant = new Tenant("Second Tenant", IntegrationTestConstants.SecondTenantSlug);
         context.Tenants.Add(tenant);
-        var role = new Role(tenant.Id, "Other Tenant Role", "cross-tenant test role");
+        var platform = new Platform(tenant.Id, "Other Tenant Platform", "cross-tenant test platform", PermissionMode.AuthOnly);
+        context.Platforms.Add(platform);
+        var role = new Role(tenant.Id, platform.Id, "Other Tenant Role", "cross-tenant test role");
         context.Roles.Add(role);
         await context.SaveChangesAsync().ConfigureAwait(false);
 
@@ -106,55 +111,27 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
         {
             SuperAdminRoleId = existingRole.Id;
             DefaultTenantId = existingRole.TenantId;
+            DefaultPlatformId = existingRole.PlatformId;
             SuperAdminUserId = await db.Users.Where(u => u.Username == IntegrationTestConstants.SuperAdminUserName).Select(u => u.Id).SingleAsync().ConfigureAwait(false);
             return;
         }
 
         var hasher = new FakePasswordHasher();
 
-        var tenant = new Tenant("Identity Tenant", IntegrationTestConstants.DefaultTenantSlug);
-        db.Tenants.Add(tenant);
-        DefaultTenantId = tenant.Id;
+        // Reuses the real provisioning service (Tenant + IdentityAdmin platform + full permission
+        // catalog + SuperAdmin role + SuperAdmins group) instead of hand-duplicating that seed logic -
+        // this is exactly what DbSeeder itself now calls for the real bootstrap tenant.
+        var provisioning = new TenantProvisioningService(
+            new TenantRepository(db), new PlatformRepository(db), new PermissionRepository(db),
+            new RoleRepository(db), new GroupRepository(db));
+        var provisioned = await provisioning.ProvisionAsync("Identity Tenant", IntegrationTestConstants.DefaultTenantSlug).ConfigureAwait(false);
 
-        var permissions = new[]
-        {
-            new Permission("identity-platform.user.read", "Read users", "User"),
-            new Permission("identity-platform.user.create", "Create users", "User"),
-            new Permission("identity-platform.user.update", "Update users", "User"),
-            new Permission("identity-platform.user.delete", "Delete users", "User"),
-            new Permission("identity-platform.user.read.all-tenants", "Read users across all tenants", "User", isGlobal: true),
-            new Permission("identity-platform.role.read", "Read roles", "Role"),
-            new Permission("identity-platform.role.create", "Create roles", "Role"),
-            new Permission("identity-platform.role.update", "Update roles", "Role"),
-            new Permission("identity-platform.role.delete", "Delete roles", "Role"),
-            new Permission("identity-platform.permission.read", "Read permissions", "Permission"),
-            new Permission("identity-platform.group.read", "Read groups", "Group"),
-            new Permission("identity-platform.group.create", "Create groups", "Group"),
-            new Permission("identity-platform.group.update", "Update groups", "Group"),
-            new Permission("identity-platform.group.delete", "Delete groups", "Group"),
-            new Permission("identity-platform.platform.read", "Read platforms", "Platform"),
-            new Permission("identity-platform.client.read", "Read clients", "Client"),
-            new Permission("identity-platform.audit.read", "Read audit logs", "Audit"),
-            new Permission("identity-platform.tenant.read", "Read tenants", "Tenant", isGlobal: true),
-            new Permission("identity-platform.dashboard.read", "View identity platform dashboard", "Dashboard"),
-        };
-        db.Permissions.AddRange(permissions);
-
-        var superAdmin = new Role(tenant.Id, "SuperAdmin", "Full system access with all permissions");
-        foreach (var permission in permissions)
-            superAdmin.AddPermission(permission);
-        db.Roles.Add(superAdmin);
-        SuperAdminRoleId = superAdmin.Id;
-
-        var superAdmins = new Group(tenant.Id, "SuperAdmins", "Super administrator group");
-        superAdmins.AddRole(superAdmin);
-        db.Groups.Add(superAdmins);
-
-        var platform = new Platform(tenant.Id, "IdentityAdmin", "Identity administration platform", PermissionMode.IdentityManaged);
-        db.Platforms.Add(platform);
+        DefaultTenantId = provisioned.Tenant.Id;
+        DefaultPlatformId = provisioned.Platform.Id;
+        SuperAdminRoleId = provisioned.SuperAdminRole.Id;
 
         var clientSecretHash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(IntegrationTestConstants.AdminClientSecret)));
-        var client = new Client(tenant.Id, Guid.Parse(IntegrationTestConstants.AdminClientId), clientSecretHash, "identity-platform", ClientType.Confidential, platform.Id);
+        var client = new Client(provisioned.Tenant.Id, Guid.Parse(IntegrationTestConstants.AdminClientId), clientSecretHash, "identity-platform", ClientType.Confidential, provisioned.Platform.Id);
         client.AddGrantType("authorization_code");
         client.AddGrantType("refresh_token");
         client.AddScope("openid");
@@ -167,11 +144,11 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
         var email = EmailAddress.FromString(IntegrationTestConstants.SuperAdminEmail);
         var user = new User(IntegrationTestConstants.SuperAdminUserName, passwordHash, email, isSystemAccount: true);
         user.VerifyEmail(email);
-        user.AddToGroup(superAdmins);
+        user.AddToGroup(provisioned.SuperAdminsGroup);
         db.Users.Add(user);
         SuperAdminUserId = user.Id;
 
-        db.TenantMemberships.Add(new TenantMembership(tenant.Id, user.Id, isOwner: true));
+        db.TenantMemberships.Add(new TenantMembership(provisioned.Tenant.Id, user.Id, isOwner: true));
 
         await db.SaveChangesAsync().ConfigureAwait(false);
     }

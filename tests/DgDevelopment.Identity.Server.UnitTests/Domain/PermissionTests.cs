@@ -8,7 +8,7 @@ public sealed class PermissionTests
     [Fact]
     public void ConstructorSetsFields()
     {
-        var permission = new Permission("user:read", "Read users", "User");
+        var permission = new Permission(Guid.NewGuid(), Guid.NewGuid(), "user:read", "Read users", "User");
 
         Assert.False(string.IsNullOrWhiteSpace(permission.Id.ToString()));
         Assert.Equal("user:read", permission.Name);

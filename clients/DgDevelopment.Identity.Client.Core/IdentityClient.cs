@@ -122,9 +122,9 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
     public Task<HttpResponseMessage> ResetPasswordAsync(Guid id, string password, bool allTenants = false, CancellationToken ct = default)
         => http.PostAsJsonAsync(new Uri($"{options.Authority}/api/v1/users/{id}/reset-password?allTenants={allTenants}"), new { password }, ct);
 
-    public Task<PagedPermissionsResponse?> GetPermissionsAsync(string? search = null, int page = 1, int pageSize = 100, CancellationToken ct = default)
+    public Task<PagedPermissionsResponse?> GetPermissionsAsync(string? search = null, int page = 1, int pageSize = 100, bool allTenants = false, CancellationToken ct = default)
     {
-        var query = $"?page={page}&pageSize={pageSize}";
+        var query = $"?page={page}&pageSize={pageSize}&allTenants={allTenants}";
         if (!string.IsNullOrWhiteSpace(search))
             query += $"&search={Uri.EscapeDataString(search)}";
 
@@ -143,9 +143,9 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
     public Task<RoleResponse?> GetRoleAsync(Guid id, bool allTenants = false, CancellationToken ct = default)
         => http.GetFromJsonAsync<RoleResponse>($"{options.Authority}/api/v1/roles/{id}?allTenants={allTenants}", ct);
 
-    public async Task<RoleResponse?> CreateRoleAsync(string name, string description, CancellationToken ct = default)
+    public async Task<RoleResponse?> CreateRoleAsync(string name, string description, Guid platformId, CancellationToken ct = default)
     {
-        using var response = await http.PostAsJsonAsync($"{options.Authority}/api/v1/roles", new { name, description }, ct).ConfigureAwait(false);
+        using var response = await http.PostAsJsonAsync($"{options.Authority}/api/v1/roles", new { name, description, platformId }, ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<RoleResponse>(ct).ConfigureAwait(false);
     }
@@ -306,6 +306,16 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
     public Task<HttpResponseMessage> DeleteClientAsync(Guid id, bool allTenants = false, CancellationToken ct = default)
         => http.DeleteAsync(new Uri($"{options.Authority}/api/v1/clients/{id}?allTenants={allTenants}"), ct);
 
+    public Task<IReadOnlyCollection<TenantAdminResponse>?> GetTenantsAdminAsync(CancellationToken ct = default)
+        => http.GetFromJsonAsync<IReadOnlyCollection<TenantAdminResponse>>($"{options.Authority}/api/v1/tenants", ct);
+
+    public async Task<TenantAdminResponse?> CreateTenantAsync(string name, string slug, CancellationToken ct = default)
+    {
+        using var response = await http.PostAsJsonAsync($"{options.Authority}/api/v1/tenants", new { name, slug }, ct).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<TenantAdminResponse>(ct).ConfigureAwait(false);
+    }
+
     public Task<PagedAuditLogResponse?> GetAuditLogsAsync(
         string? actorType = null, Guid? actorId = null, string? action = null, string? targetId = null,
         DateTime? from = null, DateTime? to = null, int page = 1, int pageSize = 50, bool allTenants = false, CancellationToken ct = default)
@@ -389,6 +399,8 @@ public sealed record PagedPermissionsResponse(
 
 public sealed record PermissionResponse(
     [property: JsonPropertyName("id")] Guid Id,
+    [property: JsonPropertyName("tenantId")] Guid TenantId,
+    [property: JsonPropertyName("platformId")] Guid PlatformId,
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("description")] string Description,
     [property: JsonPropertyName("resourceType")] string ResourceType,
@@ -409,6 +421,7 @@ public sealed record RolePermissionResponse(
 public sealed record RoleResponse(
     [property: JsonPropertyName("id")] Guid Id,
     [property: JsonPropertyName("tenantId")] Guid TenantId,
+    [property: JsonPropertyName("platformId")] Guid PlatformId,
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("description")] string Description,
     [property: JsonPropertyName("permissions")] IReadOnlyCollection<RolePermissionResponse> Permissions);
@@ -437,6 +450,13 @@ public sealed record TenantResponse(
     [property: JsonPropertyName("id")] Guid Id,
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("slug")] string Slug);
+
+public sealed record TenantAdminResponse(
+    [property: JsonPropertyName("id")] Guid Id,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("slug")] string Slug,
+    [property: JsonPropertyName("isActive")] bool IsActive,
+    [property: JsonPropertyName("createdAt")] DateTime CreatedAt);
 
 public sealed record MyTenantsResponse(
     [property: JsonPropertyName("tenants")] IReadOnlyCollection<TenantResponse> Tenants,

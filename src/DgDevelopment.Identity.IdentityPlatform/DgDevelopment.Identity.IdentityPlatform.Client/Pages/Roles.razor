@@ -20,10 +20,20 @@
     {
         <section class="mb-6 rounded-2xl border border-violet-200 bg-violet-50 p-5">
             <h2 class="text-lg font-semibold text-slate-900">Create role</h2>
-            <EditForm Model="CreateModel" OnValidSubmit="CreateAsync" class="mt-4 grid gap-4 md:grid-cols-2">
+            <EditForm Model="CreateModel" OnValidSubmit="CreateAsync" class="mt-4 grid gap-4 md:grid-cols-3">
                 <div><label class="mb-1 block text-xs font-semibold text-slate-500 uppercase">Name</label><InputText @bind-Value="CreateModel.Name" class="w-full rounded-lg border-slate-300" /></div>
                 <div><label class="mb-1 block text-xs font-semibold text-slate-500 uppercase">Description</label><InputText @bind-Value="CreateModel.Description" class="w-full rounded-lg border-slate-300" /></div>
-                <div class="md:col-span-2"><button class="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800" disabled="@Busy">Create role</button></div>
+                <div>
+                    <label class="mb-1 block text-xs font-semibold text-slate-500 uppercase">Platform</label>
+                    <select @bind="CreateModel.PlatformId" class="w-full rounded-lg border-slate-300 text-sm">
+                        <option value="">Select a platform…</option>
+                        @foreach (var platform in Platforms)
+                        {
+                            <option value="@platform.Id">@platform.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="md:col-span-3"><button class="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800" disabled="@(Busy || string.IsNullOrWhiteSpace(CreateModel.PlatformId))">Create role</button></div>
             </EditForm>
         </section>
     }
@@ -51,12 +61,13 @@
         <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[600px] text-left text-sm">
-                    <thead class="border-b border-slate-200 bg-slate-50 text-xs tracking-wide text-slate-500 uppercase"><tr><th class="px-5 py-4">Role</th><th class="px-5 py-4">Permissions</th><th class="px-5 py-4"></th></tr></thead>
+                    <thead class="border-b border-slate-200 bg-slate-50 text-xs tracking-wide text-slate-500 uppercase"><tr><th class="px-5 py-4">Role</th><th class="px-5 py-4">Platform</th><th class="px-5 py-4">Permissions</th><th class="px-5 py-4"></th></tr></thead>
                     <tbody class="divide-y divide-slate-100">
                         @foreach (var role in RolePage.Items)
                         {
                             <tr class="transition hover:bg-slate-50">
                                 <td class="px-5 py-4"><a href="/roles/@role.Id" class="font-semibold text-slate-900 hover:text-violet-700">@role.Name</a><div class="text-xs text-slate-400">@role.Description</div></td>
+                                <td class="px-5 py-4 text-slate-500">@PlatformName(role.PlatformId)</td>
                                 <td class="px-5 py-4 text-slate-500">@role.Permissions.Count</td>
                                 <td class="px-5 py-4 text-right"><a href="/roles/@role.Id" class="font-semibold text-violet-700 hover:text-violet-900">Open</a></td>
                             </tr>
@@ -71,6 +82,7 @@
 
 @code {
     private PagedRolesResponse? RolePage;
+    private IReadOnlyCollection<PlatformResponse> Platforms = [];
     private string Search = string.Empty;
     private int Page = 1;
     private bool Loading = true;
@@ -93,6 +105,9 @@
         {
             RolePage = await Api.GetRolesAsync(Search, Page, 20, TenantState.AllTenants).ConfigureAwait(false);
             if (RolePage is null) Error = "The role list returned no data.";
+
+            var platforms = await Api.GetPlatformsAsync(null, 1, 200, TenantState.AllTenants).ConfigureAwait(false);
+            Platforms = platforms?.Items ?? [];
         }
         catch (HttpRequestException)
         {
@@ -105,12 +120,18 @@
         }
     }
 
+    private string PlatformName(Guid platformId)
+        => Platforms.FirstOrDefault(p => p.Id == platformId)?.Name ?? platformId.ToString();
+
     private async Task CreateAsync()
     {
+        if (!Guid.TryParse(CreateModel.PlatformId, out var platformId))
+            return;
+
         Busy = true;
         try
         {
-            await Api.CreateRoleAsync(CreateModel.Name, CreateModel.Description).ConfigureAwait(false);
+            await Api.CreateRoleAsync(CreateModel.Name, CreateModel.Description, platformId).ConfigureAwait(false);
             CreateModel = new();
             ShowCreate = false;
             await LoadAsync();
@@ -128,5 +149,6 @@
     {
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
+        public string PlatformId { get; set; } = string.Empty;
     }
 }

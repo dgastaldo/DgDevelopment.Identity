@@ -239,7 +239,7 @@ public sealed class UserTests
     public void AssignRoleAddsOnceAndRemoveRoleClears()
     {
         var user = CreateUser();
-        var role = new Role(TenantId, "Tester", "desc");
+        var role = new Role(TenantId, Guid.NewGuid(), "Tester", "desc");
 
         user.AssignRole(role);
         user.AssignRole(role);
@@ -255,7 +255,7 @@ public sealed class UserTests
     public void GrantPermissionAddsOnceAndRevokeClears()
     {
         var user = CreateUser();
-        var permission = new Permission("role:read", "desc", "Role");
+        var permission = new Permission(TenantId, Guid.NewGuid(), "role:read", "desc", "Role");
 
         user.GrantPermission(TenantId, permission);
         user.GrantPermission(TenantId, permission);
