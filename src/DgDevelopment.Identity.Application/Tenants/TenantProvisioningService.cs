@@ -28,16 +28,25 @@ public sealed class TenantProvisioningService(
         foreach (var permission in permissions)
             await permissionRepository.AddAsync(permission, ct).ConfigureAwait(false);
 
-        var superAdminRole = new Role(tenant.Id, platform.Id, "SuperAdmin", "Full system access with all permissions");
+        // "SuperAdmin" is reserved for the one tenant that owns the platform itself - every other
+        // (customer) tenant gets a regular "Admin" role instead, even though it holds the same
+        // full permission set within its own tenant-scoped catalog. Naming it "SuperAdmin" would
+        // wrongly imply platform-wide power that IsGlobalAdministratorAsync's IsPlatformTenant
+        // check no longer grants it anyway.
+        var (roleName, roleDescription, groupName, groupDescription) = isPlatformTenant
+            ? ("SuperAdmin", "Full system access with all permissions", "SuperAdmins", "Super administrator group")
+            : ("Admin", "Full access to this tenant's own resources", "Admins", "Tenant administrator group");
+
+        var adminRole = new Role(tenant.Id, platform.Id, roleName, roleDescription);
         foreach (var permission in permissions)
-            superAdminRole.AddPermission(permission);
-        await roleRepository.AddAsync(superAdminRole, ct).ConfigureAwait(false);
+            adminRole.AddPermission(permission);
+        await roleRepository.AddAsync(adminRole, ct).ConfigureAwait(false);
 
-        var superAdminsGroup = new Group(tenant.Id, "SuperAdmins", "Super administrator group");
-        superAdminsGroup.AddRole(superAdminRole);
-        await groupRepository.AddAsync(superAdminsGroup, ct).ConfigureAwait(false);
+        var adminsGroup = new Group(tenant.Id, groupName, groupDescription);
+        adminsGroup.AddRole(adminRole);
+        await groupRepository.AddAsync(adminsGroup, ct).ConfigureAwait(false);
 
-        return new TenantProvisioningResult(tenant, platform, superAdminRole, superAdminsGroup);
+        return new TenantProvisioningResult(tenant, platform, adminRole, adminsGroup);
     }
 
     /// <summary>

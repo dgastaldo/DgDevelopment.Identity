@@ -2,7 +2,13 @@ using DgDevelopment.Identity.Domain.Entities;
 
 namespace DgDevelopment.Identity.Application.Tenants;
 
-public sealed record TenantProvisioningResult(Tenant Tenant, Platform Platform, Role SuperAdminRole, Group SuperAdminsGroup);
+/// <param name="AdminRole">
+/// Named "SuperAdmin" only for the platform tenant - every other (customer) tenant gets a
+/// regular "Admin" role instead. SuperAdmin is a special concept that belongs to the one
+/// tenant that owns the platform itself, not to every tenant's own administrator.
+/// </param>
+/// <param name="AdminsGroup">Named "SuperAdmins"/"Admins" to match <paramref name="AdminRole"/>.</param>
+public sealed record TenantProvisioningResult(Tenant Tenant, Platform Platform, Role AdminRole, Group AdminsGroup);
 
 public interface ITenantProvisioningService
 {

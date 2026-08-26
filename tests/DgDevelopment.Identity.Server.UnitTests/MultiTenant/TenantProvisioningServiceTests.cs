@@ -36,11 +36,11 @@ public sealed class TenantProvisioningServiceTests : IClassFixture<DatabaseFixtu
         Assert.False(result.Tenant.IsPlatformTenant);
         Assert.Equal("IdentityAdmin", result.Platform.Name);
         Assert.Equal(result.Tenant.Id, result.Platform.TenantId);
-        Assert.NotEmpty(result.SuperAdminRole.Permissions);
-        Assert.Equal(result.SuperAdminRole.Permissions.Count,
+        Assert.NotEmpty(result.AdminRole.Permissions);
+        Assert.Equal(result.AdminRole.Permissions.Count,
             (await new PermissionRepository(context).GetAllAsync())
                 .Count(p => p.TenantId == result.Tenant.Id));
-        Assert.Contains(result.SuperAdminsGroup.Roles, r => r.RoleId == result.SuperAdminRole.Id);
+        Assert.Contains(result.AdminsGroup.Roles, r => r.RoleId == result.AdminRole.Id);
     }
 
     [Fact]
@@ -54,6 +54,24 @@ public sealed class TenantProvisioningServiceTests : IClassFixture<DatabaseFixtu
 
         Assert.True(platformResult.Tenant.IsPlatformTenant);
         Assert.False(customerResult.Tenant.IsPlatformTenant);
+    }
+
+    // SuperAdmin is a special concept that belongs only to the tenant that owns the platform -
+    // every other tenant's own administrator is just "Admin", even though the role holds the
+    // same full permission set within its own tenant-scoped catalog.
+    [Fact]
+    public async Task ProvisionAsyncNamesTheRoleAndGroupSuperAdminOnlyForThePlatformTenant()
+    {
+        await using var context = _fixture.CreateContext();
+        var service = CreateService(context);
+
+        var platformResult = await service.ProvisionAsync("Platform Owner", Unique("platform-owner-naming"), isPlatformTenant: true);
+        var customerResult = await service.ProvisionAsync("Customer", Unique("customer-naming"));
+
+        Assert.Equal("SuperAdmin", platformResult.AdminRole.Name);
+        Assert.Equal("SuperAdmins", platformResult.AdminsGroup.Name);
+        Assert.Equal("Admin", customerResult.AdminRole.Name);
+        Assert.Equal("Admins", customerResult.AdminsGroup.Name);
     }
 
     [Fact]

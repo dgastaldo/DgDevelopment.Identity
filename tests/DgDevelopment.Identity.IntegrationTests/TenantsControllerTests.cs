@@ -21,11 +21,11 @@ public sealed class TenantsControllerTests(IntegrationTestFixture fixture)
 
     // Regression test for a real cross-tenant privilege-escalation bug: tenant.read/.create are
     // IsGlobal permissions duplicated into every tenant's own catalog, so a customer tenant's own
-    // SuperAdmin holds them too - RequirePermission alone can't tell the two apart. Without the
+    // Admin holds them too - RequirePermission alone can't tell the two apart. Without the
     // IsPlatformTenant check in TenantContext.IsGlobalAdministratorAsync, this request would
     // succeed instead of being forbidden.
     [Fact]
-    public async Task CustomerTenantSuperAdminCannotListOrCreateTenants()
+    public async Task CustomerTenantAdminCannotListOrCreateTenants()
     {
         using var client = fixture.CreateAuthenticatedClientForCustomerTenantAsync();
 
