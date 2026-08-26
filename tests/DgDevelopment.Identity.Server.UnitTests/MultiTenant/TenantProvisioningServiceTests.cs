@@ -36,11 +36,13 @@ public sealed class TenantProvisioningServiceTests : IClassFixture<DatabaseFixtu
         Assert.False(result.Tenant.IsPlatformTenant);
         Assert.Equal("IdentityAdmin", result.Platform.Name);
         Assert.Equal(result.Tenant.Id, result.Platform.TenantId);
-        Assert.NotEmpty(result.AdminRole.Permissions);
-        Assert.Equal(result.AdminRole.Permissions.Count,
+        Assert.NotEmpty(result.GlobalAdminRole.Permissions);
+        Assert.Equal(result.GlobalAdminRole.Permissions.Count,
             (await new PermissionRepository(context).GetAllAsync())
                 .Count(p => p.TenantId == result.Tenant.Id));
-        Assert.Contains(result.AdminsGroup.Roles, r => r.RoleId == result.AdminRole.Id);
+        Assert.Contains(result.GlobalAdminsGroup.Roles, r => r.RoleId == result.GlobalAdminRole.Id);
+        Assert.Null(result.SuperAdminRole);
+        Assert.Null(result.SuperAdminsGroup);
     }
 
     [Fact]
@@ -56,11 +58,11 @@ public sealed class TenantProvisioningServiceTests : IClassFixture<DatabaseFixtu
         Assert.False(customerResult.Tenant.IsPlatformTenant);
     }
 
-    // SuperAdmin is a special concept that belongs only to the tenant that owns the platform -
-    // every other tenant's own administrator is just "Admin", even though the role holds the
-    // same full permission set within its own tenant-scoped catalog.
+    // GlobalAdmin is created for every tenant (the standard full-access role), but SuperAdmin is
+    // a separate, additional role that only ever exists on the tenant that owns the platform
+    // itself, tied to the one seeded bootstrap system account - never created for a customer tenant.
     [Fact]
-    public async Task ProvisionAsyncNamesTheRoleAndGroupSuperAdminOnlyForThePlatformTenant()
+    public async Task ProvisionAsyncOnlyAddsASuperAdminRoleForThePlatformTenant()
     {
         await using var context = _fixture.CreateContext();
         var service = CreateService(context);
@@ -68,10 +70,15 @@ public sealed class TenantProvisioningServiceTests : IClassFixture<DatabaseFixtu
         var platformResult = await service.ProvisionAsync("Platform Owner", Unique("platform-owner-naming"), isPlatformTenant: true);
         var customerResult = await service.ProvisionAsync("Customer", Unique("customer-naming"));
 
-        Assert.Equal("SuperAdmin", platformResult.AdminRole.Name);
-        Assert.Equal("SuperAdmins", platformResult.AdminsGroup.Name);
-        Assert.Equal("Admin", customerResult.AdminRole.Name);
-        Assert.Equal("Admins", customerResult.AdminsGroup.Name);
+        Assert.Equal("GlobalAdmin", platformResult.GlobalAdminRole.Name);
+        Assert.Equal("GlobalAdmins", platformResult.GlobalAdminsGroup.Name);
+        Assert.Equal("SuperAdmin", platformResult.SuperAdminRole?.Name);
+        Assert.Equal("SuperAdmins", platformResult.SuperAdminsGroup?.Name);
+
+        Assert.Equal("GlobalAdmin", customerResult.GlobalAdminRole.Name);
+        Assert.Equal("GlobalAdmins", customerResult.GlobalAdminsGroup.Name);
+        Assert.Null(customerResult.SuperAdminRole);
+        Assert.Null(customerResult.SuperAdminsGroup);
     }
 
     [Fact]

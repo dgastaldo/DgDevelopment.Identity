@@ -103,7 +103,7 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
 
     /// <summary>
     /// An authenticated client for a fully provisioned, login-capable *customer* tenant (its own
-    /// Client + User, real OIDC login) whose Admin holds every permission in their own
+    /// Client + User, real OIDC login) whose GlobalAdmin holds every permission in their own
     /// catalog - including the IsGlobal-flagged ones - but is NOT the platform tenant. Exercises
     /// the real distinction IsGlobalAdministratorAsync draws: holding the permission alone isn't
     /// enough. Provisioned in SeedAsync (before the host starts) rather than lazily here - see
@@ -167,7 +167,8 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
 
             DefaultTenantId = provisioned.Tenant.Id;
             DefaultPlatformId = provisioned.Platform.Id;
-            SuperAdminRoleId = provisioned.AdminRole.Id;
+            // Non-null: ProvisionAsync always creates a SuperAdmin role/group when isPlatformTenant is true.
+            SuperAdminRoleId = provisioned.SuperAdminRole!.Id;
 
             var clientSecretHash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(IntegrationTestConstants.AdminClientSecret)));
             var client = new Client(provisioned.Tenant.Id, Guid.Parse(IntegrationTestConstants.AdminClientId), clientSecretHash, "identity-platform", ClientType.Confidential, provisioned.Platform.Id);
@@ -183,7 +184,7 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
             var email = EmailAddress.FromString(IntegrationTestConstants.SuperAdminEmail);
             var user = new User(IntegrationTestConstants.SuperAdminUserName, passwordHash, email, isSystemAccount: true);
             user.VerifyEmail(email);
-            user.AddToGroup(provisioned.AdminsGroup);
+            user.AddToGroup(provisioned.SuperAdminsGroup!);
             db.Users.Add(user);
             SuperAdminUserId = user.Id;
 
@@ -196,9 +197,9 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
     }
 
     /// <summary>
-    /// A second, non-platform tenant with its own login-capable Admin (not a SuperAdmin - that
-    /// name is reserved for the platform tenant), seeded here (before host startup) rather than
-    /// lazily from a test - see the ClientIdCache note in InitializeAsync.
+    /// A second, non-platform tenant with its own login-capable GlobalAdmin (not a SuperAdmin -
+    /// that role only ever exists on the platform tenant), seeded here (before host startup)
+    /// rather than lazily from a test - see the ClientIdCache note in InitializeAsync.
     /// </summary>
     private async Task SeedCustomerTenantAsync(IdentityDbContext db)
     {
@@ -226,7 +227,7 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
         var email = EmailAddress.FromString("customer.admin@dgdevelopment.it");
         var user = new User("customer.admin", passwordHash, email, isSystemAccount: false);
         user.VerifyEmail(email);
-        user.AddToGroup(provisioned.AdminsGroup);
+        user.AddToGroup(provisioned.GlobalAdminsGroup);
         db.Users.Add(user);
         db.TenantMemberships.Add(new TenantMembership(provisioned.Tenant.Id, user.Id, isOwner: true));
 

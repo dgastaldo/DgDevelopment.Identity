@@ -28,25 +28,35 @@ public sealed class TenantProvisioningService(
         foreach (var permission in permissions)
             await permissionRepository.AddAsync(permission, ct).ConfigureAwait(false);
 
-        // "SuperAdmin" is reserved for the one tenant that owns the platform itself - every other
-        // (customer) tenant gets a regular "Admin" role instead, even though it holds the same
-        // full permission set within its own tenant-scoped catalog. Naming it "SuperAdmin" would
-        // wrongly imply platform-wide power that IsGlobalAdministratorAsync's IsPlatformTenant
-        // check no longer grants it anyway.
-        var (roleName, roleDescription, groupName, groupDescription) = isPlatformTenant
-            ? ("SuperAdmin", "Full system access with all permissions", "SuperAdmins", "Super administrator group")
-            : ("Admin", "Full access to this tenant's own resources", "Admins", "Tenant administrator group");
-
-        var adminRole = new Role(tenant.Id, platform.Id, roleName, roleDescription);
+        // GlobalAdmin is the tenant's standard full-access role, created for every tenant - the
+        // name doesn't grant cross-tenant power by itself, that's still gated entirely by
+        // IsGlobalAdministratorAsync's IsPlatformTenant check. SuperAdmin is a separate, additional
+        // role that only ever exists on the platform tenant, tied to the one seeded bootstrap
+        // system account (see DbSeeder) - never created for a customer tenant.
+        var globalAdminRole = new Role(tenant.Id, platform.Id, "GlobalAdmin", "Full access to this tenant's own resources");
         foreach (var permission in permissions)
-            adminRole.AddPermission(permission);
-        await roleRepository.AddAsync(adminRole, ct).ConfigureAwait(false);
+            globalAdminRole.AddPermission(permission);
+        await roleRepository.AddAsync(globalAdminRole, ct).ConfigureAwait(false);
 
-        var adminsGroup = new Group(tenant.Id, groupName, groupDescription);
-        adminsGroup.AddRole(adminRole);
-        await groupRepository.AddAsync(adminsGroup, ct).ConfigureAwait(false);
+        var globalAdminsGroup = new Group(tenant.Id, "GlobalAdmins", "Tenant administrator group");
+        globalAdminsGroup.AddRole(globalAdminRole);
+        await groupRepository.AddAsync(globalAdminsGroup, ct).ConfigureAwait(false);
 
-        return new TenantProvisioningResult(tenant, platform, adminRole, adminsGroup);
+        Role? superAdminRole = null;
+        Group? superAdminsGroup = null;
+        if (isPlatformTenant)
+        {
+            superAdminRole = new Role(tenant.Id, platform.Id, "SuperAdmin", "Full system access with all permissions");
+            foreach (var permission in permissions)
+                superAdminRole.AddPermission(permission);
+            await roleRepository.AddAsync(superAdminRole, ct).ConfigureAwait(false);
+
+            superAdminsGroup = new Group(tenant.Id, "SuperAdmins", "Super administrator group");
+            superAdminsGroup.AddRole(superAdminRole);
+            await groupRepository.AddAsync(superAdminsGroup, ct).ConfigureAwait(false);
+        }
+
+        return new TenantProvisioningResult(tenant, platform, globalAdminRole, globalAdminsGroup, superAdminRole, superAdminsGroup);
     }
 
     /// <summary>
