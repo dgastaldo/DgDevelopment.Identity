@@ -1,0 +1,144 @@
+@page "/tenants"
+@using DgDevelopment.Identity.IdentityPlatform.Client.State
+@inject IdentityClient Api
+@inject TenantState TenantState
+
+<PageTitle>Tenants | IdentityPlatform</PageTitle>
+
+@* Tenant.read/.create are IsGlobal permissions duplicated into every tenant's own catalog, so
+   the client-decoded "permission" claim (what RequirePermission checks) is true for any tenant's
+   SuperAdmin too - it is not a reliable signal here. TenantState.IsGlobalAdministrator comes back
+   from the server (/me/tenants) and matches what TenantsController actually enforces. *@
+@if (!TenantState.Loaded)
+{
+    <div class="h-64 animate-pulse rounded-2xl bg-slate-100"></div>
+}
+else if (!TenantState.IsGlobalAdministrator)
+{
+    <div class="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">You don't have permission to view this page.</div>
+}
+else
+{
+    <div class="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div>
+            <p class="mb-2 text-xs font-semibold tracking-[0.2em] text-violet-700 uppercase">Global administration</p>
+            <h1 class="text-3xl font-semibold tracking-tight text-slate-900">Tenants</h1>
+            <p class="mt-2 text-sm text-slate-500">Every organization provisioned on this Identity instance, each with its own platform, permission catalog, and SuperAdmin.</p>
+        </div>
+        <button class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-800" @onclick="ToggleCreate">@(ShowCreate ? "Close form" : "Create tenant")</button>
+    </div>
+
+    @if (ShowCreate)
+    {
+        <section class="mb-6 rounded-2xl border border-violet-200 bg-violet-50 p-5">
+            <h2 class="text-lg font-semibold text-slate-900">Create tenant</h2>
+            <p class="mt-1 text-sm text-slate-600">Provisions a new organization with its own IdentityAdmin platform, full permission catalog, SuperAdmin role, and SuperAdmins group.</p>
+            <EditForm Model="CreateModel" OnValidSubmit="CreateAsync" class="mt-4 grid gap-4 md:grid-cols-2">
+                <div><label class="mb-1 block text-xs font-semibold text-slate-500 uppercase">Name</label><InputText @bind-Value="CreateModel.Name" class="w-full rounded-lg border-slate-300" /></div>
+                <div><label class="mb-1 block text-xs font-semibold text-slate-500 uppercase">Slug</label><InputText @bind-Value="CreateModel.Slug" class="w-full rounded-lg border-slate-300" /></div>
+                <div class="md:col-span-2"><button class="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800" disabled="@Busy">Create tenant</button></div>
+            </EditForm>
+        </section>
+    }
+
+    @if (Error is not null)
+    {
+        <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">@Error</div>
+    }
+
+    @if (Loading)
+    {
+        <div class="h-64 animate-pulse rounded-2xl bg-slate-100"></div>
+    }
+    else
+    {
+        <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div class="overflow-x-auto">
+                <table class="w-full min-w-[600px] text-left text-sm">
+                    <thead class="border-b border-slate-200 bg-slate-50 text-xs tracking-wide text-slate-500 uppercase"><tr><th class="px-5 py-4">Tenant</th><th class="px-5 py-4">Slug</th><th class="px-5 py-4">Status</th><th class="px-5 py-4">Created</th></tr></thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @foreach (var tenant in TenantList)
+                        {
+                            <tr class="transition hover:bg-slate-50">
+                                <td class="px-5 py-4 font-semibold text-slate-900">@tenant.Name</td>
+                                <td class="px-5 py-4 text-slate-500">@tenant.Slug</td>
+                                <td class="px-5 py-4">
+                                    @if (tenant.IsActive)
+                                    {
+                                        <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Active</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">Inactive</span>
+                                    }
+                                </td>
+                                <td class="px-5 py-4 text-slate-500">@tenant.CreatedAt.ToLocalTime().ToString("g")</td>
+                            </tr>
+                        }
+                        @if (TenantList.Count == 0)
+                        {
+                            <tr><td colspan="4" class="px-5 py-6 text-center text-sm text-slate-400">No tenants found.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="border-t border-slate-200 px-5 py-4 text-sm text-slate-500">@TenantList.Count tenants</div>
+        </section>
+    }
+}
+
+@code {
+    private IReadOnlyCollection<TenantAdminResponse> TenantList = [];
+    private bool Loading = true;
+    private bool Busy;
+    private bool ShowCreate;
+    private string? Error;
+    private CreateTenantForm CreateModel = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && OperatingSystem.IsBrowser())
+            await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            TenantList = await Api.GetTenantsAdminAsync().ConfigureAwait(false) ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            Error = "The tenant list is currently unavailable.";
+        }
+        finally
+        {
+            Loading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        Busy = true;
+        try
+        {
+            await Api.CreateTenantAsync(CreateModel.Name, CreateModel.Slug).ConfigureAwait(false);
+            CreateModel = new();
+            ShowCreate = false;
+            await LoadAsync();
+        }
+        catch (HttpRequestException) { Error = "The tenant could not be created."; }
+        finally { Busy = false; }
+    }
+
+    private void ToggleCreate() => ShowCreate = !ShowCreate;
+
+    private sealed class CreateTenantForm
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Slug { get; set; } = string.Empty;
+    }
+}

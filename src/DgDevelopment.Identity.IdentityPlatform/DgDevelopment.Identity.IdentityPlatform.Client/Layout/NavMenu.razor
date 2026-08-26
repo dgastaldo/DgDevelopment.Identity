@@ -1,5 +1,8 @@
 ﻿@using DgDevelopment.Identity.Client.Core
+@using DgDevelopment.Identity.IdentityPlatform.Client.State
 @using Microsoft.AspNetCore.Components.Authorization
+@implements IDisposable
+@inject TenantState TenantState
 
 <div class="flex h-14 items-center bg-black/40">
     <div class="w-full px-3">
@@ -68,7 +71,29 @@
                         </NavLink>
                     </div>
                 }
+                @if (TenantState.IsGlobalAdministrator)
+                {
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="tenants">
+                            <span class="mr-3 inline-block w-4 text-center text-xs" aria-hidden="true">⬡</span> Tenants
+                        </NavLink>
+                    </div>
+                }
             </nav>
         </Authorized>
     </AuthorizeView>
 </div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        TenantState.Changed += OnTenantStateChanged;
+    }
+
+    private void OnTenantStateChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        TenantState.Changed -= OnTenantStateChanged;
+    }
+}

@@ -3,10 +3,12 @@ using DgDevelopment.Identity.Application.Services;
 using DgDevelopment.Identity.Application.Users;
 using DgDevelopment.Identity.Domain.Entities;
 using DgDevelopment.Identity.Server.Authorization;
+using DgDevelopment.Identity.Server.Data;
 using DgDevelopment.Identity.Server.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Hosting;
 
 namespace DgDevelopment.Identity.Server.Controllers;
 
@@ -17,7 +19,8 @@ public sealed class UsersController(
     IUserService userService,
     IPermissionEvaluator permissionEvaluator,
     IAuditService auditService,
-    ITenantContext tenantContext) : ControllerBase
+    ITenantContext tenantContext,
+    IHostEnvironment hostEnvironment) : ControllerBase
 {
     [HttpGet]
     [RequirePermission("identity-platform.user.read")]
@@ -84,8 +87,15 @@ public sealed class UsersController(
         try
         {
             var canSeeAllTenants = await CanSeeAllTenantsAsync(allTenants, ct).ConfigureAwait(false);
-            await userService.ResetPasswordAsync(id, request.Password, tenantContext.TenantId, canSeeAllTenants, ct).ConfigureAwait(false);
+            var user = await userService.ResetPasswordAsync(id, request.Password, tenantContext.TenantId, canSeeAllTenants, ct).ConfigureAwait(false);
             await auditService.RecordAsync("user.reset-password", AuditOutcome.Success, tenantContext.TenantId, targetId: id.ToString(), targetType: "user", ct: ct).ConfigureAwait(false);
+
+            // Keeps the local dev bootstrap snapshot (superadmin-credentials.txt) truthful whenever
+            // the system account's own password is changed through the admin UI/API instead of the
+            // one-time seed - only for IsSystemAccount, never for a regular tenant user's password.
+            if (user.IsSystemAccount)
+                SuperadminCredentialsWriter.Write(hostEnvironment.ContentRootPath, user.Username, user.PrimaryEmail?.Value ?? string.Empty, request.Password);
+
             return NoContent();
         }
         catch (Exception ex) when (ex is KeyNotFoundException or ArgumentException)
