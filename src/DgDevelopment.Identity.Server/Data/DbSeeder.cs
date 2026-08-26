@@ -26,7 +26,7 @@ public sealed class DbSeeder(IServiceProvider serviceProvider)
         if (tenant is null)
         {
             var provisioning = scope.ServiceProvider.GetRequiredService<ITenantProvisioningService>();
-            var result = await provisioning.ProvisionAsync("Identity Tenant", "identity-tenant").ConfigureAwait(false);
+            var result = await provisioning.ProvisionAsync("Identity Tenant", "identity-tenant", isPlatformTenant: true).ConfigureAwait(false);
             tenant = result.Tenant;
         }
 

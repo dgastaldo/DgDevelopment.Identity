@@ -10,7 +10,7 @@ public sealed class TenantProvisioningService(
     IRoleRepository roleRepository,
     IGroupRepository groupRepository) : ITenantProvisioningService
 {
-    public async Task<TenantProvisioningResult> ProvisionAsync(string name, string slug, CancellationToken ct = default)
+    public async Task<TenantProvisioningResult> ProvisionAsync(string name, string slug, bool isPlatformTenant = false, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(slug);
@@ -18,7 +18,7 @@ public sealed class TenantProvisioningService(
         if (await tenantRepository.GetBySlugAsync(slug, ct).ConfigureAwait(false) is not null)
             throw new InvalidOperationException($"A tenant with slug '{slug}' already exists.");
 
-        var tenant = new Tenant(name, slug);
+        var tenant = new Tenant(name, slug, isPlatformTenant);
         await tenantRepository.AddAsync(tenant, ct).ConfigureAwait(false);
 
         var platform = new Platform(tenant.Id, "IdentityAdmin", "Identity administration platform", PermissionMode.IdentityManaged);

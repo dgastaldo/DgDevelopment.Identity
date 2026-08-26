@@ -24,6 +24,11 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
     public Guid SecondTenantRoleId { get; private set; }
     public string AccessToken { get; private set; } = string.Empty;
 
+    private const string CustomerTenantClientSecret = "customer-tenant-test-client-secret-0123456789";
+    private const string CustomerTenantPassword = "Customer-Tenant-Test-Password!2026";
+    private Guid _customerTenantClientId;
+    private string _customerTenantAccessToken = string.Empty;
+
     public async Task InitializeAsync()
     {
         await using (var context = CreateContext())
@@ -39,7 +44,11 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
 
         // Triggers real host startup (DbSeeder.SeedAsync runs here, but every table it checks is
         // already populated above, so every one of its seed steps short-circuits as a no-op -
-        // no credential files written to disk, no AppHost user-secrets sync attempted).
+        // no credential files written to disk, no AppHost user-secrets sync attempted). This also
+        // starts ClientIdCache's 5-minute refresh loop, which is why every OAuth client that a
+        // test needs to log in as must exist in the DB *before* this first CreateClient() call -
+        // a client added afterward isn't in the cache yet and gets "invalid_token: audience
+        // invalid" on every request until the next background refresh.
         var loginClient = Factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false,
@@ -51,6 +60,18 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
             IntegrationTestConstants.SuperAdminPassword,
             IntegrationTestConstants.AdminClientId,
             IntegrationTestConstants.AdminClientSecret,
+            IntegrationTestConstants.RedirectUri).ConfigureAwait(false);
+
+        // A fresh client (fresh cookie jar) - reusing loginClient here would still carry the
+        // superadmin's authentication cookie from the login above, so /connect/authorize would
+        // skip straight past the login form instead of showing it for this different user.
+        var customerLoginClient = Factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            BaseAddress = new Uri(IdentityWebApplicationFactory.IssuerBaseAddress),
+        });
+        _customerTenantAccessToken = await new OidcTestClient(customerLoginClient).LoginAndGetAccessTokenAsync(
+            "customer.admin", CustomerTenantPassword, _customerTenantClientId.ToString(), CustomerTenantClientSecret,
             IntegrationTestConstants.RedirectUri).ConfigureAwait(false);
     }
 
@@ -77,6 +98,24 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
             BaseAddress = new Uri(IdentityWebApplicationFactory.IssuerBaseAddress),
         });
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
+        return client;
+    }
+
+    /// <summary>
+    /// An authenticated client for a fully provisioned, login-capable *customer* tenant (its own
+    /// Client + User, real OIDC login) whose SuperAdmin holds every permission in their own
+    /// catalog - including the IsGlobal-flagged ones - but is NOT the platform tenant. Exercises
+    /// the real distinction IsGlobalAdministratorAsync draws: holding the permission alone isn't
+    /// enough. Provisioned in SeedAsync (before the host starts) rather than lazily here - see
+    /// the ClientIdCache note in InitializeAsync for why that ordering matters.
+    /// </summary>
+    public HttpClient CreateAuthenticatedClientForCustomerTenantAsync()
+    {
+        var client = Factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri(IdentityWebApplicationFactory.IssuerBaseAddress),
+        });
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _customerTenantAccessToken);
         return client;
     }
 
@@ -113,25 +152,66 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
             DefaultTenantId = existingRole.TenantId;
             DefaultPlatformId = existingRole.PlatformId;
             SuperAdminUserId = await db.Users.Where(u => u.Username == IntegrationTestConstants.SuperAdminUserName).Select(u => u.Id).SingleAsync().ConfigureAwait(false);
-            return;
+        }
+        else
+        {
+            var hasher = new FakePasswordHasher();
+
+            // Reuses the real provisioning service (Tenant + IdentityAdmin platform + full permission
+            // catalog + SuperAdmin role + SuperAdmins group) instead of hand-duplicating that seed logic -
+            // this is exactly what DbSeeder itself now calls for the real bootstrap tenant.
+            var provisioning = new TenantProvisioningService(
+                new TenantRepository(db), new PlatformRepository(db), new PermissionRepository(db),
+                new RoleRepository(db), new GroupRepository(db));
+            var provisioned = await provisioning.ProvisionAsync("Identity Tenant", IntegrationTestConstants.DefaultTenantSlug, isPlatformTenant: true).ConfigureAwait(false);
+
+            DefaultTenantId = provisioned.Tenant.Id;
+            DefaultPlatformId = provisioned.Platform.Id;
+            SuperAdminRoleId = provisioned.SuperAdminRole.Id;
+
+            var clientSecretHash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(IntegrationTestConstants.AdminClientSecret)));
+            var client = new Client(provisioned.Tenant.Id, Guid.Parse(IntegrationTestConstants.AdminClientId), clientSecretHash, "identity-platform", ClientType.Confidential, provisioned.Platform.Id);
+            client.AddGrantType("authorization_code");
+            client.AddGrantType("refresh_token");
+            client.AddScope("openid");
+            client.AddScope("profile");
+            client.AddScope("email");
+            client.AddRedirectUri(new Uri(IntegrationTestConstants.RedirectUri));
+            db.Clients.Add(client);
+
+            var passwordHash = hasher.HashPassword(IntegrationTestConstants.SuperAdminPassword);
+            var email = EmailAddress.FromString(IntegrationTestConstants.SuperAdminEmail);
+            var user = new User(IntegrationTestConstants.SuperAdminUserName, passwordHash, email, isSystemAccount: true);
+            user.VerifyEmail(email);
+            user.AddToGroup(provisioned.SuperAdminsGroup);
+            db.Users.Add(user);
+            SuperAdminUserId = user.Id;
+
+            db.TenantMemberships.Add(new TenantMembership(provisioned.Tenant.Id, user.Id, isOwner: true));
+
+            await db.SaveChangesAsync().ConfigureAwait(false);
         }
 
-        var hasher = new FakePasswordHasher();
+        await SeedCustomerTenantAsync(db).ConfigureAwait(false);
+    }
 
-        // Reuses the real provisioning service (Tenant + IdentityAdmin platform + full permission
-        // catalog + SuperAdmin role + SuperAdmins group) instead of hand-duplicating that seed logic -
-        // this is exactly what DbSeeder itself now calls for the real bootstrap tenant.
+    /// <summary>
+    /// A second, non-platform tenant with its own login-capable SuperAdmin, seeded here (before
+    /// host startup) rather than lazily from a test - see the ClientIdCache note in InitializeAsync.
+    /// </summary>
+    private async Task SeedCustomerTenantAsync(IdentityDbContext db)
+    {
+        if (await db.Tenants.AnyAsync(t => t.Slug == "customer-tenant").ConfigureAwait(false))
+            return;
+
         var provisioning = new TenantProvisioningService(
             new TenantRepository(db), new PlatformRepository(db), new PermissionRepository(db),
             new RoleRepository(db), new GroupRepository(db));
-        var provisioned = await provisioning.ProvisionAsync("Identity Tenant", IntegrationTestConstants.DefaultTenantSlug).ConfigureAwait(false);
+        var provisioned = await provisioning.ProvisionAsync("Customer Tenant", "customer-tenant").ConfigureAwait(false);
 
-        DefaultTenantId = provisioned.Tenant.Id;
-        DefaultPlatformId = provisioned.Platform.Id;
-        SuperAdminRoleId = provisioned.SuperAdminRole.Id;
-
-        var clientSecretHash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(IntegrationTestConstants.AdminClientSecret)));
-        var client = new Client(provisioned.Tenant.Id, Guid.Parse(IntegrationTestConstants.AdminClientId), clientSecretHash, "identity-platform", ClientType.Confidential, provisioned.Platform.Id);
+        _customerTenantClientId = Guid.NewGuid();
+        var clientSecretHash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(CustomerTenantClientSecret)));
+        var client = new Client(provisioned.Tenant.Id, _customerTenantClientId, clientSecretHash, "customer-admin-client", ClientType.Confidential, provisioned.Platform.Id);
         client.AddGrantType("authorization_code");
         client.AddGrantType("refresh_token");
         client.AddScope("openid");
@@ -140,14 +220,13 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
         client.AddRedirectUri(new Uri(IntegrationTestConstants.RedirectUri));
         db.Clients.Add(client);
 
-        var passwordHash = hasher.HashPassword(IntegrationTestConstants.SuperAdminPassword);
-        var email = EmailAddress.FromString(IntegrationTestConstants.SuperAdminEmail);
-        var user = new User(IntegrationTestConstants.SuperAdminUserName, passwordHash, email, isSystemAccount: true);
+        var hasher = new FakePasswordHasher();
+        var passwordHash = hasher.HashPassword(CustomerTenantPassword);
+        var email = EmailAddress.FromString("customer.admin@dgdevelopment.it");
+        var user = new User("customer.admin", passwordHash, email, isSystemAccount: false);
         user.VerifyEmail(email);
         user.AddToGroup(provisioned.SuperAdminsGroup);
         db.Users.Add(user);
-        SuperAdminUserId = user.Id;
-
         db.TenantMemberships.Add(new TenantMembership(provisioned.Tenant.Id, user.Id, isOwner: true));
 
         await db.SaveChangesAsync().ConfigureAwait(false);

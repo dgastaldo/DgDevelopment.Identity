@@ -46,7 +46,7 @@ public sealed class TenantsController(
 
         try
         {
-            var result = await provisioningService.ProvisionAsync(request.Name, request.Slug, ct).ConfigureAwait(false);
+            var result = await provisioningService.ProvisionAsync(request.Name, request.Slug, ct: ct).ConfigureAwait(false);
             await auditService.RecordAsync("tenant.create", AuditOutcome.Success, result.Tenant.Id, targetId: result.Tenant.Id.ToString(), targetType: "tenant", ct: ct).ConfigureAwait(false);
             return CreatedAtAction(nameof(GetTenants), null, TenantAdminResponse.From(result.Tenant));
         }

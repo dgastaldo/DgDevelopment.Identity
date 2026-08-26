@@ -12,5 +12,10 @@ public interface ITenantProvisioningService
     /// all of them, and a SuperAdmins group holding that role. Does not create a Client or a User -
     /// those are a separate decision (who logs into the new tenant) left to the caller.
     /// </summary>
-    Task<TenantProvisioningResult> ProvisionAsync(string name, string slug, CancellationToken ct = default);
+    /// <param name="isPlatformTenant">
+    /// True only for the one bootstrap tenant that owns the platform itself - never for a tenant
+    /// created afterward for a customer through the admin API. Controls whether this tenant's own
+    /// SuperAdmin counts as a genuine global administrator (see ITenantContext.IsGlobalAdministratorAsync).
+    /// </param>
+    Task<TenantProvisioningResult> ProvisionAsync(string name, string slug, bool isPlatformTenant = false, CancellationToken ct = default);
 }
