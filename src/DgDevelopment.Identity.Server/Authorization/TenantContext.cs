@@ -1,10 +1,14 @@
 using System.Security.Claims;
 using DgDevelopment.Identity.Application.Authorization;
+using DgDevelopment.Identity.Domain.Repositories;
 using Microsoft.AspNetCore.Http;
 
 namespace DgDevelopment.Identity.Server.Authorization;
 
-public sealed class TenantContext(IHttpContextAccessor httpContextAccessor, IPermissionEvaluator permissionEvaluator) : ITenantContext
+public sealed class TenantContext(
+    IHttpContextAccessor httpContextAccessor,
+    IPermissionEvaluator permissionEvaluator,
+    ITenantRepository tenantRepository) : ITenantContext
 {
     private const string GlobalAdministratorPermission = "identity-platform.tenant.read";
 
@@ -42,6 +46,16 @@ public sealed class TenantContext(IHttpContextAccessor httpContextAccessor, IPer
         }
     }
 
-    public Task<bool> IsGlobalAdministratorAsync(CancellationToken ct = default)
-        => permissionEvaluator.HasPermissionAsync(UserId, TenantId, GlobalAdministratorPermission, ct: ct);
+    public async Task<bool> IsGlobalAdministratorAsync(CancellationToken ct = default)
+    {
+        // Holding tenant.read alone isn't enough: since the permission catalog is duplicated
+        // per tenant, every tenant's own SuperAdmin holds every permission in their own catalog,
+        // tenant.read included. Being a genuine global administrator additionally requires that
+        // the CURRENT tenant is the one platform tenant, not just any tenant with the permission.
+        if (!await permissionEvaluator.HasPermissionAsync(UserId, TenantId, GlobalAdministratorPermission, ct: ct).ConfigureAwait(false))
+            return false;
+
+        var tenant = await tenantRepository.GetByIdAsync(TenantId, ct).ConfigureAwait(false);
+        return tenant is { IsPlatformTenant: true };
+    }
 }

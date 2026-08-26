@@ -63,12 +63,13 @@ public sealed class UserService(
         await userRepository.UpdateAsync(user, ct).ConfigureAwait(false);
     }
 
-    public async Task ResetPasswordAsync(Guid id, string password, Guid tenantId, bool allTenants, CancellationToken ct = default)
+    public async Task<User> ResetPasswordAsync(Guid id, string password, Guid tenantId, bool allTenants, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(password);
         var user = await GetRequiredAsync(id, tenantId, allTenants, ct).ConfigureAwait(false);
         user.SetPassword(passwordHasher.HashPassword(password));
         await userRepository.UpdateAsync(user, ct).ConfigureAwait(false);
+        return user;
     }
 
     public async Task AssignRoleAsync(Guid userId, Guid roleId, string? scopeType, string? scopeValue, Guid tenantId, bool allTenants, CancellationToken ct = default)

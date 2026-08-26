@@ -26,7 +26,7 @@ public sealed class DbSeeder(IServiceProvider serviceProvider)
         if (tenant is null)
         {
             var provisioning = scope.ServiceProvider.GetRequiredService<ITenantProvisioningService>();
-            var result = await provisioning.ProvisionAsync("Identity Tenant", "identity-tenant").ConfigureAwait(false);
+            var result = await provisioning.ProvisionAsync("Identity Tenant", "identity-tenant", isPlatformTenant: true).ConfigureAwait(false);
             tenant = result.Tenant;
         }
 
@@ -35,7 +35,7 @@ public sealed class DbSeeder(IServiceProvider serviceProvider)
         var superadminPassword = await SeedUsersAsync(db, hasher, tenant.Id).ConfigureAwait(false);
 
         if (superadminPassword != null)
-            WriteSuperadminCredentials(contentRoot, superadminPassword);
+            SuperadminCredentialsWriter.Write(contentRoot, "identity.superadmin", "identity.superadmin@dgdevelopment.it", superadminPassword);
 
         if (clientCredentials is { } credentials)
         {
@@ -98,26 +98,6 @@ public sealed class DbSeeder(IServiceProvider serviceProvider)
         Console.WriteLine("==============================================");
 
         return password;
-    }
-
-    private static void WriteSuperadminCredentials(string contentRoot, string password)
-    {
-        var path = Path.Combine(contentRoot, "superadmin-credentials.txt");
-        var content = $"""
-        ==============================================
-          DgDevelopment Identity - SuperAdmin Credentials
-        ==============================================
-          Username: identity.superadmin
-          Password: {password}
-          Email:    identity.superadmin@dgdevelopment.it
-        ==============================================
-          Store this file in a secure location.
-          Do not commit to version control.
-        ==============================================
-        """;
-
-        File.WriteAllText(path, content);
-        Console.WriteLine($"SuperAdmin credentials saved to: {path}");
     }
 
     private static void WriteClientCredentials(string contentRoot, Guid clientId, string clientSecret)

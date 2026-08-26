@@ -12,6 +12,12 @@ public sealed class TenantState(IdentityClient api)
 
     public TenantResponse? ActiveTenant => Tenants.FirstOrDefault(t => t.Id == ActiveTenantId);
 
+    // MainLayout's own AuthorizeView content picks up this state naturally because MainLayout
+    // calls StateHasChanged on itself once LoadAsync completes - but a sibling component like
+    // NavMenu never gets told to re-render just because MainLayout did, so it needs to subscribe
+    // to this event and re-render itself to reflect state loaded after its own first paint.
+    public event Action? Changed;
+
     public async Task LoadAsync(CancellationToken ct = default)
     {
         var response = await api.GetMyTenantsAsync(ct).ConfigureAwait(false);
@@ -22,5 +28,6 @@ public sealed class TenantState(IdentityClient api)
         ActiveTenantId = response.ActiveTenantId;
         IsGlobalAdministrator = response.IsGlobalAdministrator;
         Loaded = true;
+        Changed?.Invoke();
     }
 }
