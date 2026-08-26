@@ -59,12 +59,37 @@ public sealed class Client
         UpdatedAt = DateTime.UtcNow;
     }
 
+    public void Rename(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        Name = name;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void SetRequireConsent(bool requireConsent)
+    {
+        RequireConsent = requireConsent;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void SetPlatform(Guid? platformId)
+    {
+        PlatformId = platformId;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void AddGrantType(string grantType)
     {
         if (_grantTypes.Any(g => g.GrantType == grantType))
             return;
 
         _grantTypes.Add(new ClientGrantType(Id, grantType));
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void RemoveGrantType(string grantType)
+    {
+        _grantTypes.RemoveAll(g => g.GrantType == grantType);
         UpdatedAt = DateTime.UtcNow;
     }
 
@@ -77,12 +102,24 @@ public sealed class Client
         UpdatedAt = DateTime.UtcNow;
     }
 
+    public void RemoveScope(string scope)
+    {
+        _scopes.RemoveAll(s => s.Scope == scope);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void AddAdminConsentScope(string scope)
     {
         if (_adminConsentScopes.Any(s => s.Scope == scope))
             return;
 
         _adminConsentScopes.Add(new ClientAdminConsent(Id, scope));
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void RemoveAdminConsentScope(string scope)
+    {
+        _adminConsentScopes.RemoveAll(s => s.Scope == scope);
         UpdatedAt = DateTime.UtcNow;
     }
 
@@ -96,6 +133,13 @@ public sealed class Client
         UpdatedAt = DateTime.UtcNow;
     }
 
+    public void RemoveRedirectUri(Uri uri)
+    {
+        ArgumentNullException.ThrowIfNull(uri);
+        _redirectUris.RemoveAll(r => r.RedirectUri == uri);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void AddPostLogoutRedirectUri(Uri uri)
     {
         ArgumentNullException.ThrowIfNull(uri);
@@ -103,6 +147,13 @@ public sealed class Client
             return;
 
         _postLogoutRedirectUris.Add(new ClientPostLogoutRedirectUri(Id, uri));
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void RemovePostLogoutRedirectUri(Uri uri)
+    {
+        ArgumentNullException.ThrowIfNull(uri);
+        _postLogoutRedirectUris.RemoveAll(r => r.RedirectUri == uri);
         UpdatedAt = DateTime.UtcNow;
     }
 

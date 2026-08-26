@@ -78,7 +78,7 @@ public sealed class TestDatabaseSmokeTests : IClassFixture<DatabaseFixture<TestD
             .Include(g => g.Roles)
             .SingleAsync(g => g.Name == "SuperAdmins");
 
-        Assert.Equal(31, roleCount);
+        Assert.Equal(32, roleCount);
         Assert.Single(group.Roles);
     }
 }

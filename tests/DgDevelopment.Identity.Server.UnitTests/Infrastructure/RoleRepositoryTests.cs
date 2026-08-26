@@ -21,9 +21,10 @@ public sealed class RoleRepositoryTests : IClassFixture<DatabaseFixture<RoleRepo
     public async Task AddAndGetByIdRoundTripsWithPermissions()
     {
         var tenantId = await _fixture.GetSeededTenantIdAsync();
+        var platformId = await _fixture.GetSeededPlatformIdAsync();
         var name = UniqueName("role");
-        var permission = new Permission($"perm-{Guid.NewGuid():N}", "desc", "User");
-        var role = new Role(tenantId, name, "desc");
+        var permission = new Permission(tenantId, platformId, $"perm-{Guid.NewGuid():N}", "desc", "User");
+        var role = new Role(tenantId, platformId, name, "desc");
         role.AddPermission(permission);
         await using var context = _fixture.CreateContext();
         var repo = new RoleRepository(context);
@@ -44,8 +45,9 @@ public sealed class RoleRepositoryTests : IClassFixture<DatabaseFixture<RoleRepo
     public async Task GetByNameRoundTrips()
     {
         var tenantId = await _fixture.GetSeededTenantIdAsync();
+        var platformId = await _fixture.GetSeededPlatformIdAsync();
         var name = UniqueName("role");
-        var role = new Role(tenantId, name, "desc");
+        var role = new Role(tenantId, platformId, name, "desc");
         await using var context = _fixture.CreateContext();
         var repo = new RoleRepository(context);
         await repo.AddAsync(role);
@@ -72,10 +74,11 @@ public sealed class RoleRepositoryTests : IClassFixture<DatabaseFixture<RoleRepo
     public async Task GetAllReturnsRolesOrderedByName()
     {
         var tenantId = await _fixture.GetSeededTenantIdAsync();
+        var platformId = await _fixture.GetSeededPlatformIdAsync();
         await using var context = _fixture.CreateContext();
         var repo = new RoleRepository(context);
-        await repo.AddAsync(new Role(tenantId, UniqueName("z-role"), "desc"));
-        await repo.AddAsync(new Role(tenantId, UniqueName("a-role"), "desc"));
+        await repo.AddAsync(new Role(tenantId, platformId, UniqueName("z-role"), "desc"));
+        await repo.AddAsync(new Role(tenantId, platformId, UniqueName("a-role"), "desc"));
 
         var stored = await repo.GetAllAsync();
 
@@ -87,13 +90,14 @@ public sealed class RoleRepositoryTests : IClassFixture<DatabaseFixture<RoleRepo
     public async Task UpdateAsyncPersistsAddedPermission()
     {
         var tenantId = await _fixture.GetSeededTenantIdAsync();
+        var platformId = await _fixture.GetSeededPlatformIdAsync();
         var name = UniqueName("role");
-        var role = new Role(tenantId, name, "desc");
+        var role = new Role(tenantId, platformId, name, "desc");
         await using var context = _fixture.CreateContext();
         var repo = new RoleRepository(context);
         var permRepo = new PermissionRepository(context);
         await repo.AddAsync(role);
-        var permission = new Permission($"perm-{Guid.NewGuid():N}", "desc", "User");
+        var permission = new Permission(tenantId, platformId, $"perm-{Guid.NewGuid():N}", "desc", "User");
         await permRepo.AddAsync(permission);
         role.AddPermission(permission);
         await repo.UpdateAsync(role);
@@ -108,8 +112,9 @@ public sealed class RoleRepositoryTests : IClassFixture<DatabaseFixture<RoleRepo
     public async Task DeleteAsyncRemovesRole()
     {
         var tenantId = await _fixture.GetSeededTenantIdAsync();
+        var platformId = await _fixture.GetSeededPlatformIdAsync();
         var name = UniqueName("role");
-        var role = new Role(tenantId, name, "desc");
+        var role = new Role(tenantId, platformId, name, "desc");
         await using var context = _fixture.CreateContext();
         var repo = new RoleRepository(context);
         await repo.AddAsync(role);

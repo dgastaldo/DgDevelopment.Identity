@@ -409,14 +409,22 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<Guid>("PlatformId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("ResourceType")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
+                    b.HasIndex("PlatformId");
+
+                    b.HasIndex("TenantId", "Name")
                         .IsUnique();
 
                     b.ToTable("Permissions");
@@ -601,10 +609,15 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<Guid>("PlatformId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("PlatformId");
 
                     b.HasIndex("TenantId", "Name")
                         .IsUnique();
@@ -1137,6 +1150,21 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.Permission", b =>
+                {
+                    b.HasOne("DgDevelopment.Identity.Domain.Entities.Platform", null)
+                        .WithMany()
+                        .HasForeignKey("PlatformId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DgDevelopment.Identity.Domain.Entities.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.Platform", b =>
                 {
                     b.HasOne("DgDevelopment.Identity.Domain.Entities.Tenant", null)
@@ -1189,6 +1217,12 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
 
             modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.Role", b =>
                 {
+                    b.HasOne("DgDevelopment.Identity.Domain.Entities.Platform", null)
+                        .WithMany()
+                        .HasForeignKey("PlatformId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("DgDevelopment.Identity.Domain.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")

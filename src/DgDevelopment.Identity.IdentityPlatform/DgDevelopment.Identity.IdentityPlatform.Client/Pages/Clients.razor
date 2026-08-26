@@ -1,0 +1,170 @@
+@page "/clients"
+@using DgDevelopment.Identity.IdentityPlatform.Client.State
+@inject IdentityClient Api
+@inject NavigationManager Navigation
+@inject TenantState TenantState
+
+<PageTitle>Clients | IdentityPlatform</PageTitle>
+
+<RequirePermission Permission="identity-platform.client.read">
+    <div class="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div>
+            <p class="mb-2 text-xs font-semibold tracking-[0.2em] text-violet-700 uppercase">OAuth</p>
+            <h1 class="text-3xl font-semibold tracking-tight text-slate-900">Clients</h1>
+            <p class="mt-2 text-sm text-slate-500">Register OAuth/OIDC clients and manage their grant types, scopes, and redirect URIs.</p>
+        </div>
+        <button class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-800" @onclick="ToggleCreate">@(ShowCreate ? "Close form" : "Create client")</button>
+    </div>
+
+    @if (ShowCreate)
+    {
+        <section class="mb-6 rounded-2xl border border-violet-200 bg-violet-50 p-5">
+            <h2 class="text-lg font-semibold text-slate-900">Create client</h2>
+            @if (CreatedSecret is not null)
+            {
+                <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                    <p class="font-semibold">Client secret (shown once)</p>
+                    <p class="mt-1 break-all font-mono text-xs">@CreatedSecret</p>
+                </div>
+            }
+            <EditForm Model="CreateModel" OnValidSubmit="CreateAsync" class="mt-4 grid gap-4 md:grid-cols-2">
+                <div><label class="mb-1 block text-xs font-semibold text-slate-500 uppercase">Name</label><InputText @bind-Value="CreateModel.Name" class="w-full rounded-lg border-slate-300" /></div>
+                <div>
+                    <label class="mb-1 block text-xs font-semibold text-slate-500 uppercase">Client type</label>
+                    <select @bind="CreateModel.ClientType" class="w-full rounded-lg border-slate-300 text-sm">
+                        <option value="@ClientType.Confidential">Confidential</option>
+                        <option value="@ClientType.Public">Public</option>
+                    </select>
+                </div>
+                <div><label class="mb-1 block text-xs font-semibold text-slate-500 uppercase">Grant types (space-separated)</label><InputText @bind-Value="CreateModel.GrantTypes" class="w-full rounded-lg border-slate-300" placeholder="authorization_code refresh_token" /></div>
+                <div><label class="mb-1 block text-xs font-semibold text-slate-500 uppercase">Scopes (space-separated)</label><InputText @bind-Value="CreateModel.Scopes" class="w-full rounded-lg border-slate-300" placeholder="openid profile email" /></div>
+                <div class="md:col-span-2"><label class="mb-1 block text-xs font-semibold text-slate-500 uppercase">Redirect URIs (one per line)</label><InputTextArea @bind-Value="CreateModel.RedirectUris" class="w-full rounded-lg border-slate-300" rows="2" /></div>
+                <div class="md:col-span-2"><button class="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800" disabled="@Busy">Create client</button></div>
+            </EditForm>
+        </section>
+    }
+
+    <div class="mb-4 flex flex-col gap-3 sm:flex-row">
+        <input @bind="Search" @bind:event="oninput" @onkeydown="HandleSearchKeyDown" placeholder="Search clients" class="min-w-0 flex-1 rounded-lg border-slate-300 text-sm shadow-sm" />
+        <button class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" @onclick="LoadAsync">Search</button>
+    </div>
+
+    @if (TenantState.AllTenants)
+    {
+        <div class="mb-4 rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs font-semibold text-violet-800">Viewing clients across all tenants</div>
+    }
+
+    @if (Error is not null)
+    {
+        <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">@Error</div>
+    }
+    else if (Loading)
+    {
+        <div class="h-64 animate-pulse rounded-2xl bg-slate-100"></div>
+    }
+    else if (ClientPage is not null)
+    {
+        <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div class="overflow-x-auto">
+                <table class="w-full min-w-[700px] text-left text-sm">
+                    <thead class="border-b border-slate-200 bg-slate-50 text-xs tracking-wide text-slate-500 uppercase"><tr><th class="px-5 py-4">Client</th><th class="px-5 py-4">Type</th><th class="px-5 py-4">Status</th><th class="px-5 py-4"></th></tr></thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @foreach (var client in ClientPage.Items)
+                        {
+                            <tr class="transition hover:bg-slate-50">
+                                <td class="px-5 py-4"><a href="/clients/@client.Id" class="font-semibold text-slate-900 hover:text-violet-700">@client.Name</a><div class="text-xs text-slate-400">@client.ClientId</div></td>
+                                <td class="px-5 py-4 text-slate-500">@client.ClientType</td>
+                                <td class="px-5 py-4"><span class="rounded-full px-2.5 py-1 text-xs font-semibold @(client.IsActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500")">@(client.IsActive ? "Active" : "Inactive")</span></td>
+                                <td class="px-5 py-4 text-right"><a href="/clients/@client.Id" class="font-semibold text-violet-700 hover:text-violet-900">Open</a></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="flex items-center justify-between border-t border-slate-200 px-5 py-4 text-sm text-slate-500"><span>@ClientPage.TotalCount clients</span><div class="flex gap-2"><button disabled="@(ClientPage.Page <= 1)" @onclick="PreviousPage" class="rounded-md border border-slate-300 px-3 py-1.5 disabled:opacity-40">Previous</button><span class="px-2 py-1.5">@ClientPage.Page / @ClientPage.TotalPages</span><button disabled="@(ClientPage.Page >= ClientPage.TotalPages)" @onclick="NextPage" class="rounded-md border border-slate-300 px-3 py-1.5 disabled:opacity-40">Next</button></div></div>
+        </section>
+    }
+</RequirePermission>
+
+@code {
+    private PagedClientsResponse? ClientPage;
+    private string Search = string.Empty;
+    private int Page = 1;
+    private bool Loading = true;
+    private bool Busy;
+    private bool ShowCreate;
+    private string? Error;
+    private string? CreatedSecret;
+    private CreateClientForm CreateModel = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && OperatingSystem.IsBrowser())
+            await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            ClientPage = await Api.GetClientsAsync(Search, Page, 20, TenantState.AllTenants).ConfigureAwait(false);
+            if (ClientPage is null) Error = "The client list returned no data.";
+        }
+        catch (HttpRequestException)
+        {
+            Error = "The client list is currently unavailable.";
+        }
+        finally
+        {
+            Loading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        Busy = true;
+        try
+        {
+            var grantTypes = Split(CreateModel.GrantTypes);
+            var scopes = Split(CreateModel.Scopes);
+            var redirectUris = SplitLines(CreateModel.RedirectUris).Select(u => new Uri(u)).ToList();
+
+            var result = await Api.CreateClientAsync(
+                CreateModel.Name, CreateModel.ClientType, null, true,
+                grantTypes, scopes, redirectUris, [], []).ConfigureAwait(false);
+
+            if (result is { } created)
+            {
+                CreatedSecret = created.ClientSecret;
+                CreateModel = new();
+                await LoadAsync();
+            }
+        }
+        catch (HttpRequestException) { Error = "The client could not be created."; }
+        catch (UriFormatException) { Error = "One of the redirect URIs is not a valid absolute URI."; }
+        finally { Busy = false; }
+    }
+
+    private static IReadOnlyCollection<string> Split(string value)
+        => value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    private static IReadOnlyCollection<string> SplitLines(string value)
+        => value.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    private void ToggleCreate() { ShowCreate = !ShowCreate; CreatedSecret = null; }
+    private async Task PreviousPage() { if (Page > 1) { Page--; await LoadAsync(); } }
+    private async Task NextPage() { if (ClientPage is not null && Page < ClientPage.TotalPages) { Page++; await LoadAsync(); } }
+    private async Task HandleSearchKeyDown(KeyboardEventArgs args) { if (args.Key == "Enter") { Page = 1; await LoadAsync(); } }
+
+    private sealed class CreateClientForm
+    {
+        public string Name { get; set; } = string.Empty;
+        public ClientType ClientType { get; set; } = ClientType.Confidential;
+        public string GrantTypes { get; set; } = "authorization_code refresh_token";
+        public string Scopes { get; set; } = "openid profile email";
+        public string RedirectUris { get; set; } = string.Empty;
+    }
+}

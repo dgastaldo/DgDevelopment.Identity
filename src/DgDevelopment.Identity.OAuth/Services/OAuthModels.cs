@@ -99,4 +99,5 @@ public sealed record IntrospectionResponse(
     long? Exp = null,
     long? Iat = null,
     string? Jti = null,
-    IReadOnlyCollection<string>? Permissions = null);
+    IReadOnlyCollection<string>? Permissions = null,
+    string? Tid = null);

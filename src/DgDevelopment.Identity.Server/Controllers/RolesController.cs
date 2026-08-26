@@ -50,13 +50,21 @@ public sealed class RolesController(
         ArgumentNullException.ThrowIfNull(request);
         try
         {
-            var role = await roleService.CreateAsync(request.Name, request.Description, tenantContext.TenantId, ct).ConfigureAwait(false);
+            var role = await roleService.CreateAsync(request.Name, request.Description, request.PlatformId, tenantContext.TenantId, ct).ConfigureAwait(false);
             await auditService.RecordAsync("role.create", AuditOutcome.Success, tenantContext.TenantId, targetId: role.Id.ToString(), targetType: "role", ct: ct).ConfigureAwait(false);
             return CreatedAtAction(nameof(GetRoleById), new { id = role.Id }, RoleResponse.From(role));
         }
         catch (ArgumentException ex)
         {
             return Problem(statusCode: StatusCodes.Status400BadRequest, title: "Invalid role", detail: ex.Message);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status404NotFound, detail: ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, title: "Forbidden", detail: ex.Message);
         }
     }
 

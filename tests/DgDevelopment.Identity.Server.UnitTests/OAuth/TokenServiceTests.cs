@@ -1,7 +1,9 @@
 namespace DgDevelopment.Identity.Server.UnitTests.OAuth;
 
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Cryptography;
 using System.Text;
+using DgDevelopment.Identity.Application.Authorization;
 using DgDevelopment.Identity.Domain.Entities;
 using DgDevelopment.Identity.Infrastructure.Data;
 using DgDevelopment.Identity.Infrastructure.Repositories;
@@ -47,7 +49,8 @@ public sealed class TokenServiceTests : IClassFixture<DatabaseFixture<TokenServi
             new UserRepository(context),
             new UserSessionRepository(context),
             new TenantRepository(context),
-            new JwtService(keyMaterial, new FakeIssuerProvider()));
+            new JwtService(keyMaterial, new FakeIssuerProvider()),
+            new EffectivePermissionsService(new UserAuthorizationRepository(context)));
 
     private sealed class FakeIssuerProvider : IOidcIssuerProvider
     {
@@ -82,6 +85,30 @@ public sealed class TokenServiceTests : IClassFixture<DatabaseFixture<TokenServi
         var stored = await codeRepo.GetByCodeHashAsync(Hash(code));
         Assert.NotNull(stored);
         Assert.True(stored.IsUsed);
+    }
+
+    [Fact]
+    public async Task ProcessAuthorizationCodeAsyncIncludesTheUsersEffectivePermissionsInTheAccessToken()
+    {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
+        var clientId = await _fixture.GetSeededClientIdAsync();
+        var userId = await _fixture.GetSeededUserIdAsync();
+        var code = $"code-{Guid.NewGuid():N}";
+        var verifier = $"verifier-{Guid.NewGuid():N}";
+
+        await using var context = _fixture.CreateContext();
+        var codeRepo = new AuthorizationCodeRepository(context);
+        await codeRepo.AddAsync(new AuthorizationCode(tenantId, Hash(code), clientId, userId, SeededRedirect, ["openid", "profile"],
+            ComputePkceChallenge(verifier), "S256"));
+        using var keyMaterial = new KeyMaterialService(new SigningKeyRepository(context));
+        var service = CreateService(context, keyMaterial);
+
+        var result = await service.ProcessAuthorizationCodeAsync(code, verifier, TestConstants.AdminClientId, SeededRedirect);
+
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(result.AccessToken);
+        var permissions = jwt.Claims.Where(c => c.Type == "permission").Select(c => c.Value).ToList();
+        Assert.Contains("identity-platform.user.read", permissions);
+        Assert.Contains("identity-platform.role.read", permissions);
     }
 
     [Fact]

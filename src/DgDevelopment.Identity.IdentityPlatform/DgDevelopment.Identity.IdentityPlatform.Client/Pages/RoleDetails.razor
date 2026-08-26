@@ -1,0 +1,185 @@
+@page "/roles/{Id:guid}"
+@using DgDevelopment.Identity.IdentityPlatform.Client.State
+@inject IdentityClient Api
+@inject NavigationManager Navigation
+@inject TenantState TenantState
+
+<PageTitle>Role details | IdentityPlatform</PageTitle>
+
+<RequirePermission Permission="identity-platform.role.read">
+    @if (Loading)
+    {
+        <div class="h-64 animate-pulse rounded-2xl bg-slate-100"></div>
+    }
+    else if (Role is null)
+    {
+        <div class="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">@Error</div>
+    }
+    else
+    {
+        <div class="mb-8 flex items-end justify-between gap-4">
+            <div>
+                <button class="mb-4 text-sm font-semibold text-violet-700" @onclick="Back">← Roles</button>
+                <p class="text-xs font-semibold tracking-[0.2em] text-violet-700 uppercase">Role detail</p>
+                <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">@Role.Name</h1>
+                <p class="mt-2 text-sm text-slate-500">@Role.Description</p>
+            </div>
+            <button disabled="@Busy" @onclick="DeleteAsync" class="rounded-lg bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100">Delete role</button>
+        </div>
+        @if (Error is not null) { <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">@Error</div> }
+
+        <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p class="text-xs font-semibold tracking-[0.16em] text-slate-400 uppercase">Rename</p>
+            <EditForm Model="EditModel" OnValidSubmit="SaveAsync" class="mt-4 grid gap-4 md:grid-cols-2">
+                <div><label class="mb-1 block text-xs font-semibold text-slate-500 uppercase">Name</label><InputText @bind-Value="EditModel.Name" class="w-full rounded-lg border-slate-300" /></div>
+                <div><label class="mb-1 block text-xs font-semibold text-slate-500 uppercase">Description</label><InputText @bind-Value="EditModel.Description" class="w-full rounded-lg border-slate-300" /></div>
+                <div class="md:col-span-2"><button disabled="@Busy" class="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800">Save changes</button></div>
+            </EditForm>
+        </section>
+
+        <section class="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p class="text-xs font-semibold tracking-[0.16em] text-slate-400 uppercase">Permissions</p>
+            <div class="mt-4 flex flex-col gap-3 sm:flex-row">
+                <select @bind="SelectedPermissionId" class="min-w-0 flex-1 rounded-lg border-slate-300 text-sm">
+                    <option value="">Select a permission to add…</option>
+                    @foreach (var permission in AvailablePermissions)
+                    {
+                        <option value="@permission.Id">@permission.Name</option>
+                    }
+                </select>
+                <button disabled="@(Busy || string.IsNullOrWhiteSpace(SelectedPermissionId))" @onclick="AssignPermissionAsync" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800 disabled:opacity-50">Assign</button>
+            </div>
+            <ul class="mt-5 divide-y divide-slate-100">
+                @foreach (var assigned in Role.Permissions)
+                {
+                    <li class="flex items-center justify-between py-3">
+                        <div>
+                            <p class="text-sm font-semibold text-slate-800">@PermissionName(assigned.PermissionId)</p>
+                            @if (assigned.ScopeType is not null)
+                            {
+                                <p class="text-xs text-slate-400">Scope: @assigned.ScopeType = @assigned.ScopeValue</p>
+                            }
+                        </div>
+                        <button disabled="@Busy" @onclick="() => RemovePermissionAsync(assigned.PermissionId)" class="text-xs font-semibold text-rose-600 hover:text-rose-800">Remove</button>
+                    </li>
+                }
+                @if (Role.Permissions.Count == 0)
+                {
+                    <li class="py-3 text-sm text-slate-400">No permissions assigned yet.</li>
+                }
+            </ul>
+        </section>
+    }
+</RequirePermission>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private RoleResponse? Role;
+    private IReadOnlyCollection<PermissionResponse> AllPermissions = [];
+    private bool Loading = true;
+    private bool Busy;
+    private string? Error;
+    private string SelectedPermissionId = string.Empty;
+    private EditRoleForm EditModel = new();
+
+    private IEnumerable<PermissionResponse> AvailablePermissions
+        => AllPermissions.Where(p => Role is not null && p.PlatformId == Role.PlatformId && Role.Permissions.All(rp => rp.PermissionId != p.Id));
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && OperatingSystem.IsBrowser())
+            await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            Role = await Api.GetRoleAsync(Id, TenantState.AllTenants).ConfigureAwait(false);
+            if (Role is null) { Error = "Role not found."; return; }
+
+            EditModel = new EditRoleForm { Name = Role.Name, Description = Role.Description };
+
+            var permissions = await Api.GetPermissionsAsync(pageSize: 200, allTenants: TenantState.AllTenants).ConfigureAwait(false);
+            AllPermissions = permissions?.Items ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            Error = "The role could not be loaded.";
+        }
+        finally
+        {
+            Loading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private string PermissionName(Guid permissionId)
+        => AllPermissions.FirstOrDefault(p => p.Id == permissionId)?.Name ?? permissionId.ToString();
+
+    private async Task SaveAsync()
+    {
+        Busy = true;
+        try
+        {
+            using var response = await Api.UpdateRoleAsync(Id, EditModel.Name, EditModel.Description, TenantState.AllTenants).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            await LoadAsync();
+        }
+        catch (HttpRequestException) { Error = "The role could not be updated."; }
+        finally { Busy = false; }
+    }
+
+    private async Task AssignPermissionAsync()
+    {
+        if (!Guid.TryParse(SelectedPermissionId, out var permissionId))
+            return;
+
+        Busy = true;
+        try
+        {
+            using var response = await Api.AssignRolePermissionAsync(Id, permissionId, TenantState.AllTenants).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            SelectedPermissionId = string.Empty;
+            await LoadAsync();
+        }
+        catch (HttpRequestException) { Error = "The permission could not be assigned."; }
+        finally { Busy = false; }
+    }
+
+    private async Task RemovePermissionAsync(Guid permissionId)
+    {
+        Busy = true;
+        try
+        {
+            using var response = await Api.RemoveRolePermissionAsync(Id, permissionId, TenantState.AllTenants).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            await LoadAsync();
+        }
+        catch (HttpRequestException) { Error = "The permission could not be removed."; }
+        finally { Busy = false; }
+    }
+
+    private async Task DeleteAsync()
+    {
+        Busy = true;
+        try
+        {
+            using var response = await Api.DeleteRoleAsync(Id, TenantState.AllTenants).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            Navigation.NavigateTo("/roles");
+        }
+        catch (HttpRequestException) { Error = "The role could not be deleted."; }
+        finally { Busy = false; }
+    }
+
+    private void Back() => Navigation.NavigateTo("/roles");
+
+    private sealed class EditRoleForm
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+    }
+}

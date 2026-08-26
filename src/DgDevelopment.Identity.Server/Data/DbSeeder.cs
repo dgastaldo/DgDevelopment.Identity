@@ -1,5 +1,5 @@
+using DgDevelopment.Identity.Application.Tenants;
 using DgDevelopment.Identity.Domain.Entities;
-using DgDevelopment.Identity.Domain.Services;
 using DgDevelopment.Identity.Domain.ValueObjects;
 using DgDevelopment.Identity.Infrastructure.Data;
 using DgDevelopment.Identity.OAuth.Services;
@@ -22,14 +22,15 @@ public sealed class DbSeeder(IServiceProvider serviceProvider)
 
         await db.Database.MigrateAsync().ConfigureAwait(false);
 
-        var tenant = await SeedDefaultTenantAsync(db).ConfigureAwait(false);
-        var clientSecret = await SeedPermissionsAsync(db).ConfigureAwait(false);
-        await SeedRolesAsync(db, tenant.Id).ConfigureAwait(false);
-        await SeedGroupsAsync(db, tenant.Id).ConfigureAwait(false);
-        await SeedPlatformsAsync(db, tenant.Id).ConfigureAwait(false);
-        var clientCredentials = clientSecret is null
-            ? await SeedClientsAsync(db, tenant.Id).ConfigureAwait(false)
-            : null;
+        var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Slug == "identity-tenant").ConfigureAwait(false);
+        if (tenant is null)
+        {
+            var provisioning = scope.ServiceProvider.GetRequiredService<ITenantProvisioningService>();
+            var result = await provisioning.ProvisionAsync("Identity Tenant", "identity-tenant").ConfigureAwait(false);
+            tenant = result.Tenant;
+        }
+
+        var clientCredentials = await SeedClientsAsync(db, tenant.Id).ConfigureAwait(false);
         var hasher = scope.ServiceProvider.GetRequiredService<Domain.Services.IPasswordHasher>();
         var superadminPassword = await SeedUsersAsync(db, hasher, tenant.Id).ConfigureAwait(false);
 
@@ -43,104 +44,11 @@ public sealed class DbSeeder(IServiceProvider serviceProvider)
         }
     }
 
-    private static async Task<Tenant> SeedDefaultTenantAsync(IdentityDbContext db)
-    {
-        var existing = await db.Tenants.FirstOrDefaultAsync(t => t.Slug == "identity-tenant").ConfigureAwait(false);
-        if (existing is not null)
-            return existing;
-
-        var tenant = new Tenant("Identity Tenant", "identity-tenant");
-        db.Tenants.Add(tenant);
-        await db.SaveChangesAsync().ConfigureAwait(false);
-        return tenant;
-    }
-
-    private static async Task<string?> SeedPermissionsAsync(IdentityDbContext db)
-    {
-        if (await db.Permissions.AnyAsync().ConfigureAwait(false)) return null;
-
-        var permissions = new[]
-        {
-            new Permission("identity-platform.user.read", "Read users", "User"),
-            new Permission("identity-platform.user.create", "Create users", "User"),
-            new Permission("identity-platform.user.update", "Update users", "User"),
-            new Permission("identity-platform.user.delete", "Delete users", "User"),
-            new Permission("identity-platform.user.read.all-tenants", "Read users across all tenants", "User", isGlobal: true),
-            new Permission("identity-platform.role.read", "Read roles", "Role"),
-            new Permission("identity-platform.role.create", "Create roles", "Role"),
-            new Permission("identity-platform.role.update", "Update roles", "Role"),
-            new Permission("identity-platform.role.delete", "Delete roles", "Role"),
-            new Permission("identity-platform.permission.read", "Read permissions", "Permission"),
-            new Permission("identity-platform.permission.create", "Create permissions", "Permission"),
-            new Permission("identity-platform.permission.update", "Update permissions", "Permission"),
-            new Permission("identity-platform.permission.delete", "Delete permissions", "Permission"),
-            new Permission("identity-platform.group.read", "Read groups", "Group"),
-            new Permission("identity-platform.group.create", "Create groups", "Group"),
-            new Permission("identity-platform.group.update", "Update groups", "Group"),
-            new Permission("identity-platform.group.delete", "Delete groups", "Group"),
-            new Permission("identity-platform.platform.read", "Read platforms", "Platform"),
-            new Permission("identity-platform.platform.create", "Create platforms", "Platform"),
-            new Permission("identity-platform.platform.update", "Update platforms", "Platform"),
-            new Permission("identity-platform.platform.delete", "Delete platforms", "Platform"),
-            new Permission("identity-platform.client.read", "Read clients", "Client"),
-            new Permission("identity-platform.client.create", "Create clients", "Client"),
-            new Permission("identity-platform.client.update", "Update clients", "Client"),
-            new Permission("identity-platform.client.delete", "Delete clients", "Client"),
-            new Permission("identity-platform.audit.read", "Read audit logs", "Audit"),
-            new Permission("identity-platform.audit.read.all-tenants", "Read audit logs across all tenants", "Audit", isGlobal: true),
-            new Permission("identity-platform.tenant.read", "Read tenants", "Tenant", isGlobal: true),
-            new Permission("identity-platform.identity.manage", "Manage identity system settings", "Identity", isGlobal: true),
-            new Permission("identity-platform.identity.superadmin", "Super administrator access", "Identity", isGlobal: true),
-            new Permission("identity-platform.dashboard.read", "View identity platform dashboard", "Dashboard"),
-        };
-
-        db.Permissions.AddRange(permissions);
-        await db.SaveChangesAsync().ConfigureAwait(false);
-        return null;
-    }
-
-    private static async Task SeedRolesAsync(IdentityDbContext db, Guid tenantId)
-    {
-        if (await db.Roles.AnyAsync().ConfigureAwait(false)) return;
-
-        var permissions = await db.Permissions.ToListAsync().ConfigureAwait(false);
-
-        var superAdmin = new Role(tenantId, "SuperAdmin", "Full system access with all permissions");
-
-        foreach (var permission in permissions)
-            superAdmin.AddPermission(permission);
-
-        db.Roles.Add(superAdmin);
-        await db.SaveChangesAsync().ConfigureAwait(false);
-    }
-
-    private static async Task SeedGroupsAsync(IdentityDbContext db, Guid tenantId)
-    {
-        if (await db.Groups.AnyAsync().ConfigureAwait(false)) return;
-
-        var superAdminRole = await db.Roles.FirstAsync(r => r.Name == "SuperAdmin").ConfigureAwait(false);
-
-        var superAdmins = new Group(tenantId, "SuperAdmins", "Super administrator group");
-        superAdmins.AddRole(superAdminRole);
-
-        db.Groups.Add(superAdmins);
-        await db.SaveChangesAsync().ConfigureAwait(false);
-    }
-
-    private static async Task SeedPlatformsAsync(IdentityDbContext db, Guid tenantId)
-    {
-        if (await db.Platforms.AnyAsync().ConfigureAwait(false)) return;
-
-        var platform = new Platform(tenantId, "IdentityAdmin", "Identity administration platform", PermissionMode.IdentityManaged);
-        db.Platforms.Add(platform);
-        await db.SaveChangesAsync().ConfigureAwait(false);
-    }
-
     private static async Task<(Guid ClientId, string ClientSecret)?> SeedClientsAsync(IdentityDbContext db, Guid tenantId)
     {
         if (await db.Clients.AnyAsync().ConfigureAwait(false)) return null;
 
-        var platform = await db.Platforms.FirstAsync(p => p.Name == "IdentityAdmin").ConfigureAwait(false);
+        var platform = await db.Platforms.FirstAsync(p => p.TenantId == tenantId && p.Name == "IdentityAdmin").ConfigureAwait(false);
         var clientSecret = Secret.Generate(32);
         var clientSecretHash = Convert.ToBase64String(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(clientSecret)));
 
@@ -175,7 +83,7 @@ public sealed class DbSeeder(IServiceProvider serviceProvider)
         var user = new User("identity.superadmin", passwordHash, email, isSystemAccount: true);
         user.VerifyEmail(email);
 
-        var superAdminsGroup = await db.Groups.FirstAsync(g => g.Name == "SuperAdmins").ConfigureAwait(false);
+        var superAdminsGroup = await db.Groups.FirstAsync(g => g.TenantId == tenantId && g.Name == "SuperAdmins").ConfigureAwait(false);
         user.AddToGroup(superAdminsGroup);
 
         db.Users.Add(user);

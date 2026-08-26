@@ -2,6 +2,7 @@ namespace DgDevelopment.Identity.OAuth.Services;
 
 using System.Security.Cryptography;
 using System.Text;
+using DgDevelopment.Identity.Application.Authorization;
 using DgDevelopment.Identity.Domain.Entities;
 using DgDevelopment.Identity.Domain.Repositories;
 
@@ -13,7 +14,8 @@ public sealed class TokenService(
     IUserRepository userRepo,
     IUserSessionRepository sessionRepo,
     ITenantRepository tenantRepo,
-    IJwtService jwtService
+    IJwtService jwtService,
+    IPermissionEvaluator permissionEvaluator
     //,ISigningKeyRepository signingKeyRepo
     ) : ITokenService
 {
@@ -149,7 +151,9 @@ public sealed class TokenService(
     {
         var sessionId = session.Id.ToString("N");
         var authMethods = session.GetAuthMethods();
-        var accessToken = await jwtService.CreateAccessTokenAsync(new(tenantId, user, client, scopes, null), ct).ConfigureAwait(false);
+        var effectivePermissions = await permissionEvaluator.GetEffectivePermissionsAsync(user.Id, tenantId, ct).ConfigureAwait(false);
+        var permissions = effectivePermissions.Select(p => p.Name).Distinct(StringComparer.Ordinal).ToArray();
+        var accessToken = await jwtService.CreateAccessTokenAsync(new(tenantId, user, client, scopes, permissions), ct).ConfigureAwait(false);
         var idToken = await jwtService.CreateIdTokenAsync(new(tenantId, user, client, scopes, null, authMethods, sessionId), ct).ConfigureAwait(false);
 
         var refreshTokenValue = DgDevelopment.Identity.Domain.ValueObjects.Secret.Generate(64);

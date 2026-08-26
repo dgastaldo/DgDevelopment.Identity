@@ -61,4 +61,13 @@ public class DatabaseFixture<TTestClass> : IAsyncLifetime
             .Select(t => t.Id)
             .SingleAsync(ct);
     }
+
+    public async Task<Guid> GetSeededPlatformIdAsync(CancellationToken ct = default)
+    {
+        await using var context = CreateContext();
+        return await context.Platforms
+            .Where(p => p.Name == "IdentityAdmin")
+            .Select(p => p.Id)
+            .SingleAsync(ct);
+    }
 }

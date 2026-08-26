@@ -13,6 +13,15 @@ public sealed class TenantRepository(IdentityDbContext context) : ITenantReposit
     public Task<Tenant?> GetBySlugAsync(string slug, CancellationToken ct = default)
         => context.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == slug, ct);
 
+    public async Task<IReadOnlyCollection<Tenant>> GetAllAsync(CancellationToken ct = default)
+        => await context.Tenants.AsNoTracking().OrderBy(t => t.Name).ToListAsync(ct).ConfigureAwait(false);
+
+    public async Task AddAsync(Tenant tenant, CancellationToken ct = default)
+    {
+        await context.Tenants.AddAsync(tenant, ct).ConfigureAwait(false);
+        await context.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
     public async Task<IReadOnlyCollection<TenantMembership>> GetMembershipsForUserAsync(Guid userId, CancellationToken ct = default)
         => await context.TenantMemberships
             .AsNoTracking()

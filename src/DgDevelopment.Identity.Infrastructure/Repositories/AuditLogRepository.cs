@@ -20,11 +20,33 @@ public sealed class AuditLogRepository : IAuditLogRepository
         await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
-    public async Task<IReadOnlyCollection<AuditLog>> GetAsync(string? actorType = null, Guid? actorId = null,
-        string? action = null, DateTime? from = null, DateTime? endDate = null, int skip = 0, int take = 50,
-        CancellationToken ct = default)
+    public async Task<IReadOnlyCollection<AuditLog>> GetPagedAsync(Guid tenantId, bool allTenants, string? actorType = null,
+        Guid? actorId = null, string? action = null, string? targetId = null, DateTime? from = null, DateTime? to = null,
+        int skip = 0, int take = 50, CancellationToken ct = default)
+    {
+        var query = Filter(tenantId, allTenants, actorType, actorId, action, targetId, from, to);
+
+        return await query
+            .OrderByDescending(a => a.Timestamp)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync(ct).ConfigureAwait(false);
+    }
+
+    public async Task<int> CountAsync(Guid tenantId, bool allTenants, string? actorType = null, Guid? actorId = null,
+        string? action = null, string? targetId = null, DateTime? from = null, DateTime? to = null, CancellationToken ct = default)
+    {
+        var query = Filter(tenantId, allTenants, actorType, actorId, action, targetId, from, to);
+        return await query.CountAsync(ct).ConfigureAwait(false);
+    }
+
+    private IQueryable<AuditLog> Filter(Guid tenantId, bool allTenants, string? actorType, Guid? actorId,
+        string? action, string? targetId, DateTime? from, DateTime? to)
     {
         var query = _context.AuditLogs.AsNoTracking();
+
+        if (!allTenants)
+            query = query.Where(a => a.TenantId == tenantId);
 
         if (actorType is not null)
             query = query.Where(a => a.ActorType == actorType);
@@ -35,16 +57,15 @@ public sealed class AuditLogRepository : IAuditLogRepository
         if (action is not null)
             query = query.Where(a => a.Action == action);
 
+        if (targetId is not null)
+            query = query.Where(a => a.TargetId == targetId);
+
         if (from.HasValue)
             query = query.Where(a => a.Timestamp >= from.Value);
 
-        if (endDate.HasValue)
-            query = query.Where(a => a.Timestamp <= endDate.Value);
+        if (to.HasValue)
+            query = query.Where(a => a.Timestamp <= to.Value);
 
-        return await query
-            .OrderByDescending(a => a.Timestamp)
-            .Skip(skip)
-            .Take(take)
-            .ToListAsync(ct).ConfigureAwait(false);
+        return query;
     }
 }

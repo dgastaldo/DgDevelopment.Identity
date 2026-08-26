@@ -113,7 +113,7 @@ public sealed class JwtServiceTests : IClassFixture<DatabaseFixture<JwtServiceTe
         Assert.Equal(TestConstants.AdminClientId, jwt.Audiences.Single());
         Assert.Equal(TestConstants.AdminClientId, jwt.Claims.First(c => c.Type == "client_id").Value);
         Assert.Equal("openid profile", jwt.Claims.First(c => c.Type == "scope").Value);
-        Assert.Equal("user:read role:read", jwt.Claims.First(c => c.Type == "permission").Value);
+        Assert.Equal(["user:read", "role:read"], jwt.Claims.Where(c => c.Type == "permission").Select(c => c.Value));
         Assert.NotNull(jwt.Claims.First(c => c.Type == JwtRegisteredClaimNames.Jti));
         Assert.Equal(client.TenantId.ToString(), jwt.Claims.First(c => c.Type == "tid").Value);
     }

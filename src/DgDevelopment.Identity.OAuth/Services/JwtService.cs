@@ -70,7 +70,8 @@ public sealed class JwtService(IKeyMaterialService keyMaterial, IOidcIssuerProvi
         };
 
         if (request.Permissions is { Count: > 0 })
-            claims.Add(new("permission", string.Join(' ', request.Permissions)));
+            foreach (var permission in request.Permissions)
+                claims.Add(new("permission", permission));
 
         var token = new JwtSecurityToken(
             issuer: issuer,
@@ -85,7 +86,11 @@ public sealed class JwtService(IKeyMaterialService keyMaterial, IOidcIssuerProvi
 
     public Task<ClaimsPrincipal> ValidateTokenAsync(string token, TokenValidationParameters parameters, CancellationToken ct = default)
     {
-        var handler = new JwtSecurityTokenHandler();
+        // Default MapInboundClaims silently renames well-known short claim names (e.g. "tid", "sub")
+        // to Microsoft's Azure AD claim URIs, so callers reading them back by their original short
+        // name get nothing. The real JWT bearer pipeline in Program.cs disables this explicitly;
+        // this internal validation path (introspection) needs the same to read our own claims back.
+        var handler = new JwtSecurityTokenHandler { MapInboundClaims = false };
         var principal = handler.ValidateToken(token, parameters, out _);
         return Task.FromResult(principal);
     }

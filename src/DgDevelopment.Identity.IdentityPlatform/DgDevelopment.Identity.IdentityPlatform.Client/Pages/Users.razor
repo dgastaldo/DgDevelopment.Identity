@@ -6,6 +6,7 @@
 
 <PageTitle>Users | IdentityPlatform</PageTitle>
 
+<RequirePermission Permission="identity-platform.user.read">
 <div class="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
     <div>
         <p class="mb-2 text-xs font-semibold tracking-[0.2em] text-violet-700 uppercase">Directory</p>
@@ -69,6 +70,7 @@ else if (UserPage is not null)
         <div class="flex items-center justify-between border-t border-slate-200 px-5 py-4 text-sm text-slate-500"><span>@UserPage.TotalCount users</span><div class="flex gap-2"><button disabled="@(UserPage.Page <= 1)" @onclick="PreviousPage" class="rounded-md border border-slate-300 px-3 py-1.5 disabled:opacity-40">Previous</button><span class="px-2 py-1.5">@UserPage.Page / @UserPage.TotalPages</span><button disabled="@(UserPage.Page >= UserPage.TotalPages)" @onclick="NextPage" class="rounded-md border border-slate-300 px-3 py-1.5 disabled:opacity-40">Next</button></div></div>
     </section>
 }
+</RequirePermission>
 
 @code {
     private PagedUsersResponse? UserPage;

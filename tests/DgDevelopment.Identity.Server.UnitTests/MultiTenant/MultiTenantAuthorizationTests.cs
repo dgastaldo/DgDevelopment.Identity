@@ -27,9 +27,18 @@ public sealed class MultiTenantAuthorizationTests : IClassFixture<DatabaseFixtur
         return tenant;
     }
 
+    private static async Task<Platform> CreatePlatformAsync(IdentityDbContext context, Guid tenantId)
+    {
+        var platform = new Platform(tenantId, Unique("Platform"), "description", PermissionMode.AuthOnly);
+        context.Platforms.Add(platform);
+        await context.SaveChangesAsync();
+        return platform;
+    }
+
     private static async Task<Role> CreateRoleWithPermissionsAsync(IdentityDbContext context, Guid tenantId, params string[] permissionNames)
     {
-        var role = new Role(tenantId, Unique("role"), "desc");
+        var platform = await CreatePlatformAsync(context, tenantId);
+        var role = new Role(tenantId, platform.Id, Unique("role"), "desc");
         var permissions = await context.Permissions.Where(p => permissionNames.Contains(p.Name)).ToListAsync();
         foreach (var permission in permissions)
             role.AddPermission(permission);

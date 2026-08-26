@@ -4,7 +4,7 @@ using DgDevelopment.Identity.Domain.ValueObjects;
 
 namespace DgDevelopment.Identity.Application.Roles;
 
-public sealed class RoleService(IRoleRepository roleRepository, IPermissionRepository permissionRepository) : IRoleService
+public sealed class RoleService(IRoleRepository roleRepository, IPermissionRepository permissionRepository, IPlatformRepository platformRepository) : IRoleService
 {
     public async Task<PagedResult<Role>> GetPagedAsync(string? search, int page, int pageSize, Guid tenantId, bool allTenants, CancellationToken ct = default)
     {
@@ -31,12 +31,14 @@ public sealed class RoleService(IRoleRepository roleRepository, IPermissionRepos
         return !allTenants && role.TenantId != tenantId ? null : role;
     }
 
-    public async Task<Role> CreateAsync(string name, string description, Guid tenantId, CancellationToken ct = default)
+    public async Task<Role> CreateAsync(string name, string description, Guid platformId, Guid tenantId, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(description);
 
-        var role = new Role(tenantId, name, description);
+        await EnsurePlatformInTenantAsync(platformId, tenantId, ct).ConfigureAwait(false);
+
+        var role = new Role(tenantId, platformId, name, description);
         await roleRepository.AddAsync(role, ct).ConfigureAwait(false);
         return role;
     }
@@ -60,6 +62,9 @@ public sealed class RoleService(IRoleRepository roleRepository, IPermissionRepos
         var permission = await permissionRepository.GetByIdAsync(permissionId, ct).ConfigureAwait(false)
             ?? throw new KeyNotFoundException("Permission not found.");
 
+        if (permission.PlatformId != role.PlatformId)
+            throw new InvalidOperationException("The permission does not belong to the role's platform.");
+
         role.AddPermission(permission, scopeType, scopeValue);
         await roleRepository.UpdateAsync(role, ct).ConfigureAwait(false);
     }
@@ -80,5 +85,14 @@ public sealed class RoleService(IRoleRepository roleRepository, IPermissionRepos
             throw new InvalidOperationException("The role does not belong to the active tenant.");
 
         return role;
+    }
+
+    private async Task EnsurePlatformInTenantAsync(Guid platformId, Guid tenantId, CancellationToken ct)
+    {
+        var platform = await platformRepository.GetByIdAsync(platformId, ct).ConfigureAwait(false)
+            ?? throw new KeyNotFoundException("Platform not found.");
+
+        if (platform.TenantId != tenantId)
+            throw new InvalidOperationException("The platform does not belong to the active tenant.");
     }
 }

@@ -1,0 +1,31 @@
+@using DgDevelopment.Identity.Client.Core
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthProvider
+
+@if (!Checked)
+{
+    <div class="h-64 animate-pulse rounded-2xl bg-slate-100"></div>
+}
+else if (!Allowed)
+{
+    <div class="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">You don't have permission to view this page.</div>
+}
+else
+{
+    @ChildContent
+}
+
+@code {
+    [Parameter] public string Permission { get; set; } = string.Empty;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private bool Checked;
+    private bool Allowed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthProvider.GetAuthenticationStateAsync().ConfigureAwait(false);
+        Allowed = state.User.HasPermission(Permission);
+        Checked = true;
+    }
+}

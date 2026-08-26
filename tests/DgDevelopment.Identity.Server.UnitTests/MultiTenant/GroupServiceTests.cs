@@ -37,9 +37,18 @@ public sealed class GroupServiceTests : IClassFixture<DatabaseFixture<GroupServi
         return group;
     }
 
+    private static async Task<Platform> CreatePlatformAsync(IdentityDbContext context, Guid tenantId)
+    {
+        var platform = new Platform(tenantId, Unique("Platform"), "description", PermissionMode.AuthOnly);
+        context.Platforms.Add(platform);
+        await context.SaveChangesAsync();
+        return platform;
+    }
+
     private static async Task<Role> CreateRoleAsync(IdentityDbContext context, Guid tenantId, string name = "Role")
     {
-        var role = new Role(tenantId, Unique(name), "description");
+        var platform = await CreatePlatformAsync(context, tenantId);
+        var role = new Role(tenantId, platform.Id, Unique(name), "description");
         context.Roles.Add(role);
         await context.SaveChangesAsync();
         return role;

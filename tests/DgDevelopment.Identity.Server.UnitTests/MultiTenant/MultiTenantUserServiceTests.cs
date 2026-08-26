@@ -37,6 +37,14 @@ public sealed class MultiTenantUserServiceTests : IClassFixture<DatabaseFixture<
         return tenant;
     }
 
+    private static async Task<Platform> CreatePlatformAsync(IdentityDbContext context, Guid tenantId)
+    {
+        var platform = new Platform(tenantId, Unique("Platform"), "description", PermissionMode.AuthOnly);
+        context.Platforms.Add(platform);
+        await context.SaveChangesAsync();
+        return platform;
+    }
+
     private static async Task<User> CreateUserInTenantAsync(IdentityDbContext context, Guid tenantId)
     {
         var user = new User(Unique("user"), "hash", EmailAddress.FromString($"{Guid.NewGuid():N}@example.com"));
@@ -175,8 +183,9 @@ public sealed class MultiTenantUserServiceTests : IClassFixture<DatabaseFixture<
         await using (var setupContext = _fixture.CreateContext())
         {
             var tenant = await CreateTenantAsync(setupContext, "AssignRole");
+            var platform = await CreatePlatformAsync(setupContext, tenant.Id);
             var user = await CreateUserInTenantAsync(setupContext, tenant.Id);
-            var role = new Role(tenant.Id, Unique("Role"), "description");
+            var role = new Role(tenant.Id, platform.Id, Unique("Role"), "description");
             setupContext.Roles.Add(role);
             await setupContext.SaveChangesAsync();
             tenantId = tenant.Id;
@@ -205,8 +214,9 @@ public sealed class MultiTenantUserServiceTests : IClassFixture<DatabaseFixture<
         await using (var setupContext = _fixture.CreateContext())
         {
             var tenant = await CreateTenantAsync(setupContext, "RemoveRole");
+            var platform = await CreatePlatformAsync(setupContext, tenant.Id);
             var user = await CreateUserInTenantAsync(setupContext, tenant.Id);
-            var role = new Role(tenant.Id, Unique("Role"), "description");
+            var role = new Role(tenant.Id, platform.Id, Unique("Role"), "description");
             setupContext.Roles.Add(role);
             await setupContext.SaveChangesAsync();
             user.AssignRole(role, null, null);
