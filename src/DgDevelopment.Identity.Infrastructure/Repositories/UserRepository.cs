@@ -144,6 +144,24 @@ public sealed class UserRepository : IUserRepository
         // what's in the database.
         _context.Entry(user).State = EntityState.Modified;
 
+        // UserEmail rows have their own Id and mutable fields (IsPrimary/IsVerified/VerifiedAt),
+        // unlike the pure join tables below - marking the User root Modified doesn't cascade to
+        // them, so an existing row's field changes (e.g. VerifyEmail) are silently lost without
+        // this. Emails is an owned collection (OwnsMany), so it has no independently queryable
+        // DbSet<UserEmail> (EF Core rejects that) - the persisted set has to be read back through
+        // the owner navigation instead, AsNoTracking so it doesn't conflict with attaching the
+        // same user below. No caller removes an email through this path yet, so removal isn't
+        // handled here - revisit if/when self-service email management needs it.
+        var existingEmailIds = await _context.Users
+            .AsNoTracking()
+            .Where(u => u.Id == user.Id)
+            .SelectMany(u => u.Emails)
+            .Select(e => e.Id)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        foreach (var email in user.Emails)
+            _context.Entry(email).State = existingEmailIds.Contains(email.Id) ? EntityState.Modified : EntityState.Added;
+
         var existingRoleIds = await _context.UserRoles
             .Where(ur => ur.UserId == user.Id)
             .Select(ur => ur.RoleId)

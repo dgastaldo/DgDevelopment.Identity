@@ -18,6 +18,8 @@ public sealed class IdentityWebApplicationFactory : WebApplicationFactory<Progra
     // doesn't, so the login client below must be pointed at this exact address too.
     public const string IssuerBaseAddress = "https://localhost";
 
+    public CapturingNotificationService Notifications { get; } = new();
+
     public IdentityWebApplicationFactory()
     {
         // Program.cs reads ConnectionStrings:IdentityDb into a local variable right after
@@ -50,6 +52,11 @@ public sealed class IdentityWebApplicationFactory : WebApplicationFactory<Progra
             // and log in through this hasher repeatedly, so swap it for a trivial one.
             services.RemoveAll<IPasswordHasher>();
             services.AddSingleton<IPasswordHasher, FakePasswordHasher>();
+
+            // Captures registration/password-recovery emails instead of sending them, so tests
+            // can extract the verification/reset link exactly as a real recipient would.
+            services.RemoveAll<INotificationService>();
+            services.AddSingleton<INotificationService>(Notifications);
         });
     }
 }

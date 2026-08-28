@@ -39,6 +39,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     public DbSet<DomainEvent> DomainEvents => Set<DomainEvent>();
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
+    public DbSet<VerificationToken> VerificationTokens => Set<VerificationToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

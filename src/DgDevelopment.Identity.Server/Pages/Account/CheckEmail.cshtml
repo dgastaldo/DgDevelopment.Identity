@@ -1,0 +1,18 @@
+@page "/account/check-email"
+@model DgDevelopment.Identity.Server.Pages.Account.CheckEmailModel
+@{
+    ViewData["Title"] = "Check your email";
+}
+
+<div class="auth-card">
+    <h1 class="auth-brand">DgDevelopment Identity Server</h1>
+    @if (Model.Purpose == "reset")
+    {
+        <p class="text-sm text-gray-600 text-center">If an account exists for that email address, we've sent a link to reset your password.</p>
+    }
+    else
+    {
+        <p class="text-sm text-gray-600 text-center">Your account has been created. Check your email for a link to verify your address.</p>
+    }
+    <p class="text-sm text-center mt-4"><a href="/account/login">Back to sign in</a></p>
+</div>
