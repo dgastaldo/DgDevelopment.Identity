@@ -142,7 +142,8 @@ public sealed class RegisterModel(
     {
         var token = RandomNumberGenerator.GetHexString(64);
         var tokenHash = Hash(token);
-        await verificationTokenRepository.AddAsync(new VerificationToken(user.Id, VerificationTokenPurpose.EmailVerification, tokenHash)).ConfigureAwait(false);
+        var targetEmail = EmailAddress.FromString(Email).Value;
+        await verificationTokenRepository.AddAsync(new VerificationToken(user.Id, VerificationTokenPurpose.EmailVerification, tokenHash, targetEmail)).ConfigureAwait(false);
 
         var verifyUrl = Url.PageLink("/Account/VerifyEmail", values: new { token }) ?? string.Empty;
         await notificationService.SendEmailAsync(Email, "Verify your email address", $"Welcome! Verify your email address by visiting: {verifyUrl}").ConfigureAwait(false);

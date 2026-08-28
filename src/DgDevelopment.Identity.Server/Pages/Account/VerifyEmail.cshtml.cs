@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using DgDevelopment.Identity.Domain.Entities;
 using DgDevelopment.Identity.Domain.Repositories;
+using DgDevelopment.Identity.Domain.ValueObjects;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -23,11 +24,10 @@ public sealed class VerifyEmailModel(
             return;
 
         var user = await userRepository.GetByIdAsync(verification.UserId).ConfigureAwait(false);
-        if (user?.PrimaryEmail is not { } email)
+        if (user is null || !user.Emails.Any(e => e.Email.Value == verification.TargetEmail))
             return;
 
-        user.VerifyEmail(email);
-        await userRepository.UpdateAsync(user).ConfigureAwait(false);
+        await userRepository.VerifyEmailAsync(user.Id, EmailAddress.FromString(verification.TargetEmail)).ConfigureAwait(false);
         await verificationTokenRepository.MarkUsedAsync(verification.Id).ConfigureAwait(false);
 
         Success = true;

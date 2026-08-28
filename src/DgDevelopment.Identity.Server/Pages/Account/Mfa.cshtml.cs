@@ -5,13 +5,13 @@ using System.Security.Claims;
 using DgDevelopment.Identity.Application.Services;
 using DgDevelopment.Identity.Domain.Repositories;
 using DgDevelopment.Identity.Server.Hubs;
+using DgDevelopment.Identity.Server.Security;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.SignalR;
-using QRCoder;
 
 [Authorize(AuthenticationSchemes = "Identity.Partial")]
 public sealed class MfaModel : PageModel
@@ -153,7 +153,7 @@ public sealed class MfaModel : PageModel
             var user = await _userRepository.GetByIdAsync(userId).ConfigureAwait(false);
             var enrollment = await _totpService.EnrollAsync(userId, user?.Username ?? "user").ConfigureAwait(false);
             EnrollmentSecret = enrollment.SecretKey;
-            QrCodeDataUri = BuildQrCodeDataUri(enrollment.ProvisioningUri);
+            QrCodeDataUri = TotpQrCodeRenderer.BuildDataUri(enrollment.ProvisioningUri);
         }
 
         return Page();
@@ -196,13 +196,5 @@ public sealed class MfaModel : PageModel
             throw new InvalidOperationException("Missing user identity in the partial authentication cookie.");
 
         return userId;
-    }
-
-    private static string BuildQrCodeDataUri(Uri provisioningUri)
-    {
-        using var generator = new QRCodeGenerator();
-        var data = generator.CreateQrCode(provisioningUri.ToString(), QRCodeGenerator.ECCLevel.M);
-        using var qrCode = new PngByteQRCode(data);
-        return $"data:image/png;base64,{Convert.ToBase64String(qrCode.GetGraphic(20))}";
     }
 }

@@ -5,6 +5,7 @@ using System.Text;
 using DgDevelopment.Identity.Domain.Entities;
 using DgDevelopment.Identity.Domain.Repositories;
 using DgDevelopment.Identity.Domain.Services;
+using DgDevelopment.Identity.Domain.ValueObjects;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -32,7 +33,8 @@ public sealed class ForgotPasswordModel(
         {
             var token = RandomNumberGenerator.GetHexString(64);
             var tokenHash = Hash(token);
-            await verificationTokenRepository.AddAsync(new VerificationToken(user.Id, VerificationTokenPurpose.PasswordReset, tokenHash, lifetimeMinutes: 30)).ConfigureAwait(false);
+            var targetEmail = EmailAddress.FromString(Email).Value;
+            await verificationTokenRepository.AddAsync(new VerificationToken(user.Id, VerificationTokenPurpose.PasswordReset, tokenHash, targetEmail, lifetimeMinutes: 30)).ConfigureAwait(false);
 
             var resetUrl = Url.PageLink("/Account/ResetPassword", values: new { token }) ?? string.Empty;
             await notificationService.SendEmailAsync(Email, "Reset your password", $"Reset your password by visiting: {resetUrl}").ConfigureAwait(false);
