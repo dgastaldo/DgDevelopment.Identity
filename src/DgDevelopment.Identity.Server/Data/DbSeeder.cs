@@ -22,13 +22,19 @@ public sealed class DbSeeder(IServiceProvider serviceProvider)
 
         await db.Database.MigrateAsync().ConfigureAwait(false);
 
+        var provisioning = scope.ServiceProvider.GetRequiredService<ITenantProvisioningService>();
         var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Slug == "identity-tenant").ConfigureAwait(false);
         if (tenant is null)
         {
-            var provisioning = scope.ServiceProvider.GetRequiredService<ITenantProvisioningService>();
             var result = await provisioning.ProvisionAsync("Identity Tenant", "identity-tenant", isPlatformTenant: true).ConfigureAwait(false);
             tenant = result.Tenant;
         }
+
+        // Self-healing: backfills any permission/role added to StandardPermissionCatalog after a
+        // tenant was already provisioned, on every startup - see ReconcileAsync.
+        var tenantIds = await db.Tenants.Select(t => t.Id).ToListAsync().ConfigureAwait(false);
+        foreach (var tenantId in tenantIds)
+            await provisioning.ReconcileAsync(tenantId).ConfigureAwait(false);
 
         var clientCredentials = await SeedClientsAsync(db, tenant.Id).ConfigureAwait(false);
         var hasher = scope.ServiceProvider.GetRequiredService<Domain.Services.IPasswordHasher>();

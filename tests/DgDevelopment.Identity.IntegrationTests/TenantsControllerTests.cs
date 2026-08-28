@@ -35,4 +35,32 @@ public sealed class TenantsControllerTests(IntegrationTestFixture fixture)
         var create = await client.PostAsJsonAsync("/api/v1/tenants", new { name = "Should Never Exist", slug = "should-never-exist" });
         Assert.Equal(HttpStatusCode.Forbidden, create.StatusCode);
     }
+
+    [Fact]
+    public async Task PlatformTenantSuperAdminCanDeactivateAndReactivateATenant()
+    {
+        using var client = fixture.CreateAuthenticatedClient();
+
+        var deactivate = await client.PutAsJsonAsync($"/api/v1/tenants/{fixture.CustomerTenantId}/active", new { isActive = false });
+        Assert.Equal(HttpStatusCode.OK, deactivate.StatusCode);
+        var deactivated = await deactivate.Content.ReadFromJsonAsync<TenantAdminResponse>();
+        Assert.False(deactivated!.IsActive);
+
+        var reactivate = await client.PutAsJsonAsync($"/api/v1/tenants/{fixture.CustomerTenantId}/active", new { isActive = true });
+        Assert.Equal(HttpStatusCode.OK, reactivate.StatusCode);
+        var reactivated = await reactivate.Content.ReadFromJsonAsync<TenantAdminResponse>();
+        Assert.True(reactivated!.IsActive);
+    }
+
+    [Fact]
+    public async Task DeactivatingThePlatformTenantItselfIsRejected()
+    {
+        using var client = fixture.CreateAuthenticatedClient();
+
+        var response = await client.PutAsJsonAsync($"/api/v1/tenants/{fixture.DefaultTenantId}/active", new { isActive = false });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    private sealed record TenantAdminResponse(Guid Id, string Name, string Slug, bool IsActive, bool IsPlatformTenant, DateTime CreatedAt);
 }

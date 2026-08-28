@@ -22,6 +22,7 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
     public Guid SuperAdminRoleId { get; private set; }
     public Guid SecondTenantId { get; private set; }
     public Guid SecondTenantRoleId { get; private set; }
+    public Guid CustomerTenantId { get; private set; }
     public string AccessToken { get; private set; } = string.Empty;
 
     private const string CustomerTenantClientSecret = "customer-tenant-test-client-secret-0123456789";
@@ -210,6 +211,7 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
             new TenantRepository(db), new PlatformRepository(db), new PermissionRepository(db),
             new RoleRepository(db), new GroupRepository(db));
         var provisioned = await provisioning.ProvisionAsync("Customer Tenant", "customer-tenant").ConfigureAwait(false);
+        CustomerTenantId = provisioned.Tenant.Id;
 
         _customerTenantClientId = Guid.NewGuid();
         var clientSecretHash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(CustomerTenantClientSecret)));

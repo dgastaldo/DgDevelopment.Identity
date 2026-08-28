@@ -309,6 +309,9 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
     public Task<IReadOnlyCollection<TenantAdminResponse>?> GetTenantsAdminAsync(CancellationToken ct = default)
         => http.GetFromJsonAsync<IReadOnlyCollection<TenantAdminResponse>>($"{options.Authority}/api/v1/tenants", ct);
 
+    public Task<HttpResponseMessage> SetTenantActiveAsync(Guid id, bool isActive, CancellationToken ct = default)
+        => http.PutAsJsonAsync(new Uri($"{options.Authority}/api/v1/tenants/{id}/active"), new { isActive }, ct);
+
     public async Task<TenantAdminResponse?> CreateTenantAsync(string name, string slug, CancellationToken ct = default)
     {
         using var response = await http.PostAsJsonAsync($"{options.Authority}/api/v1/tenants", new { name, slug }, ct).ConfigureAwait(false);
@@ -456,6 +459,7 @@ public sealed record TenantAdminResponse(
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("slug")] string Slug,
     [property: JsonPropertyName("isActive")] bool IsActive,
+    [property: JsonPropertyName("isPlatformTenant")] bool IsPlatformTenant,
     [property: JsonPropertyName("createdAt")] DateTime CreatedAt);
 
 public sealed record MyTenantsResponse(

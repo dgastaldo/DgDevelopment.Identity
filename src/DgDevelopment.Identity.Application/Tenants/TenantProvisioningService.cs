@@ -59,6 +59,40 @@ public sealed class TenantProvisioningService(
         return new TenantProvisioningResult(tenant, platform, globalAdminRole, globalAdminsGroup, superAdminRole, superAdminsGroup);
     }
 
+    public async Task ReconcileAsync(Guid tenantId, CancellationToken ct = default)
+    {
+        var tenant = await tenantRepository.GetByIdAsync(tenantId, ct).ConfigureAwait(false)
+            ?? throw new InvalidOperationException($"Tenant '{tenantId}' does not exist.");
+
+        var platforms = await platformRepository.GetAllAsync(ct).ConfigureAwait(false);
+        var platform = platforms.First(p => p.TenantId == tenantId && p.Name == "IdentityAdmin");
+
+        var existingPermissions = await permissionRepository.GetByTenantAsync(tenantId, ct).ConfigureAwait(false);
+        var existingNames = existingPermissions.Select(p => p.Name).ToHashSet();
+
+        var missingPermissions = StandardPermissionCatalog(tenantId, platform.Id)
+            .Where(p => !existingNames.Contains(p.Name))
+            .ToList();
+        foreach (var permission in missingPermissions)
+            await permissionRepository.AddAsync(permission, ct).ConfigureAwait(false);
+
+        var allPermissions = existingPermissions.Concat(missingPermissions);
+
+        var roles = await roleRepository.GetAllAsync(ct).ConfigureAwait(false);
+        var rolesToReconcile = roles.Where(r => r.TenantId == tenantId
+            && (r.Name == "GlobalAdmin" || (tenant.IsPlatformTenant && r.Name == "SuperAdmin")));
+
+        foreach (var role in rolesToReconcile)
+        {
+            var permissionCountBeforeReconcile = role.Permissions.Count;
+            foreach (var permission in allPermissions)
+                role.AddPermission(permission);
+
+            if (role.Permissions.Count > permissionCountBeforeReconcile)
+                await roleRepository.UpdateAsync(role, ct).ConfigureAwait(false);
+        }
+    }
+
     /// <summary>
     /// Kept in sync by hand with the permission names every [RequirePermission("...")] attribute in
     /// the Server project actually checks for - there is no single source of truth to generate this
@@ -95,6 +129,7 @@ public sealed class TenantProvisioningService(
         new(tenantId, platformId, "identity-platform.audit.read.all-tenants", "Read audit logs across all tenants", "Audit", isGlobal: true),
         new(tenantId, platformId, "identity-platform.tenant.read", "Read tenants", "Tenant", isGlobal: true),
         new(tenantId, platformId, "identity-platform.tenant.create", "Create tenants", "Tenant", isGlobal: true),
+        new(tenantId, platformId, "identity-platform.tenant.update", "Update tenants", "Tenant", isGlobal: true),
         new(tenantId, platformId, "identity-platform.identity.manage", "Manage identity system settings", "Identity", isGlobal: true),
         new(tenantId, platformId, "identity-platform.identity.superadmin", "Super administrator access", "Identity", isGlobal: true),
         new(tenantId, platformId, "identity-platform.dashboard.read", "View identity platform dashboard", "Dashboard"),
