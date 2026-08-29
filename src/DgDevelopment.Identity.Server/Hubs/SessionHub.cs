@@ -17,7 +17,7 @@ public sealed class SessionHub : Hub
 {
     public Task SubscribeToUser(string userId)
     {
-        if (!string.Equals(userId, Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value, StringComparison.Ordinal))
+        if (!string.Equals(userId, GetCallerUserId(), StringComparison.Ordinal))
             throw new HubException("You can only subscribe to your own channel.");
 
         return Groups.AddToGroupAsync(Context.ConnectionId, GroupForUser(userId));
@@ -25,11 +25,18 @@ public sealed class SessionHub : Hub
 
     public Task UnsubscribeFromUser(string userId)
     {
-        if (!string.Equals(userId, Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value, StringComparison.Ordinal))
+        if (!string.Equals(userId, GetCallerUserId(), StringComparison.Ordinal))
             return Task.CompletedTask;
 
         return Groups.RemoveFromGroupAsync(Context.ConnectionId, GroupForUser(userId));
     }
 
     public static string GroupForUser(string userId) => $"user:{userId}";
+
+    // The Cookie scheme's claims use ClaimTypes.NameIdentifier (see e.g. Password.cshtml.cs's
+    // SignInAsync), but the Bearer scheme has MapInboundClaims = false (Program.cs), which keeps
+    // the JWT's raw "sub" claim instead of mapping it to ClaimTypes.NameIdentifier - the same
+    // dual lookup MeController.GetUserId() already needs for the same reason.
+    private string? GetCallerUserId()
+        => Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? Context.User?.FindFirst("sub")?.Value;
 }

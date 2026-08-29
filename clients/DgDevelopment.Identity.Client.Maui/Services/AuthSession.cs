@@ -10,9 +10,17 @@ using Microsoft.Maui.Authentication;
 /// <see cref="IdentityAuthHandler"/> handles attaching whatever token is currently stored to every
 /// request and clearing it on a 401.
 /// </summary>
-public sealed class AuthSession(IdentityClient identityClient, ITokenStore tokenStore, OidcOptions options)
+public sealed class AuthSession(IdentityClient identityClient, ITokenStore tokenStore, OidcOptions options, SessionEventClient sessionEventClient)
 {
     private TokenResponse? _tokens;
+    private bool _forceLogoutHandlerAttached;
+
+    /// <summary>
+    /// Raised when the server pushes a force-logout event for this device (password changed
+    /// elsewhere, sessions revoked) - tokens are already cleared by the time this fires. The app
+    /// (App.xaml.cs) subscribes to drive navigation back to the login page.
+    /// </summary>
+    public event Func<Task>? ForceLoggedOut;
 
     public async Task<bool> IsAuthenticatedAsync()
     {
@@ -36,10 +44,12 @@ public sealed class AuthSession(IdentityClient identityClient, ITokenStore token
 
         _tokens = await identityClient.ExchangeCodeAsync(code, verifier).ConfigureAwait(false);
         await tokenStore.SaveTokensAsync(_tokens).ConfigureAwait(false);
+        await EnsureSessionListenerStartedAsync().ConfigureAwait(false);
     }
 
     public async Task LogoutAsync()
     {
+        await sessionEventClient.StopAsync().ConfigureAwait(false);
         _tokens = null;
         await tokenStore.ClearTokensAsync().ConfigureAwait(false);
     }
@@ -60,5 +70,48 @@ public sealed class AuthSession(IdentityClient identityClient, ITokenStore token
         {
             await LogoutAsync().ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Opens (or re-opens) the real-time channel that reports a force-logout the instant it
+    /// happens, instead of only being discovered the next time a refresh fails. A no-op if
+    /// already connected or if there's no signed-in user yet - safe to call from every page's
+    /// OnAppearing alongside <see cref="EnsureFreshTokenAsync"/>.
+    /// </summary>
+    public async Task EnsureSessionListenerStartedAsync()
+    {
+        if (!_forceLogoutHandlerAttached)
+        {
+            sessionEventClient.ForceLogoutReceived += HandleForceLogoutAsync;
+            _forceLogoutHandlerAttached = true;
+        }
+
+        if (sessionEventClient.IsConnected)
+            return;
+
+        _tokens ??= await tokenStore.GetTokensAsync().ConfigureAwait(false);
+        if (_tokens is not { } tokens)
+            return;
+
+        var userId = JwtClaimsReader.GetSubject(tokens.AccessToken);
+        if (userId is null)
+            return;
+
+        await sessionEventClient.StartAsync(options.Authority, userId, GetCurrentAccessTokenAsync).ConfigureAwait(false);
+    }
+
+    private async Task<string?> GetCurrentAccessTokenAsync()
+    {
+        await EnsureFreshTokenAsync().ConfigureAwait(false);
+        return _tokens?.AccessToken;
+    }
+
+    private async Task HandleForceLogoutAsync()
+    {
+        _tokens = null;
+        await tokenStore.ClearTokensAsync().ConfigureAwait(false);
+
+        if (ForceLoggedOut is { } handler)
+            await handler.Invoke().ConfigureAwait(false);
     }
 }

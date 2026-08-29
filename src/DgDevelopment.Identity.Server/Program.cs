@@ -119,7 +119,7 @@ builder.Services.AddOptions<JwtBearerOptions>("Bearer")
             OnMessageReceived = context =>
             {
                 var accessToken = context.Request.Query["access_token"];
-                if (!string.IsNullOrEmpty(accessToken) && context.HttpContext.Request.Path.StartsWithSegments("/hubs/session"))
+                if (!string.IsNullOrEmpty(accessToken) && context.HttpContext.Request.Path.StartsWithSegments("/hubs/session", StringComparison.Ordinal))
                     context.Token = accessToken;
 
                 return Task.CompletedTask;

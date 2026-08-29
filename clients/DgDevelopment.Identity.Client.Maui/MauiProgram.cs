@@ -13,6 +13,7 @@ public static class MauiProgram
 
         builder.Services.AddSingleton(AppConfig.CreateOidcOptions());
         builder.Services.AddSingleton<ITokenStore, SecureStorageTokenStore>();
+        builder.Services.AddSingleton<SessionEventClient>();
         builder.Services.AddSingleton<AuthSession>();
         builder.Services.AddTransient<IdentityAuthHandler>();
         builder.Services.AddHttpClient<IdentityClient>().AddHttpMessageHandler<IdentityAuthHandler>();
