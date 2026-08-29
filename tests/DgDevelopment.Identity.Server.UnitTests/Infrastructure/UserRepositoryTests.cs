@@ -137,6 +137,103 @@ public sealed class UserRepositoryTests : IClassFixture<DatabaseFixture<UserRepo
         Assert.False(stored.IsActive);
     }
 
+    // Each mutation below uses its OWN fresh context, matching how a real HTTP request always
+    // gets a brand-new, per-request DbContext - reusing one context across AddAsync and a later
+    // mutation (as other tests in this file do for the independent join-table methods) makes the
+    // owned Emails collection's re-query in these methods collide with the already-tracked graph
+    // from the earlier AddAsync, since EF's identity resolution and the Include query's owned
+    // materialization don't reconcile cleanly for an entity that's already tracked.
+
+    [Fact]
+    public async Task AddEmailAsyncPersistsANewEmail()
+    {
+        var (username, email) = Unique();
+        var user = CreateUser(username, email);
+        await using (var seedContext = _fixture.CreateContext())
+            await new UserRepository(seedContext).AddAsync(user);
+
+        var secondEmail = EmailAddress.FromString($"second-{Guid.NewGuid():N}@dgdevelopment.it");
+        await using (var context = _fixture.CreateContext())
+            await new UserRepository(context).AddEmailAsync(user.Id, secondEmail, isPrimary: false);
+
+        await using var readContext = _fixture.CreateContext();
+        var stored = await new UserRepository(readContext).GetByIdAsync(user.Id);
+        Assert.Equal(2, stored!.Emails.Count);
+        var added = Assert.Single(stored.Emails, e => e.Email.Value == secondEmail.Value);
+        Assert.False(added.IsPrimary);
+    }
+
+    [Fact]
+    public async Task RemoveEmailAsyncRemovesANonPrimaryEmail()
+    {
+        var (username, email) = Unique();
+        var user = CreateUser(username, email);
+        await using (var seedContext = _fixture.CreateContext())
+            await new UserRepository(seedContext).AddAsync(user);
+
+        var secondEmail = EmailAddress.FromString($"second-{Guid.NewGuid():N}@dgdevelopment.it");
+        await using (var addContext = _fixture.CreateContext())
+            await new UserRepository(addContext).AddEmailAsync(user.Id, secondEmail, isPrimary: false);
+
+        await using (var removeContext = _fixture.CreateContext())
+            await new UserRepository(removeContext).RemoveEmailAsync(user.Id, secondEmail);
+
+        await using var readContext = _fixture.CreateContext();
+        var stored = await new UserRepository(readContext).GetByIdAsync(user.Id);
+        Assert.Single(stored!.Emails);
+    }
+
+    [Fact]
+    public async Task RemoveEmailAsyncThrowsWhenRemovingTheSolePrimaryEmail()
+    {
+        var (username, email) = Unique();
+        var user = CreateUser(username, email);
+        await using var context = _fixture.CreateContext();
+        var repo = new UserRepository(context);
+        await repo.AddAsync(user);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => repo.RemoveEmailAsync(user.Id, EmailAddress.FromString(email)));
+
+        var stored = await repo.GetByIdAsync(user.Id);
+        Assert.Single(stored!.Emails);
+    }
+
+    [Fact]
+    public async Task SetPrimaryEmailAsyncChangesThePrimaryEmail()
+    {
+        var (username, email) = Unique();
+        var user = CreateUser(username, email);
+        await using (var seedContext = _fixture.CreateContext())
+            await new UserRepository(seedContext).AddAsync(user);
+
+        var secondEmail = EmailAddress.FromString($"second-{Guid.NewGuid():N}@dgdevelopment.it");
+        await using (var addContext = _fixture.CreateContext())
+            await new UserRepository(addContext).AddEmailAsync(user.Id, secondEmail, isPrimary: false);
+
+        await using (var primaryContext = _fixture.CreateContext())
+            await new UserRepository(primaryContext).SetPrimaryEmailAsync(user.Id, secondEmail);
+
+        await using var readContext = _fixture.CreateContext();
+        var stored = await new UserRepository(readContext).GetByIdAsync(user.Id);
+        Assert.Equal(secondEmail.Value, stored!.PrimaryEmail!.Value);
+    }
+
+    [Fact]
+    public async Task VerifyEmailAsyncMarksTheEmailVerified()
+    {
+        var (username, email) = Unique();
+        var user = CreateUser(username, email);
+        await using var context = _fixture.CreateContext();
+        var repo = new UserRepository(context);
+        await repo.AddAsync(user);
+
+        await repo.VerifyEmailAsync(user.Id, EmailAddress.FromString(email));
+
+        var stored = await repo.GetByIdAsync(user.Id);
+        Assert.True(stored!.Emails.Single().IsVerified);
+    }
+
     [Fact]
     public async Task DeleteAsyncRemovesUser()
     {

@@ -2,6 +2,7 @@ namespace DgDevelopment.Identity.Infrastructure.Data;
 
 using DgDevelopment.Identity.Domain.Repositories;
 using DgDevelopment.Identity.Domain.Services;
+using DgDevelopment.Identity.Infrastructure.Notifications;
 using DgDevelopment.Identity.Infrastructure.Repositories;
 using DgDevelopment.Identity.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
@@ -38,10 +39,12 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IGroupRepository, GroupRepository>();
         services.AddScoped<IPlatformRepository, PlatformRepository>();
         services.AddScoped<ITenantRepository, TenantRepository>();
+        services.AddScoped<IVerificationTokenRepository, VerificationTokenRepository>();
 
         services.AddSingleton<IPasswordHasher, Argon2PasswordHasher>();
         services.AddScoped<ISecretProtector, TotpSecretProtector>();
         services.AddSingleton<IPushNotifier, AzureNotificationHubNotifier>();
+        services.AddScoped<INotificationService, SmtpNotificationService>();
 
         return services;
     }

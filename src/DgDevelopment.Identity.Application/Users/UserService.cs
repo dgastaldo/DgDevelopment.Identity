@@ -1,3 +1,4 @@
+using DgDevelopment.Identity.Application.Common;
 using DgDevelopment.Identity.Domain.Entities;
 using DgDevelopment.Identity.Domain.Repositories;
 using DgDevelopment.Identity.Domain.Services;
@@ -39,8 +40,8 @@ public sealed class UserService(
     public async Task<User> CreateAsync(string username, string password, string email, bool isSystemAccount, Guid tenantId, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(username);
-        ArgumentException.ThrowIfNullOrWhiteSpace(password);
         ArgumentException.ThrowIfNullOrWhiteSpace(email);
+        PasswordPolicy.Validate(password);
 
         var user = new User(username, passwordHasher.HashPassword(password), EmailAddress.FromString(email), isSystemAccount);
         await userRepository.AddAsync(user, ct).ConfigureAwait(false);
@@ -65,7 +66,7 @@ public sealed class UserService(
 
     public async Task<User> ResetPasswordAsync(Guid id, string password, Guid tenantId, bool allTenants, CancellationToken ct = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(password);
+        PasswordPolicy.Validate(password);
         var user = await GetRequiredAsync(id, tenantId, allTenants, ct).ConfigureAwait(false);
         user.SetPassword(passwordHasher.HashPassword(password));
         await userRepository.UpdateAsync(user, ct).ConfigureAwait(false);

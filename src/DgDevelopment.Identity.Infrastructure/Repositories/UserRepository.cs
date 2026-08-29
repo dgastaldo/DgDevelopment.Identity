@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using DgDevelopment.Identity.Domain.Authorization;
 using DgDevelopment.Identity.Domain.Entities;
 using DgDevelopment.Identity.Domain.Repositories;
+using DgDevelopment.Identity.Domain.ValueObjects;
 using DgDevelopment.Identity.Infrastructure.Data;
 
 namespace DgDevelopment.Identity.Infrastructure.Repositories;
@@ -177,6 +178,59 @@ public sealed class UserRepository : IUserRepository
 
         await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
+
+    // Emails is an owned collection (OwnsMany) - EF Core rejects a DbSet<UserEmail> query
+    // directly, and reconciling it off a detached graph (like UpdateAsync does for the
+    // independent join tables above) can't express removal, since UserEmail's constructor
+    // always assigns a new Id. Loading WITH tracking and mutating the tracked list in place
+    // lets EF's own DetectChanges() emit the correct INSERT/UPDATE/DELETE with no manual
+    // bookkeeping - the standard mechanism for owned collections.
+    public async Task AddEmailAsync(Guid userId, EmailAddress email, bool isPrimary, CancellationToken ct = default)
+    {
+        var user = await LoadTrackedForEmailMutationAsync(userId, ct).ConfigureAwait(false);
+        user.AddEmail(email, isPrimary);
+
+        // DetectChanges() doesn't reliably notice a brand-new element appended to an owned
+        // collection on an already-tracked (Unchanged) root - unlike modifying/removing an
+        // existing element, which it does pick up - so the new row needs its state set
+        // explicitly, or SaveChanges emits an UPDATE for it instead of an INSERT and throws a
+        // concurrency exception (0 rows affected) since no such row exists yet. UserEmail's own
+        // nested owned Email (EmailAddress, via OwnsOne) needs the same explicit treatment -
+        // setting the parent's state doesn't cascade to it, so left alone it inserts NULL.
+        var added = user.Emails.Single(e => e.Email.Value == email.Value);
+        var addedEntry = _context.Entry(added);
+        addedEntry.State = EntityState.Added;
+        addedEntry.Reference(e => e.Email).TargetEntry!.State = EntityState.Added;
+
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    public async Task RemoveEmailAsync(Guid userId, EmailAddress email, CancellationToken ct = default)
+    {
+        var user = await LoadTrackedForEmailMutationAsync(userId, ct).ConfigureAwait(false);
+        user.RemoveEmail(email);
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    public async Task SetPrimaryEmailAsync(Guid userId, EmailAddress email, CancellationToken ct = default)
+    {
+        var user = await LoadTrackedForEmailMutationAsync(userId, ct).ConfigureAwait(false);
+        user.SetPrimaryEmail(email);
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    public async Task VerifyEmailAsync(Guid userId, EmailAddress email, CancellationToken ct = default)
+    {
+        var user = await LoadTrackedForEmailMutationAsync(userId, ct).ConfigureAwait(false);
+        user.VerifyEmail(email);
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    private async Task<User> LoadTrackedForEmailMutationAsync(Guid userId, CancellationToken ct)
+        => await _context.Users
+            .Include(u => u.Emails)
+            .FirstOrDefaultAsync(u => u.Id == userId, ct).ConfigureAwait(false)
+            ?? throw new InvalidOperationException($"User '{userId}' does not exist.");
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
