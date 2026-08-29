@@ -360,7 +360,7 @@ AuditLog
 ├── UserAgent: string?
 └── Timestamp: DateTime
 
-Event (Event Store)
+Event (Event Store) — see status note below
 ├── Id: Guid
 ├── AggregateId: Guid
 ├── AggregateType: string
@@ -369,6 +369,8 @@ Event (Event Store)
 ├── Version: int
 └── Timestamp: DateTime
 ```
+
+> **Implementation status:** `AuditLog` is fully implemented (API + admin UI). The Event Store above was scaffolded early on (before `AuditLog` existed) but was **removed** during the M1 close-out: it had zero consumers anywhere in the codebase, and everything it could offer is already covered by `AuditLog` (`TargetId`/`TargetType` ≈ `AggregateId`/`AggregateType`, `Details` ≈ `Data`) except the per-aggregate `Version` counter, which only matters for actual event-sourcing/replay - a use case with no named consumer today. Kept here as a design reference; rebuild it purposefully if a real consumer shows up (a webhook, an external integration, a replay/projection use case) rather than reviving it speculatively.
 
 ## 6. OAuth 2.0 / OIDC Flows
 
@@ -767,8 +769,8 @@ Per RFC 6749, errors from OAuth endpoints use the standard format:
 - **Transport**: TLS 1.3 enforced for all endpoints
 - **PKCE**: mandatory for public clients (S256 only)
 - **Refresh Token Rotation**: each use invalidates the old refresh token
-- **DPoP**: proof-of-possession binding to prevent token replay
-- **Rate Limiting**: on login, token, and userinfo endpoints
+- **DPoP**: proof-of-possession binding to prevent token replay (not yet implemented)
+- **Rate Limiting**: ✅ implemented on `DgDevelopment.Identity.Server` - per-client-IP sliding windows, a stricter tier on login/registration/password-recovery/MFA pages and `/connect/token`+`/connect/userinfo` (`Microsoft.AspNetCore.RateLimiting`, see `RateLimiterFactory`)
 - **CORS**: whitelist of allowed origins per client
-- **CSP Headers**: Content-Security-Policy on all UI pages
+- **CSP Headers**: ✅ implemented on `DgDevelopment.Identity.Server`, nonce-based (`SecurityHeadersMiddleware`) - **not yet extended to `IdentityPlatform`** (the Blazor admin UI), whose CSP needs differ (Blazor Server's SignalR circuit, WASM's `wasm-unsafe-eval`)
 - **TOTP secret**: encrypted at rest (AES) via `ISecretProtector`; backup codes and push challenge codes stored as SHA-256 hashes; challenge-code comparison uses constant-time comparison
