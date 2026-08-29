@@ -108,4 +108,52 @@ public sealed class UserAuthorizationRepository(IdentityDbContext context) : IUs
             .Distinct()
             .ToArray();
     }
+
+    public async Task<bool> HasAnyRoleAsync(Guid userId, Guid tenantId, IReadOnlyCollection<string> roleNames, CancellationToken ct = default)
+    {
+        var roleIds = await context.Roles
+            .AsNoTracking()
+            .Where(r => r.TenantId == tenantId && roleNames.Contains(r.Name))
+            .Select(r => r.Id)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        if (roleIds.Count == 0)
+            return false;
+
+        var user = await context.Users
+            .AsNoTracking()
+            .Include(u => u.Roles)
+            .Include(u => u.Groups)
+            .SingleOrDefaultAsync(u => u.Id == userId, ct)
+            .ConfigureAwait(false);
+
+        if (user is null)
+            return false;
+
+        if (user.Roles.Any(r => roleIds.Contains(r.RoleId)))
+            return true;
+
+        if (user.Groups.Count == 0)
+            return false;
+
+        var groups = await context.Groups.AsNoTracking().ToListAsync(ct).ConfigureAwait(false);
+        var visitedGroups = new HashSet<Guid>();
+        foreach (var groupId in user.Groups.Select(g => g.GroupId))
+        {
+            var current = groups.FirstOrDefault(g => g.Id == groupId);
+            while (current is not null && visitedGroups.Add(current.Id))
+                current = current.ParentGroupId is { } parentId
+                    ? groups.FirstOrDefault(g => g.Id == parentId)
+                    : null;
+        }
+
+        if (visitedGroups.Count == 0)
+            return false;
+
+        return await context.GroupRoles
+            .AsNoTracking()
+            .AnyAsync(gr => visitedGroups.Contains(gr.GroupId) && roleIds.Contains(gr.RoleId), ct)
+            .ConfigureAwait(false);
+    }
 }

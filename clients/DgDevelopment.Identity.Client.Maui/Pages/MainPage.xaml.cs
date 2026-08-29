@@ -26,6 +26,7 @@ public partial class MainPage : ContentPage
         try
         {
             await _authSession.EnsureFreshTokenAsync().ConfigureAwait(true);
+            await _authSession.EnsureSessionListenerStartedAsync().ConfigureAwait(true);
             var me = await _identityClient.GetMeAsync().ConfigureAwait(true);
             WelcomeLabel.Text = me is null ? "Signed in" : $"Signed in as {me.Username}";
         }

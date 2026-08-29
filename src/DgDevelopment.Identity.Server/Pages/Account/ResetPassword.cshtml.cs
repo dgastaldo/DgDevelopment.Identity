@@ -3,17 +3,21 @@ namespace DgDevelopment.Identity.Server.Pages.Account;
 using System.Security.Cryptography;
 using System.Text;
 using DgDevelopment.Identity.Application.Common;
+using DgDevelopment.Identity.Application.Services;
 using DgDevelopment.Identity.Domain.Entities;
 using DgDevelopment.Identity.Domain.Repositories;
 using DgDevelopment.Identity.Domain.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.RateLimiting;
 
+[EnableRateLimiting("auth")]
 public sealed class ResetPasswordModel(
     IVerificationTokenRepository verificationTokenRepository,
     IUserRepository userRepository,
     IPasswordHasher passwordHasher,
-    IPasswordHistoryService passwordHistoryService) : PageModel
+    IPasswordHistoryService passwordHistoryService,
+    ISessionRevocationService sessionRevocationService) : PageModel
 {
     [BindProperty] public string Token { get; set; } = string.Empty;
     [BindProperty] public string Password { get; set; } = string.Empty;
@@ -80,6 +84,7 @@ public sealed class ResetPasswordModel(
         user.SetPassword(passwordHasher.HashPassword(Password));
         await userRepository.UpdateAsync(user).ConfigureAwait(false);
         await passwordHistoryService.RecordChangeAsync(user.Id, previousHash).ConfigureAwait(false);
+        await sessionRevocationService.RevokeAllAsync(user.Id).ConfigureAwait(false);
         await verificationTokenRepository.MarkUsedAsync(verification.Id).ConfigureAwait(false);
 
         Success = true;

@@ -10,6 +10,17 @@ using System.Text.Json;
 /// </summary>
 public static class JwtClaimsReader
 {
+    /// <summary>The "sub" (subject/user id) claim - used to pick which real-time notification
+    /// channel to subscribe to (<see cref="SessionEventClient"/>), never as an authorization
+    /// boundary.</summary>
+    public static string? GetSubject(string? jwt)
+    {
+        var claims = GetClaims(jwt);
+        return claims is not null && claims.TryGetValue("sub", out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+    }
+
     public static IReadOnlyCollection<string> GetPermissions(string? jwt)
     {
         var claims = GetClaims(jwt);

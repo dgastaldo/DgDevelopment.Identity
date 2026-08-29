@@ -58,4 +58,16 @@ public sealed class PasswordPolicyTests
     {
         Assert.Throws<ArgumentException>(() => PasswordPolicy.Validate("NoDigitsHere"));
     }
+
+    [Theory]
+    [InlineData("Password123!")]
+    [InlineData("PASSWORD123!")]
+    [InlineData("password123!")]
+    public void ValidateRejectsACommonPasswordRegardlessOfCase(string password)
+    {
+        // These satisfy every complexity rule but are still on the shipped common-password
+        // blocklist - the check is case-insensitive, since capitalizing a common password
+        // doesn't make it any less predictable.
+        Assert.Throws<ArgumentException>(() => PasswordPolicy.Validate(password));
+    }
 }

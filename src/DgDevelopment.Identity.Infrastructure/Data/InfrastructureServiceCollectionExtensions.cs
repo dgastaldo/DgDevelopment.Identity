@@ -33,7 +33,6 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IPushDeviceRepository, PushDeviceRepository>();
         services.AddScoped<IMfaChallengeRepository, MfaChallengeRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
-        services.AddScoped<IEventStoreRepository, EventStoreRepository>();
         services.AddScoped<IPermissionRepository, PermissionRepository>();
         services.AddScoped<IRoleRepository, RoleRepository>();
         services.AddScoped<IGroupRepository, GroupRepository>();

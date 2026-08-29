@@ -36,7 +36,6 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     public DbSet<PushDevice> PushDevices => Set<PushDevice>();
     public DbSet<MfaChallenge> MfaChallenges => Set<MfaChallenge>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
-    public DbSet<DomainEvent> DomainEvents => Set<DomainEvent>();
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
     public DbSet<VerificationToken> VerificationTokens => Set<VerificationToken>();

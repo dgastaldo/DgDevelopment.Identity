@@ -10,7 +10,9 @@ using DgDevelopment.Identity.Domain.Services;
 using DgDevelopment.Identity.Domain.ValueObjects;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.RateLimiting;
 
+[EnableRateLimiting("auth")]
 public sealed class RegisterModel(
     IUserRepository userRepository,
     ITenantRepository tenantRepository,

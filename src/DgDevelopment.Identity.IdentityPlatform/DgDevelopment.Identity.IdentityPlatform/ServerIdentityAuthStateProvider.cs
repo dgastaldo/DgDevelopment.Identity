@@ -10,8 +10,10 @@ public sealed class ServerIdentityAuthStateProvider(
     IdentityClient client,
     ITokenStore tokenStore,
     ISessionMarkerService markerService,
+    SessionEventClient sessionEventClient,
+    OidcOptions options,
     IHttpContextAccessor httpContextAccessor)
-    : IdentityAuthStateProvider(client, tokenStore, markerService)
+    : IdentityAuthStateProvider(client, tokenStore, markerService, sessionEventClient, options)
 {
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {

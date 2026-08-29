@@ -1,4 +1,5 @@
 using DgDevelopment.Identity.Application.Common;
+using DgDevelopment.Identity.Application.Services;
 using DgDevelopment.Identity.Domain.Entities;
 using DgDevelopment.Identity.Domain.Repositories;
 using DgDevelopment.Identity.Domain.Services;
@@ -14,7 +15,8 @@ public sealed class UserService(
     IClientRepository clientRepository,
     ITenantRepository tenantRepository,
     IPasswordHasher passwordHasher,
-    IPasswordHistoryService passwordHistoryService) : IUserService
+    IPasswordHistoryService passwordHistoryService,
+    ISessionRevocationService sessionRevocationService) : IUserService
 {
     public async Task<PagedResult<User>> GetPagedAsync(string? search, int page, int pageSize, Guid tenantId, bool allTenants, CancellationToken ct = default)
     {
@@ -74,6 +76,7 @@ public sealed class UserService(
         user.SetPassword(passwordHasher.HashPassword(password));
         await userRepository.UpdateAsync(user, ct).ConfigureAwait(false);
         await passwordHistoryService.RecordChangeAsync(user.Id, previousHash, ct).ConfigureAwait(false);
+        await sessionRevocationService.RevokeAllAsync(user.Id, ct).ConfigureAwait(false);
         return user;
     }
 

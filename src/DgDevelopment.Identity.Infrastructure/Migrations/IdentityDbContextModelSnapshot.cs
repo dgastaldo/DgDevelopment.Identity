@@ -260,44 +260,6 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                     b.ToTable("DeviceCodes");
                 });
 
-            modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.DomainEvent", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("AggregateId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("AggregateType")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("Data")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("EventType")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<DateTime>("Timestamp")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("Version")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AggregateId");
-
-                    b.HasIndex("AggregateType");
-
-                    b.ToTable("DomainEvents");
-                });
-
             modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.Group", b =>
                 {
                     b.Property<Guid>("Id")
@@ -827,6 +789,12 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                         .HasColumnType("bit");
 
                     b.Property<DateTime?>("LockoutEnd")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("MfaGracePeriodStartedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("PasswordChangedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("PasswordHash")

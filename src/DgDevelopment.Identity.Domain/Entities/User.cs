@@ -7,12 +7,14 @@ public sealed class User
     public Guid Id { get; private set; }
     public string Username { get; private set; }
     public string PasswordHash { get; private set; }
+    public DateTime PasswordChangedAt { get; private set; }
     public bool IsActive { get; private set; }
     public bool IsLocked { get; private set; }
     public bool IsSystemAccount { get; private set; }
     public bool RequireMfa { get; private set; }
     public DateTime? LockoutEnd { get; private set; }
     public int FailedLoginAttempts { get; set; }
+    public DateTime? MfaGracePeriodStartedAt { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
@@ -39,6 +41,7 @@ public sealed class User
         Id = Guid.NewGuid();
         Username = username;
         PasswordHash = passwordHash;
+        PasswordChangedAt = DateTime.UtcNow;
         IsActive = true;
         IsLocked = false;
         IsSystemAccount = isSystemAccount;
@@ -130,6 +133,16 @@ public sealed class User
     public void SetPassword(string passwordHash)
     {
         PasswordHash = passwordHash;
+        PasswordChangedAt = DateTime.UtcNow;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void StartMfaGracePeriodIfNotStarted()
+    {
+        if (MfaGracePeriodStartedAt is not null)
+            return;
+
+        MfaGracePeriodStartedAt = DateTime.UtcNow;
         UpdatedAt = DateTime.UtcNow;
     }
 
