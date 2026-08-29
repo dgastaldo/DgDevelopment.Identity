@@ -70,7 +70,7 @@
 @code {
     protected override void OnInitialized()
     {
-        AuthStateProvider.ForceLoggedOut += OnForceLoggedOutAsync;
+        AuthStateProvider.ForceLoggedOut += OnForceLoggedOut;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -92,15 +92,14 @@
     // The server pushed a force-logout event (password changed elsewhere) - AuthStateProvider has
     // already cleared tokens and renotified auth state by the time this fires; this just gets the
     // user back to a fresh, unauthenticated page.
-    private Task OnForceLoggedOutAsync()
+    private void OnForceLoggedOut(object? sender, EventArgs e)
     {
         InvokeAsync(() => Navigation.NavigateTo("/", forceLoad: true));
-        return Task.CompletedTask;
     }
 
     public void Dispose()
     {
-        AuthStateProvider.ForceLoggedOut -= OnForceLoggedOutAsync;
+        AuthStateProvider.ForceLoggedOut -= OnForceLoggedOut;
     }
 
     private async Task SwitchTenantAsync(ChangeEventArgs args)

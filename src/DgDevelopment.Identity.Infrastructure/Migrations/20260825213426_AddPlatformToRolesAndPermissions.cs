@@ -11,6 +11,8 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            ArgumentNullException.ThrowIfNull(migrationBuilder);
+
             migrationBuilder.DropIndex(
                 name: "IX_Permissions_Name",
                 table: "Permissions");
@@ -105,6 +107,8 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            ArgumentNullException.ThrowIfNull(migrationBuilder);
+
             migrationBuilder.DropForeignKey(
                 name: "FK_Permissions_Platforms_PlatformId",
                 table: "Permissions");

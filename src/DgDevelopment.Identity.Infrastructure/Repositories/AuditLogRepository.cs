@@ -21,10 +21,10 @@ public sealed class AuditLogRepository : IAuditLogRepository
     }
 
     public async Task<IReadOnlyCollection<AuditLog>> GetPagedAsync(Guid tenantId, bool allTenants, string? actorType = null,
-        Guid? actorId = null, string? action = null, string? targetId = null, DateTime? from = null, DateTime? to = null,
+        Guid? actorId = null, string? action = null, string? targetId = null, DateTime? fromDate = null, DateTime? toDate = null,
         int skip = 0, int take = 50, CancellationToken ct = default)
     {
-        var query = Filter(tenantId, allTenants, actorType, actorId, action, targetId, from, to);
+        var query = Filter(tenantId, allTenants, actorType, actorId, action, targetId, fromDate, toDate);
 
         return await query
             .OrderByDescending(a => a.Timestamp)
@@ -34,14 +34,14 @@ public sealed class AuditLogRepository : IAuditLogRepository
     }
 
     public async Task<int> CountAsync(Guid tenantId, bool allTenants, string? actorType = null, Guid? actorId = null,
-        string? action = null, string? targetId = null, DateTime? from = null, DateTime? to = null, CancellationToken ct = default)
+        string? action = null, string? targetId = null, DateTime? fromDate = null, DateTime? toDate = null, CancellationToken ct = default)
     {
-        var query = Filter(tenantId, allTenants, actorType, actorId, action, targetId, from, to);
+        var query = Filter(tenantId, allTenants, actorType, actorId, action, targetId, fromDate, toDate);
         return await query.CountAsync(ct).ConfigureAwait(false);
     }
 
     private IQueryable<AuditLog> Filter(Guid tenantId, bool allTenants, string? actorType, Guid? actorId,
-        string? action, string? targetId, DateTime? from, DateTime? to)
+        string? action, string? targetId, DateTime? fromDate, DateTime? toDate)
     {
         var query = _context.AuditLogs.AsNoTracking();
 
@@ -60,11 +60,11 @@ public sealed class AuditLogRepository : IAuditLogRepository
         if (targetId is not null)
             query = query.Where(a => a.TargetId == targetId);
 
-        if (from.HasValue)
-            query = query.Where(a => a.Timestamp >= from.Value);
+        if (fromDate.HasValue)
+            query = query.Where(a => a.Timestamp >= fromDate.Value);
 
-        if (to.HasValue)
-            query = query.Where(a => a.Timestamp <= to.Value);
+        if (toDate.HasValue)
+            query = query.Where(a => a.Timestamp <= toDate.Value);
 
         return query;
     }

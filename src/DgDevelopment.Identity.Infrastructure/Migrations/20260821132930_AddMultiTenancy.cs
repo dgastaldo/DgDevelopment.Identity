@@ -11,6 +11,8 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            ArgumentNullException.ThrowIfNull(migrationBuilder);
+
             migrationBuilder.DropIndex(
                 name: "IX_Roles_Name",
                 table: "Roles");
@@ -334,6 +336,8 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            ArgumentNullException.ThrowIfNull(migrationBuilder);
+
             migrationBuilder.DropForeignKey(
                 name: "FK_AuditLogs_Tenants_TenantId",
                 table: "AuditLogs");

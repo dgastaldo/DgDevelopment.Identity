@@ -10,6 +10,8 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            ArgumentNullException.ThrowIfNull(migrationBuilder);
+
             migrationBuilder.AddColumn<string>(
                 name: "TargetEmail",
                 table: "VerificationTokens",
@@ -22,6 +24,8 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            ArgumentNullException.ThrowIfNull(migrationBuilder);
+
             migrationBuilder.DropColumn(
                 name: "TargetEmail",
                 table: "VerificationTokens");

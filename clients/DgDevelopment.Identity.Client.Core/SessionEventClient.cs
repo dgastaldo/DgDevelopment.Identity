@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.SignalR.Client;
 
 namespace DgDevelopment.Identity.Client.Core;
@@ -10,6 +11,7 @@ namespace DgDevelopment.Identity.Client.Core;
 /// duplicated per platform, since the protocol - connect, subscribe to a per-user group, listen
 /// for one named message - has nothing platform-specific about it.
 /// </summary>
+[SuppressMessage("Design", "CA2213", Justification = "_connection is disposed - StopAsync() copies it to a local, nulls the field, then disposes the local; DisposeAsync() calls StopAsync(). The analyzer's Dispose-pattern matcher doesn't see through that indirection.")]
 public sealed class SessionEventClient : IAsyncDisposable
 {
     private HubConnection? _connection;

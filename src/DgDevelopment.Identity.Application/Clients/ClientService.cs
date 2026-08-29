@@ -40,6 +40,11 @@ public sealed class ClientService(IClientRepository clientRepository, IPlatformR
         IReadOnlyCollection<string> adminConsentScopes, Guid tenantId, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(grantTypes);
+        ArgumentNullException.ThrowIfNull(scopes);
+        ArgumentNullException.ThrowIfNull(redirectUris);
+        ArgumentNullException.ThrowIfNull(postLogoutRedirectUris);
+        ArgumentNullException.ThrowIfNull(adminConsentScopes);
 
         if (platformId is { } requestedPlatformId)
             await EnsurePlatformInTenantAsync(requestedPlatformId, tenantId, ct).ConfigureAwait(false);

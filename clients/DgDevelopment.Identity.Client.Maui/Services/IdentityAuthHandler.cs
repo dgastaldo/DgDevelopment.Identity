@@ -1,5 +1,6 @@
 namespace DgDevelopment.Identity.Client.Maui.Services;
 
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Http.Headers;
 
@@ -13,10 +14,13 @@ using System.Net.Http.Headers;
 /// Proactive refresh-before-expiry instead happens in <see cref="AuthSession.EnsureFreshTokenAsync"/>,
 /// called explicitly by pages before they make authenticated calls.
 /// </summary>
-public sealed class IdentityAuthHandler(ITokenStore tokenStore) : DelegatingHandler
+[SuppressMessage("Performance", "CA1812", Justification = "Constructed via DI (AddTransient<IdentityAuthHandler>() + AddHttpMessageHandler<IdentityAuthHandler>() in MauiProgram.cs), not by direct instantiation.")]
+internal sealed class IdentityAuthHandler(ITokenStore tokenStore) : DelegatingHandler
 {
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(request);
+
         var tokens = await tokenStore.GetTokensAsync().ConfigureAwait(false);
         if (tokens is not null)
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);

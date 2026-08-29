@@ -154,6 +154,6 @@ public sealed class TenantProvisioningServiceTests : IClassFixture<DatabaseFixtu
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.ProvisionAsync("Second", slug));
 
-        Assert.Contains(slug, exception.Message);
+        Assert.Contains(slug, exception.Message, StringComparison.Ordinal);
     }
 }

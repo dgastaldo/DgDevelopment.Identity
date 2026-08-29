@@ -100,7 +100,7 @@
         TenantState.Changed += OnTenantStateChanged;
     }
 
-    private void OnTenantStateChanged() => InvokeAsync(StateHasChanged);
+    private void OnTenantStateChanged(object? sender, EventArgs e) => InvokeAsync(StateHasChanged);
 
     public void Dispose()
     {

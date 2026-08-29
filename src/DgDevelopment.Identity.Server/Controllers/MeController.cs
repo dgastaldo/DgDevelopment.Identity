@@ -112,7 +112,7 @@ public sealed class MeController(
 
         var updatedUser = await userRepository.GetByIdAsync(userId.Value, ct).ConfigureAwait(false);
         var added = updatedUser?.Emails.First(e => e.Email.Value == email.Value);
-        return Created(string.Empty, new MeEmailResponse(added?.Id ?? Guid.Empty, email.Value, IsPrimary: false, IsVerified: false));
+        return Created(new Uri(string.Empty, UriKind.Relative), new MeEmailResponse(added?.Id ?? Guid.Empty, email.Value, IsPrimary: false, IsVerified: false));
     }
 
     [HttpDelete("emails/{email}")]

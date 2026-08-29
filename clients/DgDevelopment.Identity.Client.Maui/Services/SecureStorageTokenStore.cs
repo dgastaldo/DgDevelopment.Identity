@@ -1,9 +1,11 @@
 namespace DgDevelopment.Identity.Client.Maui.Services;
 
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using DgDevelopment.Identity.Client.Core;
 
-public sealed class SecureStorageTokenStore : ITokenStore
+[SuppressMessage("Performance", "CA1812", Justification = "Constructed via DI (AddSingleton<ITokenStore, SecureStorageTokenStore>() in MauiProgram.cs), not by direct instantiation.")]
+internal sealed class SecureStorageTokenStore : ITokenStore
 {
     private const string Key = "identity_tokens";
 

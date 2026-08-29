@@ -4,7 +4,7 @@ using DgDevelopment.Identity.Client.Core;
 using DgDevelopment.Identity.Client.Maui.Services;
 using Microsoft.Extensions.Logging;
 
-public static class MauiProgram
+internal static class MauiProgram
 {
     public static MauiApp CreateMauiApp()
     {

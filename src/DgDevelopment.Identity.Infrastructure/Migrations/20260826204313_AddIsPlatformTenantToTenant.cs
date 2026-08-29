@@ -10,6 +10,8 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            ArgumentNullException.ThrowIfNull(migrationBuilder);
+
             migrationBuilder.AddColumn<bool>(
                 name: "IsPlatformTenant",
                 table: "Tenants",
@@ -27,6 +29,8 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            ArgumentNullException.ThrowIfNull(migrationBuilder);
+
             migrationBuilder.DropColumn(
                 name: "IsPlatformTenant",
                 table: "Tenants");

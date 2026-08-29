@@ -29,15 +29,15 @@ public sealed partial class SmtpNotificationService : INotificationService
         _enableSsl = !bool.TryParse(configuration["Email:EnableSsl"], out var enableSslConfigured) || enableSslConfigured;
     }
 
-    public async Task SendEmailAsync(string to, string subject, string body, CancellationToken ct = default)
+    public async Task SendEmailAsync(string recipient, string subject, string body, CancellationToken ct = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(to);
+        ArgumentException.ThrowIfNullOrWhiteSpace(recipient);
 
         // No SMTP host configured (the local dev/test default) - log instead of sending, so
         // registration/password-recovery flows work out of the box without a real mail server.
         if (string.IsNullOrWhiteSpace(_host) || string.IsNullOrWhiteSpace(_from))
         {
-            LogEmail(to, subject, body);
+            LogEmail(recipient, subject, body);
             return;
         }
 
@@ -45,7 +45,7 @@ public sealed partial class SmtpNotificationService : INotificationService
         if (!string.IsNullOrWhiteSpace(_username))
             client.Credentials = new NetworkCredential(_username, _password);
 
-        using var message = new MailMessage(_from, to, subject, body);
+        using var message = new MailMessage(_from, recipient, subject, body);
         await client.SendMailAsync(message, ct).ConfigureAwait(false);
     }
 

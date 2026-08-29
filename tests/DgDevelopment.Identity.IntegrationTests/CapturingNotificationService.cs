@@ -13,9 +13,9 @@ public sealed class CapturingNotificationService : INotificationService
 {
     private readonly ConcurrentDictionary<string, string> _lastBodySentTo = new(StringComparer.OrdinalIgnoreCase);
 
-    public Task SendEmailAsync(string to, string subject, string body, CancellationToken ct = default)
+    public Task SendEmailAsync(string recipient, string subject, string body, CancellationToken ct = default)
     {
-        _lastBodySentTo[to] = body;
+        _lastBodySentTo[recipient] = body;
         return Task.CompletedTask;
     }
 

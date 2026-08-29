@@ -1,5 +1,6 @@
 namespace DgDevelopment.Identity.IntegrationTests;
 
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Http.Json;
 
@@ -62,5 +63,6 @@ public sealed class TenantsControllerTests(IntegrationTestFixture fixture)
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [SuppressMessage("Performance", "CA1812", Justification = "Constructed via System.Text.Json deserialization (ReadFromJsonAsync<TenantAdminResponse>()), not by direct instantiation.")]
     private sealed record TenantAdminResponse(Guid Id, string Name, string Slug, bool IsActive, bool IsPlatformTenant, DateTime CreatedAt);
 }

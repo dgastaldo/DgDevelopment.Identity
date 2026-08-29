@@ -27,6 +27,11 @@
 		     via Package.appxmanifest below, which Windows honors for protocol activation even for
 		     an unpackaged app run through this manifest. -->
 		<WindowsPackageType>None</WindowsPackageType>
+
+		<!-- CA5392 fires on UndockedRegFreeWinRT-AutoInitializer.cs, a generated interop shim
+		     shipped inside the Microsoft.WindowsAppSDK.Foundation NuGet package (not our code -
+		     nothing in this repo to fix). -->
+		<NoWarn>$(NoWarn);CA5392</NoWarn>
 	</PropertyGroup>
 
 	<PropertyGroup>

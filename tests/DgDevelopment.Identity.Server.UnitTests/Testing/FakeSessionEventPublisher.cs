@@ -4,11 +4,13 @@ using DgDevelopment.Identity.Domain.Services;
 
 public sealed class FakeSessionEventPublisher : ISessionEventPublisher
 {
-    public List<Guid> PublishedForUserIds { get; } = [];
+    private readonly List<Guid> _publishedForUserIds = [];
+
+    public IReadOnlyList<Guid> PublishedForUserIds => _publishedForUserIds;
 
     public Task PublishForceLogoutAsync(Guid userId, CancellationToken ct = default)
     {
-        PublishedForUserIds.Add(userId);
+        _publishedForUserIds.Add(userId);
         return Task.CompletedTask;
     }
 }

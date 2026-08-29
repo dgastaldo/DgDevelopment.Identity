@@ -22,7 +22,7 @@ public class IdentityAuthStateProvider(
     /// navigation back to the login page. Only ever raised client-side (WASM) - see
     /// EnsureSessionListenerStartedAsync.
     /// </summary>
-    public event Func<Task>? ForceLoggedOut;
+    public event EventHandler? ForceLoggedOut;
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
@@ -152,8 +152,7 @@ public class IdentityAuthStateProvider(
         await ClearTokensAndReturnAnonymousAsync().ConfigureAwait(false);
         NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()))));
 
-        if (ForceLoggedOut is { } handler)
-            await handler.Invoke().ConfigureAwait(false);
+        ForceLoggedOut?.Invoke(this, EventArgs.Empty);
     }
 
     public Uri GetLoginUrl(string? state = null, string? codeChallenge = null, string? tenant = null)

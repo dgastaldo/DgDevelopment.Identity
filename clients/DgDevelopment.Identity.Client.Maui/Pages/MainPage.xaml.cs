@@ -1,9 +1,11 @@
 namespace DgDevelopment.Identity.Client.Maui.Pages;
 
+using System.Diagnostics.CodeAnalysis;
 using DgDevelopment.Identity.Client.Core;
 using DgDevelopment.Identity.Client.Maui.Services;
 using Microsoft.Extensions.DependencyInjection;
 
+[SuppressMessage("Design", "CA1515", Justification = "Must stay public: XAML source generation (MauiXamlInflator=SourceGen) emits a matching public partial declaration.")]
 public partial class MainPage : ContentPage
 {
     private readonly AuthSession _authSession;

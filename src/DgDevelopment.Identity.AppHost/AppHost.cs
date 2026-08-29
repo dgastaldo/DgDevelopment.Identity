@@ -1,14 +1,12 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
 var sqlServer = builder.AddConnectionString("IdentityDb");
-var redis = builder.AddRedis("Redis");
 
 var server = builder
     .AddProject<Projects.DgDevelopment_Identity_Server>("identity-server", launchProfileName: "https")
     .WithEndpoint("https", endpoint => endpoint.IsProxied = false)
     .WithEndpoint("http", endpoint => endpoint.IsProxied = false)
-    .WithReference(sqlServer)
-    .WithReference(redis);
+    .WithReference(sqlServer);
 
 var adminClientId = builder.Configuration["Identity:AdminClientId"] ?? "";
 var adminClientSecret = builder.Configuration["Identity:AdminClientSecret"] ?? "";

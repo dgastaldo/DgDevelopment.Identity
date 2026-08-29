@@ -25,7 +25,7 @@ public sealed class ClientServiceTests : IClassFixture<DatabaseFixture<ClientSer
 
     private static async Task<Tenant> CreateTenantAsync(IdentityDbContext context, string name)
     {
-        var tenant = new Tenant(name, Unique(name.ToLowerInvariant()));
+        var tenant = new Tenant(name, Unique(name.ToUpperInvariant()));
         context.Tenants.Add(tenant);
         await context.SaveChangesAsync();
         return tenant;

@@ -1,5 +1,6 @@
 namespace DgDevelopment.Identity.Client.Maui.Services;
 
+using System.Diagnostics.CodeAnalysis;
 using DgDevelopment.Identity.Client.Core;
 using Microsoft.Maui.Authentication;
 
@@ -10,6 +11,7 @@ using Microsoft.Maui.Authentication;
 /// <see cref="IdentityAuthHandler"/> handles attaching whatever token is currently stored to every
 /// request and clearing it on a 401.
 /// </summary>
+[SuppressMessage("Design", "CA1515", Justification = "Must stay public: it's a constructor parameter type on LoginPage/MainPage/MfaPage, which themselves must stay public for XAML source generation.")]
 public sealed class AuthSession(IdentityClient identityClient, ITokenStore tokenStore, OidcOptions options, SessionEventClient sessionEventClient)
 {
     private TokenResponse? _tokens;
@@ -20,7 +22,7 @@ public sealed class AuthSession(IdentityClient identityClient, ITokenStore token
     /// elsewhere, sessions revoked) - tokens are already cleared by the time this fires. The app
     /// (App.xaml.cs) subscribes to drive navigation back to the login page.
     /// </summary>
-    public event Func<Task>? ForceLoggedOut;
+    public event EventHandler? ForceLoggedOut;
 
     public async Task<bool> IsAuthenticatedAsync()
     {
@@ -111,7 +113,6 @@ public sealed class AuthSession(IdentityClient identityClient, ITokenStore token
         _tokens = null;
         await tokenStore.ClearTokensAsync().ConfigureAwait(false);
 
-        if (ForceLoggedOut is { } handler)
-            await handler.Invoke().ConfigureAwait(false);
+        ForceLoggedOut?.Invoke(this, EventArgs.Empty);
     }
 }

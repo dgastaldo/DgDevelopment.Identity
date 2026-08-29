@@ -105,7 +105,10 @@ public sealed class ClientsController(
     [HttpPut("{id:guid}/active")]
     [RequirePermission("identity-platform.client.update")]
     public Task<IActionResult> SetActive(Guid id, [FromBody] SetClientActiveRequest request, [FromQuery] bool allTenants, CancellationToken ct)
-        => MutateAsync(id, request.IsActive ? "client.activate" : "client.deactivate", allTenants, canSeeAllTenants => clientService.SetActiveAsync(id, request.IsActive, tenantContext.TenantId, canSeeAllTenants, ct), ct);
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return MutateAsync(id, request.IsActive ? "client.activate" : "client.deactivate", allTenants, canSeeAllTenants => clientService.SetActiveAsync(id, request.IsActive, tenantContext.TenantId, canSeeAllTenants, ct), ct);
+    }
 
     [HttpDelete("{id:guid}")]
     [RequirePermission("identity-platform.client.delete")]

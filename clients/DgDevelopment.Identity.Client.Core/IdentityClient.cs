@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 
@@ -539,6 +540,8 @@ public sealed record TotpStatusResponse(
     [property: JsonPropertyName("isEnabled")] bool IsEnabled,
     [property: JsonPropertyName("availableBackupCodes")] int AvailableBackupCodes);
 
+[SuppressMessage("Design", "CA1056", Justification = "Kept as string, matching the server's own Razor Pages (Account/Mfa.cshtml.cs, MfaEnroll.cshtml.cs) which also type QrCodeDataUri as string throughout - it's a data: URI carrying base64 PNG bytes, and System.Uri round-tripping isn't guaranteed lossless for that content.")]
+[SuppressMessage("Design", "CA1054", Justification = "See CA1056 justification above - applies to the matching constructor parameters.")]
 public sealed record TotpEnrollmentResponse(
     [property: JsonPropertyName("secretKey")] string SecretKey,
     [property: JsonPropertyName("provisioningUri")] string ProvisioningUri,

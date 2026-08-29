@@ -111,7 +111,7 @@ public sealed partial class MeControllerSelfServiceTests(IntegrationTestFixture 
 
         await using var context = fixture.CreateContext();
         var user = await context.Users.Include(u => u.Emails).SingleAsync(u => u.Id == fixture.SuperAdminUserId);
-        var addedEmail = Assert.Single(user.Emails, e => e.Email.Value == newEmail.ToUpperInvariant());
+        var addedEmail = Assert.Single(user.Emails, e => string.Equals(e.Email.Value, newEmail, StringComparison.OrdinalIgnoreCase));
         Assert.True(addedEmail.IsVerified);
         var primaryEmail = user.Emails.Single(e => e.IsPrimary);
         Assert.NotEqual(addedEmail.Id, primaryEmail.Id);
@@ -153,7 +153,7 @@ public sealed partial class MeControllerSelfServiceTests(IntegrationTestFixture 
 
         await using var context = fixture.CreateContext();
         var user = await context.Users.Include(u => u.Emails).SingleAsync(u => u.Id == fixture.SuperAdminUserId);
-        Assert.DoesNotContain(user.Emails, e => e.Email.Value == secondEmail.ToUpperInvariant());
+        Assert.DoesNotContain(user.Emails, e => string.Equals(e.Email.Value, secondEmail, StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
