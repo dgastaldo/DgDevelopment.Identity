@@ -11,9 +11,11 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
 
 [Authorize(AuthenticationSchemes = "Identity.Partial")]
+[EnableRateLimiting("auth")]
 public sealed class MfaModel : PageModel
 {
     private const string PartialAuthenticationScheme = "Identity.Partial";

@@ -8,7 +8,9 @@ using DgDevelopment.Identity.Domain.Repositories;
 using DgDevelopment.Identity.Domain.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.RateLimiting;
 
+[EnableRateLimiting("auth")]
 public sealed class ResetPasswordModel(
     IVerificationTokenRepository verificationTokenRepository,
     IUserRepository userRepository,

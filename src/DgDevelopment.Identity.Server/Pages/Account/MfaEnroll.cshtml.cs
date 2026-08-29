@@ -7,8 +7,10 @@ using DgDevelopment.Identity.Server.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.RateLimiting;
 
 [Authorize]
+[EnableRateLimiting("auth")]
 public sealed class MfaEnrollModel(ITotpService totpService, IUserRepository userRepository) : PageModel
 {
     [BindProperty] public string Code { get; set; } = string.Empty;

@@ -11,12 +11,15 @@ using DgDevelopment.Identity.Application.Users;
 using DgDevelopment.Identity.Infrastructure.Data;
 using DgDevelopment.Identity.OAuth.Services;
 using DgDevelopment.Identity.Server.Data;
+using DgDevelopment.Identity.Server.Security;
 using DgDevelopment.Identity.Server.Services;
 using DgDevelopment.Identity.ServiceDefaults;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -57,6 +60,15 @@ builder.Services.Configure<ConsentOptions>(builder.Configuration.GetSection(Cons
 builder.Services.AddScoped<DbSeeder>();
 builder.Services.AddSingleton<IClientIdCache, ClientIdCache>();
 builder.Services.AddSingleton<ICorsOriginCache, CorsOriginCache>();
+builder.Services.AddScoped<CspNonceService>();
+
+var rateLimiting = builder.Configuration.GetSection(RateLimitingOptions.SectionName).Get<RateLimitingOptions>() ?? new RateLimitingOptions();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.GlobalLimiter = PartitionedRateLimiter.Create(RateLimiterFactory.CreatePartitioner(rateLimiting.Global));
+    options.AddPolicy("auth", RateLimiterFactory.CreatePartitioner(rateLimiting.Auth));
+});
 
 builder.Services.AddAuthentication("Cookies")
     .AddCookie("Cookies", options =>
@@ -134,6 +146,7 @@ builder.Services.AddSwaggerGen();
 var app = builder.Build();
 
 app.UseExceptionHandler();
+app.UseSecurityHeaders();
 app.UseStaticFiles();
 
 using (var scope = app.Services.CreateScope())
@@ -170,6 +183,7 @@ app.MapGet("/", () => Results.Content(System.IO.File.ReadAllText(
 app.MapHealthChecks("/health");
 
 app.UseCors();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
