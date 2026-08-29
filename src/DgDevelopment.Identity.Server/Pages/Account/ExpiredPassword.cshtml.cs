@@ -19,6 +19,7 @@ public sealed class ExpiredPasswordModel(
     IUserRepository userRepository,
     IPasswordHasher passwordHasher,
     IPasswordHistoryService passwordHistoryService,
+    ISessionRevocationService sessionRevocationService,
     IMfaPolicyService mfaPolicy,
     IServerSessionService sessionService) : PageModel
 {
@@ -65,6 +66,10 @@ public sealed class ExpiredPasswordModel(
         user.SetPassword(passwordHasher.HashPassword(Password));
         await userRepository.UpdateAsync(user).ConfigureAwait(false);
         await passwordHistoryService.RecordChangeAsync(user.Id, previousHash).ConfigureAwait(false);
+
+        // Must run before the new session/sign-in below, not after - otherwise this exact request
+        // would revoke the very session it's about to create.
+        await sessionRevocationService.RevokeAllAsync(user.Id).ConfigureAwait(false);
 
         if (await mfaPolicy.RequiresMfaStepAsync(user).ConfigureAwait(false))
             return RedirectToPage("/Account/Mfa", new { returnUrl });

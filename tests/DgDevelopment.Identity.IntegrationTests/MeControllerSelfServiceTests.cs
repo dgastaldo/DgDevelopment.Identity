@@ -79,6 +79,17 @@ public sealed partial class MeControllerSelfServiceTests(IntegrationTestFixture 
         await using var context = fixture.CreateContext();
         var user = await context.Users.SingleAsync(u => u.Id == fixture.SuperAdminUserId);
         Assert.Equal(new FakePasswordHasher().HashPassword("New-Correct-Horse-1"), user.PasswordHash);
+
+        // The refresh token minted for this same client during fixture setup (InitializeAsync's
+        // login) must now be revoked - changing your password forces every device to
+        // re-authenticate, this one included.
+        var refreshTokens = await context.RefreshTokens.Where(r => r.UserId == fixture.SuperAdminUserId).ToListAsync();
+        Assert.NotEmpty(refreshTokens);
+        Assert.All(refreshTokens, r => Assert.True(r.IsRevoked));
+
+        var sessions = await context.UserSessions.Where(s => s.UserId == fixture.SuperAdminUserId).ToListAsync();
+        Assert.NotEmpty(sessions);
+        Assert.All(sessions, s => Assert.True(s.IsRevoked));
     }
 
     [Fact]

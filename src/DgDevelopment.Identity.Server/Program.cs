@@ -61,6 +61,8 @@ builder.Services.AddScoped<DbSeeder>();
 builder.Services.AddSingleton<IClientIdCache, ClientIdCache>();
 builder.Services.AddSingleton<ICorsOriginCache, CorsOriginCache>();
 builder.Services.AddScoped<CspNonceService>();
+builder.Services.AddScoped<ISessionRevocationService, SessionRevocationService>();
+builder.Services.AddScoped<DgDevelopment.Identity.Domain.Services.ISessionEventPublisher, DgDevelopment.Identity.Server.Hubs.SignalRSessionEventPublisher>();
 
 var rateLimiting = builder.Configuration.GetSection(RateLimitingOptions.SectionName).Get<RateLimitingOptions>() ?? new RateLimitingOptions();
 builder.Services.AddRateLimiter(options =>
@@ -104,6 +106,23 @@ builder.Services.AddOptions<JwtBearerOptions>("Bearer")
                 using var scope = scopeFactory.CreateScope();
                 var keyMaterial = scope.ServiceProvider.GetRequiredService<IKeyMaterialService>();
                 return keyMaterial.GetJwksDocumentAsync().GetAwaiter().GetResult().GetSigningKeys();
+            }
+        };
+
+        // SignalR's browser/client transports can't attach an Authorization header to the
+        // WebSocket handshake, so JS/client SDKs send the access token as a query string
+        // parameter instead - the standard pattern for a Bearer-authenticated hub. Restricted to
+        // the session hub's own path so this doesn't become an alternate way to authenticate
+        // every other Bearer endpoint via URL.
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(accessToken) && context.HttpContext.Request.Path.StartsWithSegments("/hubs/session"))
+                    context.Token = accessToken;
+
+                return Task.CompletedTask;
             }
         };
     });
@@ -190,6 +209,7 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapRazorPages();
 app.MapHub<DgDevelopment.Identity.Server.Hubs.MfaHub>("/hubs/mfa");
+app.MapHub<DgDevelopment.Identity.Server.Hubs.SessionHub>("/hubs/session");
 
 await app.RunAsync();
 

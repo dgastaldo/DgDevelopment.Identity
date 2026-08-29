@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using DgDevelopment.Identity.Application.Authorization;
 using DgDevelopment.Identity.Application.Common;
+using DgDevelopment.Identity.Application.Services;
 using DgDevelopment.Identity.Domain.Entities;
 using DgDevelopment.Identity.Domain.Repositories;
 using DgDevelopment.Identity.Domain.Services;
@@ -23,6 +24,7 @@ public sealed class MeController(
     IUserRepository userRepository,
     IPasswordHasher passwordHasher,
     IPasswordHistoryService passwordHistoryService,
+    ISessionRevocationService sessionRevocationService,
     IVerificationTokenRepository verificationTokenRepository,
     INotificationService notificationService) : ControllerBase
 {
@@ -85,6 +87,7 @@ public sealed class MeController(
         user.SetPassword(passwordHasher.HashPassword(request.NewPassword!));
         await userRepository.UpdateAsync(user, ct).ConfigureAwait(false);
         await passwordHistoryService.RecordChangeAsync(user.Id, previousHash, ct).ConfigureAwait(false);
+        await sessionRevocationService.RevokeAllAsync(user.Id, ct).ConfigureAwait(false);
 
         return NoContent();
     }
