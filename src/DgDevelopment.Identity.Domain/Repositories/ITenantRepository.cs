@@ -8,6 +8,7 @@ public interface ITenantRepository
     Task<Tenant?> GetBySlugAsync(string slug, CancellationToken ct = default);
     Task<IReadOnlyCollection<Tenant>> GetAllAsync(CancellationToken ct = default);
     Task AddAsync(Tenant tenant, CancellationToken ct = default);
+    Task UpdateAsync(Tenant tenant, CancellationToken ct = default);
     Task<IReadOnlyCollection<TenantMembership>> GetMembershipsForUserAsync(Guid userId, CancellationToken ct = default);
     Task<IReadOnlyCollection<Tenant>> GetTenantsForUserAsync(Guid userId, CancellationToken ct = default);
     Task<TenantMembership?> GetMembershipAsync(Guid tenantId, Guid userId, CancellationToken ct = default);

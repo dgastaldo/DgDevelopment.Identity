@@ -55,7 +55,7 @@ else
         <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[600px] text-left text-sm">
-                    <thead class="border-b border-slate-200 bg-slate-50 text-xs tracking-wide text-slate-500 uppercase"><tr><th class="px-5 py-4">Tenant</th><th class="px-5 py-4">Slug</th><th class="px-5 py-4">Status</th><th class="px-5 py-4">Created</th></tr></thead>
+                    <thead class="border-b border-slate-200 bg-slate-50 text-xs tracking-wide text-slate-500 uppercase"><tr><th class="px-5 py-4">Tenant</th><th class="px-5 py-4">Slug</th><th class="px-5 py-4">Status</th><th class="px-5 py-4">Created</th><th class="px-5 py-4"></th></tr></thead>
                     <tbody class="divide-y divide-slate-100">
                         @foreach (var tenant in TenantList)
                         {
@@ -73,11 +73,21 @@ else
                                     }
                                 </td>
                                 <td class="px-5 py-4 text-slate-500">@tenant.CreatedAt.ToLocalTime().ToString("g")</td>
+                                <td class="px-5 py-4 text-right">
+                                    @if (tenant.IsPlatformTenant)
+                                    {
+                                        <span class="text-xs text-slate-400">Platform tenant</span>
+                                    }
+                                    else
+                                    {
+                                        <button disabled="@Busy" @onclick="() => ToggleActiveAsync(tenant)" class="font-semibold text-violet-700 hover:text-violet-900 disabled:opacity-40">@(tenant.IsActive ? "Deactivate" : "Activate")</button>
+                                    }
+                                </td>
                             </tr>
                         }
                         @if (TenantList.Count == 0)
                         {
-                            <tr><td colspan="4" class="px-5 py-6 text-center text-sm text-slate-400">No tenants found.</td></tr>
+                            <tr><td colspan="5" class="px-5 py-6 text-center text-sm text-slate-400">No tenants found.</td></tr>
                         }
                     </tbody>
                 </table>
@@ -135,6 +145,19 @@ else
     }
 
     private void ToggleCreate() => ShowCreate = !ShowCreate;
+
+    private async Task ToggleActiveAsync(TenantAdminResponse tenant)
+    {
+        Busy = true;
+        try
+        {
+            using var response = await Api.SetTenantActiveAsync(tenant.Id, !tenant.IsActive).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            await LoadAsync();
+        }
+        catch (HttpRequestException) { Error = "The tenant status could not be changed."; }
+        finally { Busy = false; }
+    }
 
     private sealed class CreateTenantForm
     {

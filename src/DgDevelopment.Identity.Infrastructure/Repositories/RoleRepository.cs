@@ -53,7 +53,17 @@ public sealed class RoleRepository : IRoleRepository
         // client-generated-key children (RolePermission) as Modified instead of Added,
         // since EF can't tell new rows from existing ones by key alone. Attach only the
         // root and reconcile the child collection explicitly against what's in the database.
-        _context.Entry(role).State = EntityState.Modified;
+        //
+        // The root itself may already be tracked by this same context (e.g. it was just Added
+        // earlier in the same unit of work - see TenantProvisioningService.ReconcileAsync running
+        // against a tenant's role right after ProvisionAsync created it in the same DbContext).
+        // Attaching a second, distinct instance with the same key would throw, so update the
+        // already-tracked instance's values instead of attaching this detached one.
+        var trackedRole = _context.ChangeTracker.Entries<Role>().FirstOrDefault(e => e.Entity.Id == role.Id);
+        if (trackedRole is null)
+            _context.Entry(role).State = EntityState.Modified;
+        else if (!ReferenceEquals(trackedRole.Entity, role))
+            trackedRole.CurrentValues.SetValues(role);
 
         var existingPermissionIds = await _context.RolePermissions
             .Where(rp => rp.RoleId == role.Id)

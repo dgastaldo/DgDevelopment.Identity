@@ -59,4 +59,30 @@ public sealed class TenantsController(
             return Problem(statusCode: StatusCodes.Status409Conflict, title: "Tenant already exists", detail: ex.Message);
         }
     }
+
+    [HttpPut("{id:guid}/active")]
+    [RequirePermission("identity-platform.tenant.update")]
+    public async Task<IActionResult> SetActive(Guid id, [FromBody] SetTenantActiveRequest request, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (!await tenantContext.IsGlobalAdministratorAsync(ct).ConfigureAwait(false))
+            return Forbid();
+
+        var tenant = await tenantRepository.GetByIdAsync(id, ct).ConfigureAwait(false);
+        if (tenant is null)
+            return Problem(statusCode: StatusCodes.Status404NotFound, title: "Tenant not found");
+
+        // The platform tenant owns the system itself - deactivating it would lock out every
+        // administrator, including whoever would need to reactivate it.
+        if (tenant.IsPlatformTenant)
+            return Problem(statusCode: StatusCodes.Status400BadRequest, title: "Cannot deactivate the platform tenant",
+                detail: "The platform tenant cannot be deactivated.");
+
+        if (request.IsActive) tenant.Activate(); else tenant.Deactivate();
+        await tenantRepository.UpdateAsync(tenant, ct).ConfigureAwait(false);
+
+        await auditService.RecordAsync(request.IsActive ? "tenant.activate" : "tenant.deactivate", AuditOutcome.Success,
+            tenant.Id, targetId: tenant.Id.ToString(), targetType: "tenant", ct: ct).ConfigureAwait(false);
+        return Ok(TenantAdminResponse.From(tenant));
+    }
 }

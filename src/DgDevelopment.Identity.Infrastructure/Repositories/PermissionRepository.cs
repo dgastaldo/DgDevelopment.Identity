@@ -36,6 +36,15 @@ public sealed class PermissionRepository : IPermissionRepository
             .ToListAsync(ct).ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyCollection<Permission>> GetByTenantAsync(Guid tenantId, CancellationToken ct = default)
+    {
+        return await _context.Permissions
+            .AsNoTracking()
+            .Where(p => p.TenantId == tenantId)
+            .OrderBy(p => p.Name)
+            .ToListAsync(ct).ConfigureAwait(false);
+    }
+
     public async Task AddAsync(Permission permission, CancellationToken ct = default)
     {
         await _context.Permissions.AddAsync(permission, ct).ConfigureAwait(false);

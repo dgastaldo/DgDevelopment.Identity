@@ -82,6 +82,68 @@ public sealed class TenantProvisioningServiceTests : IClassFixture<DatabaseFixtu
     }
 
     [Fact]
+    public async Task ReconcileAsyncBackfillsAMissingPermissionAndGrantsItToGlobalAdmin()
+    {
+        await using var context = _fixture.CreateContext();
+        var service = CreateService(context);
+        var permissionRepository = new PermissionRepository(context);
+        var roleRepository = new RoleRepository(context);
+        var provisioned = await service.ProvisionAsync("Reconcile Tenant", Unique("reconcile"));
+
+        // Simulates catalog drift: a permission the current StandardPermissionCatalog says this
+        // tenant should have is missing from its catalog (e.g. added to the catalog after this
+        // tenant was already provisioned).
+        var permissions = await permissionRepository.GetByTenantAsync(provisioned.Tenant.Id);
+        var staleUpdatePermission = permissions.Single(p => p.Name == "identity-platform.tenant.update");
+        await permissionRepository.DeleteAsync(staleUpdatePermission.Id);
+
+        await service.ReconcileAsync(provisioned.Tenant.Id);
+
+        var permissionsAfterReconcile = await permissionRepository.GetByTenantAsync(provisioned.Tenant.Id);
+        var restoredPermission = Assert.Single(permissionsAfterReconcile, p => p.Name == "identity-platform.tenant.update");
+
+        var globalAdminRole = await roleRepository.GetByIdAsync(provisioned.GlobalAdminRole.Id);
+        Assert.Contains(globalAdminRole!.Permissions, rp => rp.PermissionId == restoredPermission.Id);
+    }
+
+    [Fact]
+    public async Task ReconcileAsyncIsANoOpWhenTheCatalogIsAlreadyUpToDate()
+    {
+        await using var context = _fixture.CreateContext();
+        var service = CreateService(context);
+        var permissionRepository = new PermissionRepository(context);
+        var provisioned = await service.ProvisionAsync("Reconcile NoOp Tenant", Unique("reconcile-noop"));
+
+        var before = await permissionRepository.GetByTenantAsync(provisioned.Tenant.Id);
+
+        await service.ReconcileAsync(provisioned.Tenant.Id);
+
+        var after = await permissionRepository.GetByTenantAsync(provisioned.Tenant.Id);
+        Assert.Equal(before.Select(p => p.Id).OrderBy(id => id), after.Select(p => p.Id).OrderBy(id => id));
+    }
+
+    [Fact]
+    public async Task ReconcileAsyncOnlyGrantsARestoredPermissionToSuperAdminOnThePlatformTenant()
+    {
+        await using var context = _fixture.CreateContext();
+        var service = CreateService(context);
+        var permissionRepository = new PermissionRepository(context);
+        var roleRepository = new RoleRepository(context);
+        var provisioned = await service.ProvisionAsync("Reconcile Platform Tenant", Unique("reconcile-platform"), isPlatformTenant: true);
+
+        var permissions = await permissionRepository.GetByTenantAsync(provisioned.Tenant.Id);
+        var staleUpdatePermission = permissions.Single(p => p.Name == "identity-platform.tenant.update");
+        await permissionRepository.DeleteAsync(staleUpdatePermission.Id);
+
+        await service.ReconcileAsync(provisioned.Tenant.Id);
+
+        var restoredPermission = (await permissionRepository.GetByTenantAsync(provisioned.Tenant.Id))
+            .Single(p => p.Name == "identity-platform.tenant.update");
+        var superAdminRole = await roleRepository.GetByIdAsync(provisioned.SuperAdminRole!.Id);
+        Assert.Contains(superAdminRole!.Permissions, rp => rp.PermissionId == restoredPermission.Id);
+    }
+
+    [Fact]
     public async Task ProvisionAsyncThrowsWhenSlugAlreadyExists()
     {
         await using var context = _fixture.CreateContext();
