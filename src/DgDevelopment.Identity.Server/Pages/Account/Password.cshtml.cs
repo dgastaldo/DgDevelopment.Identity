@@ -2,6 +2,7 @@ namespace DgDevelopment.Identity.Server.Pages.Account;
 
 using System.Globalization;
 using System.Security.Claims;
+using DgDevelopment.Identity.Application.Common;
 using DgDevelopment.Identity.Application.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -58,6 +59,12 @@ public sealed class PasswordModel : PageModel
         }
 
         await _authService.RecordSuccessfulLoginAsync(user).ConfigureAwait(false);
+
+        if (PasswordExpirationPolicy.IsExpired(user.PasswordChangedAt))
+        {
+            await SignInPartialAsync(user, RememberMe).ConfigureAwait(false);
+            return RedirectToPage("/Account/ExpiredPassword", new { returnUrl });
+        }
 
         if (await _mfaPolicy.RequiresMfaStepAsync(user).ConfigureAwait(false))
         {

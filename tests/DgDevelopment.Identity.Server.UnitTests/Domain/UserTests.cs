@@ -187,6 +187,34 @@ public sealed class UserTests
     }
 
     [Fact]
+    public void SetPasswordUpdatesPasswordChangedAt()
+    {
+        var user = CreateUser();
+        var before = user.PasswordChangedAt;
+
+        Thread.Sleep(10);
+        user.SetPassword("new-hash");
+
+        Assert.True(user.PasswordChangedAt > before);
+    }
+
+    [Fact]
+    public void StartMfaGracePeriodIfNotStartedSetsItOnlyOnce()
+    {
+        var user = CreateUser();
+        Assert.Null(user.MfaGracePeriodStartedAt);
+
+        user.StartMfaGracePeriodIfNotStarted();
+        var firstStart = user.MfaGracePeriodStartedAt;
+        Assert.NotNull(firstStart);
+
+        Thread.Sleep(10);
+        user.StartMfaGracePeriodIfNotStarted();
+
+        Assert.Equal(firstStart, user.MfaGracePeriodStartedAt);
+    }
+
+    [Fact]
     public void LockSetsLockoutAndUnlockRestores()
     {
         var user = CreateUser();

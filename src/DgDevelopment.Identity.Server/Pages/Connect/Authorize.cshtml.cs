@@ -21,6 +21,7 @@ public sealed class AuthorizeModel : PageModel
     private readonly IUserConsentRepository _consentRepository;
     private readonly IConsentService _consentService;
     private readonly ITenantSelectionService _tenantSelectionService;
+    private readonly IMfaEnforcementService _mfaEnforcement;
 
     public AuthorizeModel(
         IAuthorizationService authorizationService,
@@ -29,7 +30,8 @@ public sealed class AuthorizeModel : PageModel
         IUserInteractionService interaction,
         IUserConsentRepository consentRepository,
         IConsentService consentService,
-        ITenantSelectionService tenantSelectionService)
+        ITenantSelectionService tenantSelectionService,
+        IMfaEnforcementService mfaEnforcement)
     {
         _authorizationService = authorizationService;
         _userRepo = userRepo;
@@ -38,6 +40,7 @@ public sealed class AuthorizeModel : PageModel
         _consentRepository = consentRepository;
         _consentService = consentService;
         _tenantSelectionService = tenantSelectionService;
+        _mfaEnforcement = mfaEnforcement;
     }
 
     public string ClientId { get; set; } = string.Empty;
@@ -109,6 +112,12 @@ public sealed class AuthorizeModel : PageModel
         {
             var returnUrl = $"{Request.Path}{Request.QueryString}";
             return RedirectToPage("/Account/SelectTenant", new { returnUrl });
+        }
+
+        if (await _mfaEnforcement.MustEnrollMfaBeforeProceedingAsync(userId, selection.TenantId.Value).ConfigureAwait(false))
+        {
+            var returnUrl = $"{Request.Path}{Request.QueryString}";
+            return RedirectToPage("/Account/MfaEnroll", new { returnUrl });
         }
 
         var client = result.Client!;

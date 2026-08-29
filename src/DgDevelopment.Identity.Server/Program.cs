@@ -34,6 +34,7 @@ builder.Services.AddScoped<IServerSessionService, ServerSessionService>();
 builder.Services.AddScoped<ITotpService, TotpService>();
 builder.Services.AddScoped<IPushMfaService, PushMfaService>();
 builder.Services.AddScoped<IMfaPolicyService, MfaPolicyService>();
+builder.Services.AddScoped<IMfaEnforcementService, MfaEnforcementService>();
 builder.Services.AddScoped<IMfaProvider, TotpMfaProvider>();
 builder.Services.AddScoped<IMfaProvider, PushMfaProvider>();
 builder.Services.AddScoped<DgDevelopment.Identity.Application.Authorization.IPermissionEvaluator, DgDevelopment.Identity.Application.Authorization.EffectivePermissionsService>();
