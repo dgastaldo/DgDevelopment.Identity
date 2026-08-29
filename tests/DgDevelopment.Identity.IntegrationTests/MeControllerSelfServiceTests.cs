@@ -42,6 +42,31 @@ public sealed partial class MeControllerSelfServiceTests(IntegrationTestFixture 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    // Confirms the common-password blocklist is actually wired into this endpoint, not just
+    // unit-tested against PasswordPolicy in isolation - "Password123!" passes every complexity
+    // rule (upper/lower/digit/special/length) but is still on the shipped CommonPasswords.txt list.
+    [Fact]
+    public async Task ChangePasswordWithACommonPasswordReturnsBadRequest()
+    {
+        using var client = fixture.CreateAuthenticatedClient();
+
+        var response = await client.PutAsJsonAsync("/api/v1/me/password", new { currentPassword = IntegrationTestConstants.SuperAdminPassword, newPassword = "Password123!" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    // Confirms password-history reuse prevention is wired into this endpoint end-to-end, not just
+    // unit-tested against PasswordHistoryService in isolation.
+    [Fact]
+    public async Task ChangePasswordToTheCurrentPasswordReturnsBadRequest()
+    {
+        using var client = fixture.CreateAuthenticatedClient();
+
+        var response = await client.PutAsJsonAsync("/api/v1/me/password", new { currentPassword = IntegrationTestConstants.SuperAdminPassword, newPassword = IntegrationTestConstants.SuperAdminPassword });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     [Fact]
     public async Task ChangePasswordWithCorrectCurrentPasswordSucceedsAndPersists()
     {
