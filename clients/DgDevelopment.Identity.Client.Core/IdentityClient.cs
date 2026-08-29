@@ -137,6 +137,9 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
     public Task<IReadOnlyCollection<PushDeviceResponse>?> GetPushDevicesAsync(CancellationToken ct = default)
         => http.GetFromJsonAsync<IReadOnlyCollection<PushDeviceResponse>>($"{options.Authority}/api/v1/account/mfa/push-devices", ct);
 
+    public Task<HttpResponseMessage> RegisterPushDeviceAsync(string platform, string pushToken, string? deviceName = null, string? totpCode = null, CancellationToken ct = default)
+        => http.PostAsJsonAsync(new Uri($"{options.Authority}/api/v1/account/mfa/push-devices"), new { platform, pushToken, deviceName, totpCode }, ct);
+
     public Task<HttpResponseMessage> RemovePushDeviceAsync(Guid id, CancellationToken ct = default)
         => http.DeleteAsync(new Uri($"{options.Authority}/api/v1/account/mfa/push-devices/{id}"), ct);
 
