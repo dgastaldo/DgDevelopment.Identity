@@ -7,16 +7,30 @@ using Microsoft.AspNetCore.Components.Authorization;
 
 namespace DgDevelopment.Identity.Client.Blazor;
 
-public class IdentityAuthStateProvider(IdentityClient client, ITokenStore tokenStore, ISessionMarkerService markerService) : AuthenticationStateProvider
+public class IdentityAuthStateProvider(
+    IdentityClient client, ITokenStore tokenStore, ISessionMarkerService markerService, SessionEventClient sessionEventClient, OidcOptions options) : AuthenticationStateProvider
 {
     private TokenResponse? _tokens;
     private ClaimsPrincipal? _currentUser;
     private UserInfo? _userInfo;
+    private bool _forceLogoutHandlerAttached;
+
+    /// <summary>
+    /// Raised when the server pushes a force-logout event for this user (password changed
+    /// elsewhere, sessions revoked) - tokens are already cleared and auth state already
+    /// renotified by the time this fires. Consumers (e.g. MainLayout) subscribe to drive
+    /// navigation back to the login page. Only ever raised client-side (WASM) - see
+    /// EnsureSessionListenerStartedAsync.
+    /// </summary>
+    public event Func<Task>? ForceLoggedOut;
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
         if (_currentUser?.Identity?.IsAuthenticated == true)
+        {
+            await EnsureSessionListenerStartedAsync().ConfigureAwait(false);
             return new AuthenticationState(_currentUser);
+        }
 
         _tokens = await tokenStore.GetTokensAsync().ConfigureAwait(false);
 
@@ -70,6 +84,7 @@ public class IdentityAuthStateProvider(IdentityClient client, ITokenStore tokenS
         _currentUser = BuildPrincipal(_userInfo!, _tokens.AccessToken);
 
         await markerService.SetAsync(_userInfo!).ConfigureAwait(false);
+        await EnsureSessionListenerStartedAsync().ConfigureAwait(false);
 
         NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(_currentUser)));
         return new AuthenticationState(_currentUser);
@@ -83,6 +98,62 @@ public class IdentityAuthStateProvider(IdentityClient client, ITokenStore tokenS
         _currentUser = null;
         _userInfo = null;
         return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+    }
+
+    /// <summary>
+    /// Opens (or re-opens) the real-time channel that reports a force-logout the instant it
+    /// happens. Only meaningful client-side (WASM) - this base class's GetAuthenticationStateAsync/
+    /// CompleteLoginAsync only ever run for real in the browser, since ServerIdentityAuthStateProvider
+    /// overrides GetAuthenticationStateAsync entirely for prerender/server rendering (cookie-based,
+    /// no real tokens) - the OperatingSystem.IsBrowser() guard is still here so this stays inert in
+    /// case that assumption ever changes. A no-op if already connected or there's no signed-in user.
+    /// </summary>
+    protected async Task EnsureSessionListenerStartedAsync()
+    {
+        if (!OperatingSystem.IsBrowser())
+            return;
+
+        if (!_forceLogoutHandlerAttached)
+        {
+            sessionEventClient.ForceLogoutReceived += HandleForceLogoutAsync;
+            _forceLogoutHandlerAttached = true;
+        }
+
+        if (sessionEventClient.IsConnected || _tokens is not { } tokens)
+            return;
+
+        var userId = JwtClaimsReader.GetSubject(tokens.AccessToken);
+        if (userId is null)
+            return;
+
+        await sessionEventClient.StartAsync(options.Authority, userId, GetCurrentAccessTokenAsync).ConfigureAwait(false);
+    }
+
+    private async Task<string?> GetCurrentAccessTokenAsync()
+    {
+        if (_tokens is { } tokens && tokens.IsExpired() && tokens.RefreshToken is not null)
+        {
+            try
+            {
+                _tokens = await client.RefreshTokenAsync(tokens.RefreshToken).ConfigureAwait(false);
+                await tokenStore.SaveTokensAsync(_tokens).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
+            {
+                return null;
+            }
+        }
+
+        return _tokens?.AccessToken;
+    }
+
+    private async Task HandleForceLogoutAsync()
+    {
+        await ClearTokensAndReturnAnonymousAsync().ConfigureAwait(false);
+        NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()))));
+
+        if (ForceLoggedOut is { } handler)
+            await handler.Invoke().ConfigureAwait(false);
     }
 
     public Uri GetLoginUrl(string? state = null, string? codeChallenge = null, string? tenant = null)
@@ -115,6 +186,7 @@ public class IdentityAuthStateProvider(IdentityClient client, ITokenStore tokenS
 
     public async Task LogoutAsync()
     {
+        await sessionEventClient.StopAsync().ConfigureAwait(false);
         await tokenStore.ClearTokensAsync().ConfigureAwait(false);
         await markerService.ClearAsync().ConfigureAwait(false);
         _tokens = null;

@@ -13,6 +13,7 @@ public static class IdentityBlazorExtensions
         services.AddScoped<ISessionStorageService, BrowserSessionStorage>();
         services.AddScoped<ITokenStore, SessionStorageTokenStore>();
         services.AddScoped<ISessionMarkerService, SessionMarkerService>();
+        services.AddScoped<SessionEventClient>();
         services.AddAuthorizationCore();
         services.AddScoped<IdentityAuthStateProvider>();
         services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<IdentityAuthStateProvider>());

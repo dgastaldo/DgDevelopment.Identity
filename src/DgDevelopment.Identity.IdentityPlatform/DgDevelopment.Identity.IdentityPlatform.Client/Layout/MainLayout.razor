@@ -65,7 +65,14 @@
     <span class="dismiss">🗙</span>
 </div>
 
+@implements IDisposable
+
 @code {
+    protected override void OnInitialized()
+    {
+        AuthStateProvider.ForceLoggedOut += OnForceLoggedOutAsync;
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender || !OperatingSystem.IsBrowser())
@@ -80,6 +87,20 @@
         {
             // Anonymous or unauthenticated requests fail here; the tenant bar simply stays hidden.
         }
+    }
+
+    // The server pushed a force-logout event (password changed elsewhere) - AuthStateProvider has
+    // already cleared tokens and renotified auth state by the time this fires; this just gets the
+    // user back to a fresh, unauthenticated page.
+    private Task OnForceLoggedOutAsync()
+    {
+        InvokeAsync(() => Navigation.NavigateTo("/", forceLoad: true));
+        return Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        AuthStateProvider.ForceLoggedOut -= OnForceLoggedOutAsync;
     }
 
     private async Task SwitchTenantAsync(ChangeEventArgs args)

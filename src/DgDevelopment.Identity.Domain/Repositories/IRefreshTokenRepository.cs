@@ -8,5 +8,6 @@ public interface IRefreshTokenRepository
     Task AddAsync(RefreshToken token, CancellationToken ct = default);
     Task RevokeAsync(Guid id, CancellationToken ct = default);
     Task RevokeChainAsync(string familyId, CancellationToken ct = default);
+    Task RevokeAllForUserAsync(Guid userId, CancellationToken ct = default);
     Task DeleteExpiredAsync(CancellationToken ct = default);
 }

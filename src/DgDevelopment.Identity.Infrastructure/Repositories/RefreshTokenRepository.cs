@@ -59,6 +59,13 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
         await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
+    public async Task RevokeAllForUserAsync(Guid userId, CancellationToken ct = default)
+    {
+        await _context.RefreshTokens
+            .Where(r => r.UserId == userId && !r.IsRevoked)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(r => r.IsRevoked, true), ct).ConfigureAwait(false);
+    }
+
     public async Task DeleteExpiredAsync(CancellationToken ct = default)
     {
         await _context.RefreshTokens

@@ -18,47 +18,7 @@ public sealed partial class OidcTestClient(HttpClient client)
         string username, string password, string clientId, string clientSecret, string redirectUri, CancellationToken ct = default)
     {
         var (verifier, challenge) = GeneratePkce();
-        var authorizeUrl = "/connect/authorize"
-            + $"?client_id={Uri.EscapeDataString(clientId)}"
-            + $"&redirect_uri={Uri.EscapeDataString(redirectUri)}"
-            + "&response_type=code"
-            + $"&scope={Uri.EscapeDataString("openid profile email")}"
-            + $"&code_challenge={Uri.EscapeDataString(challenge)}"
-            + "&code_challenge_method=S256";
-
-        var loginRedirect = await client.GetAsync(authorizeUrl, ct).ConfigureAwait(false);
-        var loginUrl = RequireLocation(loginRedirect);
-
-        var loginPage = await client.GetAsync(loginUrl, ct).ConfigureAwait(false);
-        var loginToken = await ExtractAntiforgeryAsync(loginPage, ct).ConfigureAwait(false);
-
-        var loginPost = await client.PostAsync(loginUrl, FormContent(new()
-        {
-            ["Identifier"] = username,
-            ["__RequestVerificationToken"] = loginToken,
-        }), ct).ConfigureAwait(false);
-        var passwordUrl = RequireLocation(loginPost);
-
-        var passwordPage = await client.GetAsync(passwordUrl, ct).ConfigureAwait(false);
-        var passwordBody = await passwordPage.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-        var passwordToken = ExtractAntiforgery(passwordBody);
-        var hiddenUsername = ExtractHidden(passwordBody, "Username") ?? username;
-        var hiddenReturnUrl = ExtractHidden(passwordBody, "returnUrl");
-
-        var passwordFields = new Dictionary<string, string>
-        {
-            ["Username"] = hiddenUsername,
-            ["Password"] = password,
-            ["__RequestVerificationToken"] = passwordToken,
-        };
-        if (hiddenReturnUrl is not null)
-            passwordFields["returnUrl"] = hiddenReturnUrl;
-
-        var passwordPost = await client.PostAsync(passwordUrl, FormContent(passwordFields), ct).ConfigureAwait(false);
-        var afterPassword = RequireLocation(passwordPost);
-
-        var authorizeAgain = await client.GetAsync(afterPassword, ct).ConfigureAwait(false);
-        var next = RequireLocation(authorizeAgain);
+        var next = await LoginAndGetAuthorizeRedirectAsync(username, password, clientId, redirectUri, challenge, ct).ConfigureAwait(false);
 
         string code;
         if (next.ToString().Contains("/account/consent", StringComparison.OrdinalIgnoreCase))
@@ -108,6 +68,71 @@ public sealed partial class OidcTestClient(HttpClient client)
             ?? throw new InvalidOperationException("Token response had no access_token.");
     }
 
+    /// <summary>
+    /// Drives login -&gt; password -&gt; the post-tenant-resolution redirect from /connect/authorize,
+    /// then stops - callers that need the full code/token exchange should use
+    /// <see cref="LoginAndGetAccessTokenAsync"/> instead. Exposed separately so a test can inspect
+    /// where /connect/authorize redirects to *before* consent/code issuance (e.g. asserting a
+    /// redirect to /account/mfa-enroll or /account/expired-password instead of consent).
+    /// </summary>
+    public async Task<Uri> LoginAndGetAuthorizeRedirectAsync(
+        string username, string password, string clientId, string redirectUri, string codeChallenge, CancellationToken ct = default)
+    {
+        var afterPassword = await PostPasswordAndGetRedirectAsync(username, password, clientId, redirectUri, codeChallenge, ct).ConfigureAwait(false);
+        var authorizeAgain = await client.GetAsync(afterPassword, ct).ConfigureAwait(false);
+        return RequireLocation(authorizeAgain);
+    }
+
+    /// <summary>
+    /// Drives login -&gt; password and returns the raw redirect target from the password POST
+    /// itself, without assuming it leads back to /connect/authorize - use this (instead of
+    /// <see cref="LoginAndGetAuthorizeRedirectAsync"/>) when what's under test is the password
+    /// step's own branching (e.g. an expired-password redirect to /account/expired-password,
+    /// which is a real page, not another redirect).
+    /// </summary>
+    public async Task<Uri> PostPasswordAndGetRedirectAsync(
+        string username, string password, string clientId, string redirectUri, string codeChallenge, CancellationToken ct = default)
+    {
+        var authorizeUrl = "/connect/authorize"
+            + $"?client_id={Uri.EscapeDataString(clientId)}"
+            + $"&redirect_uri={Uri.EscapeDataString(redirectUri)}"
+            + "&response_type=code"
+            + $"&scope={Uri.EscapeDataString("openid profile email")}"
+            + $"&code_challenge={Uri.EscapeDataString(codeChallenge)}"
+            + "&code_challenge_method=S256";
+
+        var loginRedirect = await client.GetAsync(authorizeUrl, ct).ConfigureAwait(false);
+        var loginUrl = RequireLocation(loginRedirect);
+
+        var loginPage = await client.GetAsync(loginUrl, ct).ConfigureAwait(false);
+        var loginToken = await ExtractAntiforgeryAsync(loginPage, ct).ConfigureAwait(false);
+
+        var loginPost = await client.PostAsync(loginUrl, FormContent(new()
+        {
+            ["Identifier"] = username,
+            ["__RequestVerificationToken"] = loginToken,
+        }), ct).ConfigureAwait(false);
+        var passwordUrl = RequireLocation(loginPost);
+
+        var passwordPage = await client.GetAsync(passwordUrl, ct).ConfigureAwait(false);
+        var passwordBody = await passwordPage.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        var passwordToken = ExtractAntiforgery(passwordBody);
+        var hiddenUsername = ExtractHidden(passwordBody, "Username") ?? username;
+        var hiddenReturnUrl = ExtractHidden(passwordBody, "returnUrl");
+
+        var passwordFields = new Dictionary<string, string>
+        {
+            ["Username"] = hiddenUsername,
+            ["Password"] = password,
+            ["__RequestVerificationToken"] = passwordToken,
+        };
+        if (hiddenReturnUrl is not null)
+            passwordFields["returnUrl"] = hiddenReturnUrl;
+
+        var passwordPost = await client.PostAsync(passwordUrl, FormContent(passwordFields), ct).ConfigureAwait(false);
+        return RequireLocation(passwordPost);
+    }
+
     private static Uri RequireLocation(HttpResponseMessage response)
         => response.Headers.Location
             ?? throw new InvalidOperationException($"Expected a redirect from {response.RequestMessage?.RequestUri}, got {(int)response.StatusCode}.");
@@ -137,7 +162,7 @@ public sealed partial class OidcTestClient(HttpClient client)
 
     private static FormUrlEncodedContent FormContent(Dictionary<string, string> fields) => new(fields);
 
-    private static (string Verifier, string Challenge) GeneratePkce()
+    public static (string Verifier, string Challenge) GeneratePkce()
     {
         var bytes = RandomNumberGenerator.GetBytes(32);
         var verifier = Base64Url(bytes);

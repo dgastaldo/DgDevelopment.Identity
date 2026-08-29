@@ -88,6 +88,61 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
     public Task<MyTenantsResponse?> GetMyTenantsAsync(CancellationToken ct = default)
         => http.GetFromJsonAsync<MyTenantsResponse>($"{options.Authority}/api/v1/me/tenants", ct);
 
+    public Task<MeResponse?> GetMeAsync(CancellationToken ct = default)
+        => http.GetFromJsonAsync<MeResponse>($"{options.Authority}/api/v1/me", ct);
+
+    public Task<HttpResponseMessage> ChangePasswordAsync(string currentPassword, string newPassword, CancellationToken ct = default)
+        => http.PutAsJsonAsync(new Uri($"{options.Authority}/api/v1/me/password"), new { currentPassword, newPassword }, ct);
+
+    public async Task<MeEmailResponse?> AddEmailAsync(string email, CancellationToken ct = default)
+    {
+        using var response = await http.PostAsJsonAsync($"{options.Authority}/api/v1/me/emails", new { email }, ct).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<MeEmailResponse>(ct).ConfigureAwait(false);
+    }
+
+    public Task<HttpResponseMessage> RemoveEmailAsync(string email, CancellationToken ct = default)
+        => http.DeleteAsync(new Uri($"{options.Authority}/api/v1/me/emails/{Uri.EscapeDataString(email)}"), ct);
+
+    public Task<HttpResponseMessage> SetPrimaryEmailAsync(string email, CancellationToken ct = default)
+        => http.PutAsJsonAsync(new Uri($"{options.Authority}/api/v1/me/emails/{Uri.EscapeDataString(email)}/primary"), new { }, ct);
+
+    public Task<TotpStatusResponse?> GetTotpStatusAsync(CancellationToken ct = default)
+        => http.GetFromJsonAsync<TotpStatusResponse>($"{options.Authority}/api/v1/account/mfa/totp/status", ct);
+
+    public async Task<TotpEnrollmentResponse?> EnrollTotpAsync(CancellationToken ct = default)
+    {
+        using var response = await http.PostAsJsonAsync($"{options.Authority}/api/v1/account/mfa/totp/enroll", new { }, ct).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<TotpEnrollmentResponse>(ct).ConfigureAwait(false);
+    }
+
+    public async Task<BackupCodesResponse?> EnableTotpAsync(string code, CancellationToken ct = default)
+    {
+        using var response = await http.PostAsJsonAsync($"{options.Authority}/api/v1/account/mfa/totp/enable", new { code }, ct).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<BackupCodesResponse>(ct).ConfigureAwait(false);
+    }
+
+    public async Task<BackupCodesResponse?> RegenerateBackupCodesAsync(CancellationToken ct = default)
+    {
+        using var response = await http.PostAsync(new Uri($"{options.Authority}/api/v1/account/mfa/totp/backup-codes/regenerate"), null, ct).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<BackupCodesResponse>(ct).ConfigureAwait(false);
+    }
+
+    public Task<HttpResponseMessage> DisableTotpAsync(CancellationToken ct = default)
+        => http.PostAsync(new Uri($"{options.Authority}/api/v1/account/mfa/totp/disable"), null, ct);
+
+    public Task<IReadOnlyCollection<PushDeviceResponse>?> GetPushDevicesAsync(CancellationToken ct = default)
+        => http.GetFromJsonAsync<IReadOnlyCollection<PushDeviceResponse>>($"{options.Authority}/api/v1/account/mfa/push-devices", ct);
+
+    public Task<HttpResponseMessage> RegisterPushDeviceAsync(string platform, string pushToken, string? deviceName = null, string? totpCode = null, CancellationToken ct = default)
+        => http.PostAsJsonAsync(new Uri($"{options.Authority}/api/v1/account/mfa/push-devices"), new { platform, pushToken, deviceName, totpCode }, ct);
+
+    public Task<HttpResponseMessage> RemovePushDeviceAsync(Guid id, CancellationToken ct = default)
+        => http.DeleteAsync(new Uri($"{options.Authority}/api/v1/account/mfa/push-devices/{id}"), ct);
+
     public Task<DashboardSummary?> GetDashboardSummaryAsync(bool allTenants = false, CancellationToken ct = default)
         => http.GetFromJsonAsync<DashboardSummary>($"{options.Authority}/api/v1/dashboard/summary?allTenants={allTenants}", ct);
 
@@ -309,6 +364,9 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
     public Task<IReadOnlyCollection<TenantAdminResponse>?> GetTenantsAdminAsync(CancellationToken ct = default)
         => http.GetFromJsonAsync<IReadOnlyCollection<TenantAdminResponse>>($"{options.Authority}/api/v1/tenants", ct);
 
+    public Task<HttpResponseMessage> SetTenantActiveAsync(Guid id, bool isActive, CancellationToken ct = default)
+        => http.PutAsJsonAsync(new Uri($"{options.Authority}/api/v1/tenants/{id}/active"), new { isActive }, ct);
+
     public async Task<TenantAdminResponse?> CreateTenantAsync(string name, string slug, CancellationToken ct = default)
     {
         using var response = await http.PostAsJsonAsync($"{options.Authority}/api/v1/tenants", new { name, slug }, ct).ConfigureAwait(false);
@@ -456,12 +514,44 @@ public sealed record TenantAdminResponse(
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("slug")] string Slug,
     [property: JsonPropertyName("isActive")] bool IsActive,
+    [property: JsonPropertyName("isPlatformTenant")] bool IsPlatformTenant,
     [property: JsonPropertyName("createdAt")] DateTime CreatedAt);
 
 public sealed record MyTenantsResponse(
     [property: JsonPropertyName("tenants")] IReadOnlyCollection<TenantResponse> Tenants,
     [property: JsonPropertyName("activeTenantId")] Guid ActiveTenantId,
     [property: JsonPropertyName("isGlobalAdministrator")] bool IsGlobalAdministrator);
+
+public sealed record MeEmailResponse(
+    [property: JsonPropertyName("id")] Guid Id,
+    [property: JsonPropertyName("email")] string Email,
+    [property: JsonPropertyName("isPrimary")] bool IsPrimary,
+    [property: JsonPropertyName("isVerified")] bool IsVerified);
+
+public sealed record MeResponse(
+    [property: JsonPropertyName("id")] Guid Id,
+    [property: JsonPropertyName("username")] string Username,
+    [property: JsonPropertyName("emails")] IReadOnlyCollection<MeEmailResponse> Emails,
+    [property: JsonPropertyName("requireMfa")] bool RequireMfa,
+    [property: JsonPropertyName("createdAt")] DateTime CreatedAt);
+
+public sealed record TotpStatusResponse(
+    [property: JsonPropertyName("isEnabled")] bool IsEnabled,
+    [property: JsonPropertyName("availableBackupCodes")] int AvailableBackupCodes);
+
+public sealed record TotpEnrollmentResponse(
+    [property: JsonPropertyName("secretKey")] string SecretKey,
+    [property: JsonPropertyName("provisioningUri")] string ProvisioningUri,
+    [property: JsonPropertyName("qrCodeDataUri")] string QrCodeDataUri);
+
+public sealed record BackupCodesResponse(
+    [property: JsonPropertyName("backupCodes")] IReadOnlyCollection<string> BackupCodes);
+
+public sealed record PushDeviceResponse(
+    [property: JsonPropertyName("id")] Guid Id,
+    [property: JsonPropertyName("platform")] string Platform,
+    [property: JsonPropertyName("deviceName")] string? DeviceName,
+    [property: JsonPropertyName("createdAt")] DateTime CreatedAt);
 
 public enum PermissionMode
 {

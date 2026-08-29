@@ -22,15 +22,22 @@ public sealed class DbSeeder(IServiceProvider serviceProvider)
 
         await db.Database.MigrateAsync().ConfigureAwait(false);
 
+        var provisioning = scope.ServiceProvider.GetRequiredService<ITenantProvisioningService>();
         var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Slug == "identity-tenant").ConfigureAwait(false);
         if (tenant is null)
         {
-            var provisioning = scope.ServiceProvider.GetRequiredService<ITenantProvisioningService>();
             var result = await provisioning.ProvisionAsync("Identity Tenant", "identity-tenant", isPlatformTenant: true).ConfigureAwait(false);
             tenant = result.Tenant;
         }
 
+        // Self-healing: backfills any permission/role added to StandardPermissionCatalog after a
+        // tenant was already provisioned, on every startup - see ReconcileAsync.
+        var tenantIds = await db.Tenants.Select(t => t.Id).ToListAsync().ConfigureAwait(false);
+        foreach (var tenantId in tenantIds)
+            await provisioning.ReconcileAsync(tenantId).ConfigureAwait(false);
+
         var clientCredentials = await SeedClientsAsync(db, tenant.Id).ConfigureAwait(false);
+        await SeedMauiClientAsync(db, tenant.Id).ConfigureAwait(false);
         var hasher = scope.ServiceProvider.GetRequiredService<Domain.Services.IPasswordHasher>();
         var superadminPassword = await SeedUsersAsync(db, hasher, tenant.Id).ConfigureAwait(false);
 
@@ -70,6 +77,34 @@ public sealed class DbSeeder(IServiceProvider serviceProvider)
         Console.WriteLine($"--- IdentityPlatform Client ID: {client.ClientId} ---");
         Console.WriteLine($"--- IdentityPlatform Client Secret: {clientSecret} ---");
         return (client.ClientId, clientSecret);
+    }
+
+    // The GUID here must match clients/DgDevelopment.Identity.Client.Maui/AppConfig.cs's ClientId
+    // constant exactly - the MAUI app has no secret to authenticate with (it's a Public/PKCE-only
+    // client), so its identity is this well-known Id rather than something generated per install.
+    // Runs unconditionally (unlike SeedClientsAsync, which only ever seeds once) so the MAUI
+    // client keeps working even on a database that already had other clients before this existed.
+    private static async Task SeedMauiClientAsync(IdentityDbContext db, Guid tenantId)
+    {
+        var mauiClientId = Guid.Parse("8f2b1a4c-6d3e-4a7b-9c1d-2e5f6a7b8c9d");
+        if (await db.Clients.AnyAsync(c => c.ClientId == mauiClientId).ConfigureAwait(false))
+            return;
+
+        var platform = await db.Platforms.FirstAsync(p => p.TenantId == tenantId && p.Name == "IdentityAdmin").ConfigureAwait(false);
+
+        var client = new Client(tenantId, mauiClientId, clientSecretHash: string.Empty, "MAUI App", ClientType.Public, platform.Id);
+        client.AddGrantType("authorization_code");
+        client.AddGrantType("refresh_token");
+        client.AddScope("openid");
+        client.AddScope("profile");
+        client.AddScope("email");
+        client.AddRedirectUri(new Uri("dgidentityapp://callback"));
+        client.AddPostLogoutRedirectUri(new Uri("dgidentityapp://callback"));
+
+        db.Clients.Add(client);
+        await db.SaveChangesAsync().ConfigureAwait(false);
+
+        Console.WriteLine($"--- MAUI App Client ID (Public/PKCE, no secret): {client.ClientId} ---");
     }
 
     private static async Task<string?> SeedUsersAsync(IdentityDbContext db, Domain.Services.IPasswordHasher hasher, Guid tenantId)

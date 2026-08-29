@@ -22,6 +22,12 @@ public sealed class TenantRepository(IdentityDbContext context) : ITenantReposit
         await context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
+    public async Task UpdateAsync(Tenant tenant, CancellationToken ct = default)
+    {
+        context.Tenants.Update(tenant);
+        await context.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
     public async Task<IReadOnlyCollection<TenantMembership>> GetMembershipsForUserAsync(Guid userId, CancellationToken ct = default)
         => await context.TenantMemberships
             .AsNoTracking()
@@ -29,11 +35,13 @@ public sealed class TenantRepository(IdentityDbContext context) : ITenantReposit
             .ToListAsync(ct)
             .ConfigureAwait(false);
 
+    // Deactivated tenants must stop being selectable/loggable even for their own members - not
+    // just rejected for cross-tenant access (that's TenantAccessValidator's IsActive check).
     public async Task<IReadOnlyCollection<Tenant>> GetTenantsForUserAsync(Guid userId, CancellationToken ct = default)
         => await (
             from membership in context.TenantMemberships.AsNoTracking()
             join tenant in context.Tenants.AsNoTracking() on membership.TenantId equals tenant.Id
-            where membership.UserId == userId && membership.Status == TenantMembershipStatus.Active
+            where membership.UserId == userId && membership.Status == TenantMembershipStatus.Active && tenant.IsActive
             select tenant
         ).ToListAsync(ct).ConfigureAwait(false);
 

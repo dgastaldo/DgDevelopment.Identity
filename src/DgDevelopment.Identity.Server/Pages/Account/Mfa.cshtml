@@ -1,5 +1,6 @@
 @page "/account/mfa"
 @model DgDevelopment.Identity.Server.Pages.Account.MfaModel
+@inject DgDevelopment.Identity.Server.Security.CspNonceService CspNonce
 @{
     ViewData["Title"] = "Two-factor verification";
 }
@@ -98,7 +99,7 @@
 
 @section Scripts {
     <script src="~/lib/signalr/signalr.min.js"></script>
-    <script>
+    <script nonce="@CspNonce.Nonce">
         (function () {
             const startPush = document.getElementById('start-push');
             const waiting = document.getElementById('push-waiting');

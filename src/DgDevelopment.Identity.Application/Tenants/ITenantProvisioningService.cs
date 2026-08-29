@@ -40,4 +40,14 @@ public interface ITenantProvisioningService
     /// and whether a SuperAdmin role/group is created at all.
     /// </param>
     Task<TenantProvisioningResult> ProvisionAsync(string name, string slug, bool isPlatformTenant = false, CancellationToken ct = default);
+
+    /// <summary>
+    /// Backfills a single already-provisioned tenant against the current <c>StandardPermissionCatalog</c>:
+    /// inserts any permission the tenant is missing, then grants it to the tenant's GlobalAdmin role
+    /// (and SuperAdmin too, if the tenant is the platform tenant). Fully idempotent - a no-op when
+    /// the tenant's catalog and roles are already up to date. Exists because the catalog is only ever
+    /// applied at provisioning time; nothing else keeps an existing tenant in sync when the catalog
+    /// changes later.
+    /// </summary>
+    Task ReconcileAsync(Guid tenantId, CancellationToken ct = default);
 }

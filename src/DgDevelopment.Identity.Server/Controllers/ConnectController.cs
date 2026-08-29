@@ -7,6 +7,7 @@ using DgDevelopment.Identity.OAuth.Services;
 using DgDevelopment.Identity.Server.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 [Route("connect")]
 public sealed partial class ConnectController : Controller
@@ -58,6 +59,7 @@ public sealed partial class ConnectController : Controller
     }
 
     [HttpPost("token")]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> Token([FromForm] TokenRequestForm form)
     {
         ArgumentNullException.ThrowIfNull(form);
@@ -226,6 +228,7 @@ public sealed partial class ConnectController : Controller
 
     [HttpGet("userinfo")]
     [HttpPost("userinfo")]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> UserInfo()
     {
         var authHeader = Request.Headers.Authorization.FirstOrDefault();

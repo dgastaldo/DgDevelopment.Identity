@@ -18,6 +18,8 @@ public sealed class IdentityWebApplicationFactory : WebApplicationFactory<Progra
     // doesn't, so the login client below must be pointed at this exact address too.
     public const string IssuerBaseAddress = "https://localhost";
 
+    public CapturingNotificationService Notifications { get; } = new();
+
     public IdentityWebApplicationFactory()
     {
         // Program.cs reads ConnectionStrings:IdentityDb into a local variable right after
@@ -28,6 +30,17 @@ public sealed class IdentityWebApplicationFactory : WebApplicationFactory<Progra
         // appsettings.Development.json's real connection string instead of this test database).
         Environment.SetEnvironmentVariable("ConnectionStrings__IdentityDb", ConnectionString);
         Environment.SetEnvironmentVariable("Identity__Issuer", IssuerBaseAddress);
+
+        // Same early-read timing concern as the two variables above (Program.cs reads the
+        // "RateLimiting" section into a local before Build() runs) - production defaults (20
+        // permits/minute on the "auth" policy) would trip almost immediately once dozens of
+        // integration tests share this one host instance. Rate-limiting behavior itself is
+        // covered deterministically by RateLimiterFactoryTests (unit test, fake HttpContext, no
+        // shared server) instead of relying on a real 429 here.
+        Environment.SetEnvironmentVariable("RateLimiting__Global__PermitLimit", "1000000");
+        Environment.SetEnvironmentVariable("RateLimiting__Global__WindowSeconds", "60");
+        Environment.SetEnvironmentVariable("RateLimiting__Auth__PermitLimit", "1000000");
+        Environment.SetEnvironmentVariable("RateLimiting__Auth__WindowSeconds", "60");
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -50,6 +63,11 @@ public sealed class IdentityWebApplicationFactory : WebApplicationFactory<Progra
             // and log in through this hasher repeatedly, so swap it for a trivial one.
             services.RemoveAll<IPasswordHasher>();
             services.AddSingleton<IPasswordHasher, FakePasswordHasher>();
+
+            // Captures registration/password-recovery emails instead of sending them, so tests
+            // can extract the verification/reset link exactly as a real recipient would.
+            services.RemoveAll<INotificationService>();
+            services.AddSingleton<INotificationService>(Notifications);
         });
     }
 }

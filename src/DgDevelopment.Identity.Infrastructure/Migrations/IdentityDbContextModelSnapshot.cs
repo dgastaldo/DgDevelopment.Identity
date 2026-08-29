@@ -260,44 +260,6 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                     b.ToTable("DeviceCodes");
                 });
 
-            modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.DomainEvent", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("AggregateId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("AggregateType")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("Data")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("EventType")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<DateTime>("Timestamp")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("Version")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AggregateId");
-
-                    b.HasIndex("AggregateType");
-
-                    b.ToTable("DomainEvents");
-                });
-
             modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.Group", b =>
                 {
                     b.Property<Guid>("Id")
@@ -388,6 +350,30 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("MfaChallenges");
+                });
+
+            modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.PasswordHistoryEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "CreatedAt");
+
+                    b.ToTable("PasswordHistoryEntries");
                 });
 
             modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.Permission", b =>
@@ -805,6 +791,12 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                     b.Property<DateTime?>("LockoutEnd")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("MfaGracePeriodStartedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("PasswordChangedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -963,6 +955,49 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("UserSessions");
+                });
+
+            modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.VerificationToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsUsed")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("TargetEmail")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("nvarchar(320)");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("VerificationTokens");
                 });
 
             modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.AuditLog", b =>
@@ -1147,6 +1182,15 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.MfaChallenge", b =>
+                {
+                    b.HasOne("DgDevelopment.Identity.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.PasswordHistoryEntry", b =>
                 {
                     b.HasOne("DgDevelopment.Identity.Domain.Entities.User", null)
                         .WithMany()
@@ -1475,6 +1519,15 @@ namespace DgDevelopment.Identity.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.UserSession", b =>
+                {
+                    b.HasOne("DgDevelopment.Identity.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DgDevelopment.Identity.Domain.Entities.VerificationToken", b =>
                 {
                     b.HasOne("DgDevelopment.Identity.Domain.Entities.User", null)
                         .WithMany()

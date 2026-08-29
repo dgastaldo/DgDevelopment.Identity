@@ -1,3 +1,5 @@
+using DgDevelopment.Identity.Application.Common;
+using DgDevelopment.Identity.Application.Services;
 using DgDevelopment.Identity.Domain.Entities;
 using DgDevelopment.Identity.Domain.Repositories;
 using DgDevelopment.Identity.Domain.Services;
@@ -12,7 +14,9 @@ public sealed class UserService(
     IGroupRepository groupRepository,
     IClientRepository clientRepository,
     ITenantRepository tenantRepository,
-    IPasswordHasher passwordHasher) : IUserService
+    IPasswordHasher passwordHasher,
+    IPasswordHistoryService passwordHistoryService,
+    ISessionRevocationService sessionRevocationService) : IUserService
 {
     public async Task<PagedResult<User>> GetPagedAsync(string? search, int page, int pageSize, Guid tenantId, bool allTenants, CancellationToken ct = default)
     {
@@ -39,8 +43,8 @@ public sealed class UserService(
     public async Task<User> CreateAsync(string username, string password, string email, bool isSystemAccount, Guid tenantId, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(username);
-        ArgumentException.ThrowIfNullOrWhiteSpace(password);
         ArgumentException.ThrowIfNullOrWhiteSpace(email);
+        PasswordPolicy.Validate(password);
 
         var user = new User(username, passwordHasher.HashPassword(password), EmailAddress.FromString(email), isSystemAccount);
         await userRepository.AddAsync(user, ct).ConfigureAwait(false);
@@ -65,10 +69,14 @@ public sealed class UserService(
 
     public async Task<User> ResetPasswordAsync(Guid id, string password, Guid tenantId, bool allTenants, CancellationToken ct = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(password);
+        PasswordPolicy.Validate(password);
         var user = await GetRequiredAsync(id, tenantId, allTenants, ct).ConfigureAwait(false);
+        await passwordHistoryService.EnsureNotReusedAsync(user.Id, password, user.PasswordHash, ct).ConfigureAwait(false);
+        var previousHash = user.PasswordHash;
         user.SetPassword(passwordHasher.HashPassword(password));
         await userRepository.UpdateAsync(user, ct).ConfigureAwait(false);
+        await passwordHistoryService.RecordChangeAsync(user.Id, previousHash, ct).ConfigureAwait(false);
+        await sessionRevocationService.RevokeAllAsync(user.Id, ct).ConfigureAwait(false);
         return user;
     }
 

@@ -39,5 +39,8 @@ public sealed class EffectivePermissionsServiceTests
     {
         public Task<IReadOnlyCollection<EffectivePermission>> GetEffectivePermissionsAsync(Guid userId, Guid tenantId, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyCollection<EffectivePermission>>(permissions);
+
+        public Task<bool> HasAnyRoleAsync(Guid userId, Guid tenantId, IReadOnlyCollection<string> roleNames, CancellationToken ct = default)
+            => Task.FromResult(false);
     }
 }

@@ -1,0 +1,18 @@
+@page "/account/verify-email"
+@model DgDevelopment.Identity.Server.Pages.Account.VerifyEmailModel
+@{
+    ViewData["Title"] = "Verify email";
+}
+
+<div class="auth-card">
+    <h1 class="auth-brand">DgDevelopment Identity Server</h1>
+    @if (Model.Success)
+    {
+        <p class="text-sm text-gray-600 text-center">Your email address has been verified.</p>
+    }
+    else
+    {
+        <p class="text-sm text-gray-600 text-center">This verification link is invalid or has expired.</p>
+    }
+    <p class="text-sm text-center mt-4"><a href="/account/login">Back to sign in</a></p>
+</div>
