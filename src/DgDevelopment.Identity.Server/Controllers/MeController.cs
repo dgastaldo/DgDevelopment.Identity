@@ -22,6 +22,7 @@ public sealed class MeController(
     ITenantContext tenantContext,
     IUserRepository userRepository,
     IPasswordHasher passwordHasher,
+    IPasswordHistoryService passwordHistoryService,
     IVerificationTokenRepository verificationTokenRepository,
     INotificationService notificationService) : ControllerBase
 {
@@ -73,14 +74,17 @@ public sealed class MeController(
         try
         {
             PasswordPolicy.Validate(request.NewPassword!);
+            await passwordHistoryService.EnsureNotReusedAsync(user.Id, request.NewPassword!, user.PasswordHash, ct).ConfigureAwait(false);
         }
         catch (ArgumentException ex)
         {
             return Problem(statusCode: StatusCodes.Status400BadRequest, title: "Invalid password", detail: ex.Message);
         }
 
+        var previousHash = user.PasswordHash;
         user.SetPassword(passwordHasher.HashPassword(request.NewPassword!));
         await userRepository.UpdateAsync(user, ct).ConfigureAwait(false);
+        await passwordHistoryService.RecordChangeAsync(user.Id, previousHash, ct).ConfigureAwait(false);
 
         return NoContent();
     }

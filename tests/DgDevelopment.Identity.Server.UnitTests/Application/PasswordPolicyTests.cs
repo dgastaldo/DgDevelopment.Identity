@@ -12,6 +12,24 @@ public sealed class PasswordPolicyTests
         Assert.Null(exception);
     }
 
+    [Fact]
+    public void ValidateRejectsAPasswordWithNoUppercaseLetter()
+    {
+        Assert.Throws<ArgumentException>(() => PasswordPolicy.Validate("no-uppercase-1"));
+    }
+
+    [Fact]
+    public void ValidateRejectsAPasswordWithNoLowercaseLetter()
+    {
+        Assert.Throws<ArgumentException>(() => PasswordPolicy.Validate("NO-LOWERCASE-1"));
+    }
+
+    [Fact]
+    public void ValidateRejectsAPasswordWithNoSpecialCharacter()
+    {
+        Assert.Throws<ArgumentException>(() => PasswordPolicy.Validate("NoSpecialChar1"));
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]
