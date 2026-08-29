@@ -1,5 +1,6 @@
 using DgDevelopment.Identity.Application.Audit;
 using DgDevelopment.Identity.Application.Clients;
+using DgDevelopment.Identity.Application.Common;
 using DgDevelopment.Identity.Application.Consent;
 using DgDevelopment.Identity.Application.Groups;
 using DgDevelopment.Identity.Application.Platforms;
@@ -41,6 +42,7 @@ builder.Services.AddScoped<DgDevelopment.Identity.Application.Authorization.ITen
 builder.Services.AddScoped<DgDevelopment.Identity.Application.Authorization.ITenantSelectionService, DgDevelopment.Identity.Application.Authorization.TenantSelectionService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IPasswordHistoryService, PasswordHistoryService>();
 builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddScoped<IGroupService, GroupService>();
 builder.Services.AddScoped<IClientService, ClientService>();

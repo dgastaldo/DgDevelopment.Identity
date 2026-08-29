@@ -40,6 +40,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
     public DbSet<VerificationToken> VerificationTokens => Set<VerificationToken>();
+    public DbSet<PasswordHistoryEntry> PasswordHistoryEntries => Set<PasswordHistoryEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -10,9 +10,13 @@ public static class PasswordPolicy
 
         if (password.Length < MinimumLength)
             throw new ArgumentException($"Password must be at least {MinimumLength} characters long.", nameof(password));
-        if (!password.Any(char.IsLetter))
-            throw new ArgumentException("Password must contain at least one letter.", nameof(password));
+        if (!password.Any(char.IsUpper))
+            throw new ArgumentException("Password must contain at least one uppercase letter.", nameof(password));
+        if (!password.Any(char.IsLower))
+            throw new ArgumentException("Password must contain at least one lowercase letter.", nameof(password));
         if (!password.Any(char.IsDigit))
             throw new ArgumentException("Password must contain at least one digit.", nameof(password));
+        if (!password.Any(c => !char.IsLetterOrDigit(c)))
+            throw new ArgumentException("Password must contain at least one special character.", nameof(password));
     }
 }

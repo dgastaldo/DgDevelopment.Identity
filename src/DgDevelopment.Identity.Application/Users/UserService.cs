@@ -13,7 +13,8 @@ public sealed class UserService(
     IGroupRepository groupRepository,
     IClientRepository clientRepository,
     ITenantRepository tenantRepository,
-    IPasswordHasher passwordHasher) : IUserService
+    IPasswordHasher passwordHasher,
+    IPasswordHistoryService passwordHistoryService) : IUserService
 {
     public async Task<PagedResult<User>> GetPagedAsync(string? search, int page, int pageSize, Guid tenantId, bool allTenants, CancellationToken ct = default)
     {
@@ -68,8 +69,11 @@ public sealed class UserService(
     {
         PasswordPolicy.Validate(password);
         var user = await GetRequiredAsync(id, tenantId, allTenants, ct).ConfigureAwait(false);
+        await passwordHistoryService.EnsureNotReusedAsync(user.Id, password, user.PasswordHash, ct).ConfigureAwait(false);
+        var previousHash = user.PasswordHash;
         user.SetPassword(passwordHasher.HashPassword(password));
         await userRepository.UpdateAsync(user, ct).ConfigureAwait(false);
+        await passwordHistoryService.RecordChangeAsync(user.Id, previousHash, ct).ConfigureAwait(false);
         return user;
     }
 

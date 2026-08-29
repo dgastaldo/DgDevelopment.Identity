@@ -1,5 +1,6 @@
 namespace DgDevelopment.Identity.Server.UnitTests.MultiTenant;
 
+using DgDevelopment.Identity.Application.Common;
 using DgDevelopment.Identity.Application.Users;
 using DgDevelopment.Identity.Domain.Entities;
 using DgDevelopment.Identity.Domain.ValueObjects;
@@ -27,7 +28,8 @@ public sealed class MultiTenantUserServiceTests : IClassFixture<DatabaseFixture<
             new GroupRepository(context),
             new ClientRepository(context),
             new TenantRepository(context),
-            new FakePasswordHasher());
+            new FakePasswordHasher(),
+            new PasswordHistoryService(new PasswordHistoryRepository(context), new FakePasswordHasher()));
 
     private static async Task<Tenant> CreateTenantAsync(IdentityDbContext context, string name)
     {

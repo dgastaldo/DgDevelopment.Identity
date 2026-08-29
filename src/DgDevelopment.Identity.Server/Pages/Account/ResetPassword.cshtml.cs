@@ -12,7 +12,8 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 public sealed class ResetPasswordModel(
     IVerificationTokenRepository verificationTokenRepository,
     IUserRepository userRepository,
-    IPasswordHasher passwordHasher) : PageModel
+    IPasswordHasher passwordHasher,
+    IPasswordHistoryService passwordHistoryService) : PageModel
 {
     [BindProperty] public string Token { get; set; } = string.Empty;
     [BindProperty] public string Password { get; set; } = string.Empty;
@@ -65,8 +66,20 @@ public sealed class ResetPasswordModel(
             return Page();
         }
 
+        try
+        {
+            await passwordHistoryService.EnsureNotReusedAsync(user.Id, Password, user.PasswordHash).ConfigureAwait(false);
+        }
+        catch (ArgumentException ex)
+        {
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return Page();
+        }
+
+        var previousHash = user.PasswordHash;
         user.SetPassword(passwordHasher.HashPassword(Password));
         await userRepository.UpdateAsync(user).ConfigureAwait(false);
+        await passwordHistoryService.RecordChangeAsync(user.Id, previousHash).ConfigureAwait(false);
         await verificationTokenRepository.MarkUsedAsync(verification.Id).ConfigureAwait(false);
 
         Success = true;

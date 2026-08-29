@@ -40,6 +40,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IPlatformRepository, PlatformRepository>();
         services.AddScoped<ITenantRepository, TenantRepository>();
         services.AddScoped<IVerificationTokenRepository, VerificationTokenRepository>();
+        services.AddScoped<IPasswordHistoryRepository, PasswordHistoryRepository>();
 
         services.AddSingleton<IPasswordHasher, Argon2PasswordHasher>();
         services.AddScoped<ISecretProtector, TotpSecretProtector>();
