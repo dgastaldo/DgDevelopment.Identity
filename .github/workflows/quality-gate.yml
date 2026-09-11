@@ -36,7 +36,9 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
   build-test-sonar:
-    runs-on: ubuntu-latest
+    # Must run on the self-hosted (NUC) runner, not a GitHub-hosted one - SonarQube is only
+    # reachable on the home LAN, a GitHub-hosted runner in the cloud couldn't reach it.
+    runs-on: [self-hosted, home-pc]
     needs: snyk
     steps:
       - uses: actions/checkout@v4
