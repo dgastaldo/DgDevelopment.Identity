@@ -10,7 +10,7 @@ This file provides full project context for AI tools and LLMs operating on the r
 
 The OAuth 2.0 / OIDC authentication cycle is **fully merged into `develop`** (PRs #1–#33). PRs #34–#49 are also merged: the admin client was renamed `AdminUi` → **`IdentityPlatform`** (with GUID client IDs), an admin authorization foundation landed (`RequirePermissionAttribute`, `IPermissionEvaluator`), a Users administration API + dashboard + Blazor UI shipped, a **multi-tenant foundation** (`Tenant`/`TenantMembership`, `ITenantContext`, `tid` token claim, tenant switcher UI) made all of the above tenant-aware, a tenant-aware **Roles/Permissions/Groups/Clients/Platforms/Audit/Tenants admin API + UI** shipped, `Role`/`Permission` became platform-scoped with a real `TenantProvisioningService`, and the **`IntegrationTests` project** was brought forward with real-HTTP end-to-end coverage. PR #49 additionally fixed a real cross-tenant privilege-escalation bug affecting the *entire* `allTenants` authorization model (`Tenant.IsPlatformTenant`, see the dedicated bullet below), not just the new `TenantsController`.
 
-**Milestone M1 is complete.** PRs #50–#57 are all merged: tenant deactivate/activate + permission-catalog reconciliation (#50), self-registration/password-recovery (#51), self-service MFA/profile pages (#52), a first-cut MAUI client SDK (#53, technically M2 scope, built opportunistically), password-policy hardening + mandatory admin MFA (#54), the E2E-testing-strategy reference doc (#55), rate limiting/CSP headers + removal of the dormant Event Store scaffolding (#56), and session/refresh-token revocation with real-time push on password change, wired all the way into every client (#57). See "Implemented" below for what each of those actually shipped, and "Next steps" for the M2+ roadmap. **This docs pass is the last M1 step** — the forward merge (`develop` → `docs` → `integration` → `main`) is unblocked once it lands.
+**Milestone M1 is complete.** PRs #50–#57 are all merged: tenant deactivate/activate + permission-catalog reconciliation (#50), self-registration/password-recovery (#51), self-service MFA/profile pages (#52), a first-cut MAUI client SDK (#53, technically M2 scope, built opportunistically), password-policy hardening + mandatory admin MFA (#54), the E2E-testing-strategy reference doc (#55), rate limiting/CSP headers + removal of the dormant Event Store scaffolding (#56), and session/refresh-token revocation with real-time push on password change, wired all the way into every client (#57). See "Implemented" below for what each of those actually shipped, and "Next steps" for the M2+ roadmap. **This docs pass is the last M1 step** — the forward merge (`develop` → `personal` → `docs` → `integration` → `main`, `personal` newly inserted into the chain — see `docs/deployment.md`) is unblocked once it lands.
 
 **TOTP + Push MFA** (merged, PR #33): RFC 6238 enrollment/verification with QR code and hashed single-use backup codes, plus push-mfa primitives (device registry, challenge lifecycle, ANH notifier). MFA login step via partial-authentication cookie (`Identity.Partial`) wired into the password page → `Account/Mfa` page. See `docs/mfa.md`.
 
@@ -81,7 +81,7 @@ Known, explicitly-accepted gaps rather than oversights - listed here so they don
 - **MFA push-device registration in the MAUI client uses a placeholder token** - no real FCM/APNs push SDK is wired up yet (M2/M3 work).
 - **No UI-level end-to-end test automation** for the MAUI app or `IdentityPlatform` - see `docs/e2e-testing-strategy.md` for what that would take per platform and why it's not done now.
 
-After M1: **forward merge** `develop` → `docs` → `integration` → `main`, then milestones M2–M4 (SAML 2.0, React/WPF client SDKs + finishing the MAUI/Blazor ones, Push MFA + external providers, localization integration).
+After M1: **forward merge** `develop` → `personal` → `docs` → `integration` → `main` (`docs` is genuinely public, hosting the IDP's own API documentation for third-party integrators, not just a stage name — see `docs/deployment.md`), then milestones M2–M4 (SAML 2.0, React/WPF client SDKs + finishing the MAUI/Blazor ones, Push MFA + external providers, localization integration). A GitHub Actions CI/CD pipeline automating this promotion (`develop`/`personal` implemented so far, `docs`/`integration`/`production` designed but not yet provisioned) is under active development — see `docs/deployment.md` for the full design.
 
 ## Architecture Rules
 
@@ -209,21 +209,30 @@ dotnet format
 ```
 main ──── Production
   ▲
-integration ──── Third-party integration testing
+integration ──── First publicly-reachable tier ("preview prod")
   ▲
-docs ──── API documentation + generated OpenAPI
+docs ──── Public API documentation + generated OpenAPI, for third-party integrators
   ▲
-develop ──── Active development (base for all feature/fix branches)
+personal ──── Always-on personal deployment (own PC, Docker Compose)
+  ▲
+develop ──── Active development (base for all feature/fix branches);
+  │          also the source for an ephemeral per-merge test stack - see docs/deployment.md
   ▲
 feature/*  fix/*
 ```
 
+`personal` sits in the chain between `develop` and `docs` — every environment runs identical
+application code, differing only in deploy-time configuration, so promoting `personal` forward is
+no different from promoting `develop` directly. See `docs/deployment.md` for the full CI/CD design
+(the promotion cascade, deploy triggers, and why `develop` itself is never a persistent deployment).
+
 ### Rules
 
-- `main`, `integration`, `docs`: **no direct commits** — only merges from lower branches.
+- `main`, `integration`, `docs`, `personal`: **no direct commits** — only merges from lower branches.
 - `develop`: feature/fix branches merged via **PR + squash merge** (1 approval required).
-- **Merge forward**: `develop` → `docs` → `integration` → `main` (when promoted).
-- **Merge backward**: hotfixes on `main` flow back: `main` → `integration` → `docs` → `develop`.
+- **Merge forward**: `develop` → `personal` → `docs` → `integration` → `main` (when promoted).
+- **Merge backward**: hotfixes on `main` flow back: `main` → `integration` → `docs` → `personal` →
+  `develop`.
 - Branch naming: `feature/<description>` or `fix/<description>` (kebab-case, English).
 - Stacked PRs target the parent feature branch, not develop directly.
 

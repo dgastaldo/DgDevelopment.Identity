@@ -1,0 +1,47 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "packages": {
+    "clients/DgDevelopment.Identity.Client.Core": {
+      "release-type": "simple",
+      "component": "client-core",
+      "include-component-in-tag": true,
+      "tag-separator": "-",
+      "changelog-path": "CHANGELOG.md"
+    },
+    "clients/DgDevelopment.Identity.Client.Blazor": {
+      "release-type": "simple",
+      "component": "client-blazor",
+      "include-component-in-tag": true,
+      "tag-separator": "-",
+      "changelog-path": "CHANGELOG.md"
+    },
+    "clients/DgDevelopment.Identity.Client.Maui": {
+      "release-type": "simple",
+      "component": "client-maui",
+      "include-component-in-tag": true,
+      "tag-separator": "-",
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        {
+          "type": "xml",
+          "path": "DgDevelopment.Identity.Client.Maui.csproj",
+          "xpath": "//ApplicationDisplayVersion"
+        }
+      ]
+    },
+    "clients/DgDevelopment.Identity.Client.Wpf": {
+      "release-type": "simple",
+      "component": "client-wpf",
+      "include-component-in-tag": true,
+      "tag-separator": "-",
+      "changelog-path": "CHANGELOG.md"
+    },
+    "clients/DgDevelopment.Identity.Client.React": {
+      "release-type": "node",
+      "component": "client-react",
+      "include-component-in-tag": true,
+      "tag-separator": "-",
+      "changelog-path": "CHANGELOG.md"
+    }
+  }
+}

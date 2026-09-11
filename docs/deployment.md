@@ -130,16 +130,22 @@ workflow, needs no external counter):
 then — if X has a next branch in the chain — opens the `X→next` promotion PR. One workflow, two
 side effects.
 
-## Client package/app versioning (`Client.Core`, `Client.Blazor`, `Client.Maui`, `Client.Wpf`)
+## Client package/app versioning (`Client.Core`, `Client.Blazor`, `Client.Maui`, `Client.Wpf`, `Client.React`)
 
 **Decided**: a separate, real-semver scheme from the app deploy tags above, driven automatically by
-Conventional Commits — and it applies to **all four** `clients/*` projects, not just the two NuGet
+Conventional Commits — and it applies to **all five** `clients/*` projects, not just the two NuGet
 libraries. `Client.Core`/`Client.Blazor` ship to NuGet, where consumers depend on the version number
 meaning something (breaking change → major, new capability → minor, fix → patch); `Client.Maui`/
 `Client.Wpf` are apps (not NuGet packages — `OutputType=Exe`) but still need their own independent
 version numbers (MSIX/store package version, `ApplicationDisplayVersion` in the `.csproj`, etc.) on
-their own release cadence, for whatever their eventual distribution channel turns out to be. Four
-independent components, same versioning mechanism.
+their own release cadence, for whatever their eventual distribution channel turns out to be.
+**`Client.React`** — discovered mid-implementation to already have real scaffolding
+(`package.json` as `@dgdevelopment/identity-client`, `tsconfig.json`, `src/`), further along than
+`CONTEXT.md`/`functional-specification.md` suggested ("Planned", Milestone 3) but still presumably
+embryonic — is an npm package, not NuGet, so it gets release-please's `node` release type instead
+(bumps `package.json`'s `version` field directly) rather than the `.NET`/`csproj` machinery the
+other four use. Five independent components, same versioning mechanism, two different release-type
+strategies under the hood.
 
 **Proposed tool: [release-please](https://github.com/googleapis/release-please)** (Google), not
 semantic-release — the deciding factor is that this is a **monorepo with independent components**,
@@ -152,12 +158,19 @@ review/approval moment for free, in the same spirit as this design's other promo
 than every commit silently shipping a new release. For `Client.Core`/`Client.Blazor`, release-please
 has a native .NET/NuGet release type that bumps the version directly in the `.csproj`; for
 `Client.Maui`/`Client.Wpf` the "release type" is more generic (bump `ApplicationDisplayVersion`/
-equivalent) since there's no NuGet publish step to hand off to yet — see the open question below.
+equivalent) since there's no NuGet publish step to hand off to yet — see the open question below;
+for `Client.React`, the native `node` release type bumps `package.json` and generates a
+`CHANGELOG.md`, same as the npm ecosystem convention.
 
 Consequence worth flagging: this needs **Conventional Commit discipline** going forward on commits
-touching any of the four `clients/*` project directories — release-please can't compute a bump from
+touching any of the five `clients/*` project directories — release-please can't compute a bump from
 a commit message that doesn't follow the convention. Not a concern for commits touching only `src/`
 or `tests/`.
+
+`Client.React` publishing itself (an actual `npm publish` step, an npm account/token) is **not**
+part of this pass — release-please will version and tag it once it feeds real commits, but nothing
+consumes that tag yet, mirroring exactly the still-open `Client.Maui`/`Client.Wpf` distribution
+question below. Flagging now so it isn't a surprise later, not solving it now.
 
 **How the bump is decided** — from the prefix of each commit message touching that component's
 path, since the last release for it; the highest-priority type found wins (one `feat!:` among ten
@@ -179,7 +192,8 @@ normal path.
 Tag prefixes (release-please's default per-component format), independent version numbers since one
 component changing shouldn't bump another's: `client-core-v1.2.0`, `client-blazor-v1.2.0`,
 `client-maui-v1.0.0`, `client-wpf-v1.0.0` (the latter presumably starting once `Client.Wpf` is more
-than a scaffold).
+than a scaffold), `client-react-v0.2.0` (`Client.React` already has `"version": "0.1.0"` in its
+`package.json` — release-please picks up from whatever's there, no manual reset needed).
 
 **Decided: `develop` feeds release-please.** Keeps package/app release cadence independent of the
 app's own promotion cascade — a library fix doesn't need to wait for someone to decide to promote
@@ -513,6 +527,13 @@ diagnosable from the workflow run itself without needing anything to persist on 
 
 - **Fully greenfield for CI/CD**: `.github/workflows/` is empty, no Dockerfiles, no Helm/Bicep, no
   `appsettings.Production.json`, no versioning scheme anywhere in the repo.
+- **`Client.React` is further along than the other docs suggested**: `CONTEXT.md`/
+  `functional-specification.md` both list it as "Planned" (Milestone 3), but
+  `clients/DgDevelopment.Identity.Client.React/` already has a real npm package scaffold
+  (`package.json` as `@dgdevelopment/identity-client`, `tsconfig.json`, `src/`) — presumably still
+  embryonic, but real enough to include in `release-please`'s versioning from the start rather than
+  bolt on later. Added as the fifth component, using release-please's `node` release type instead
+  of the `.NET`-oriented one the other four use.
 - **`IdentityDb`** is today an `AddConnectionString` parameter in `AppHost.cs` — bring-your-own, not
   Aspire-provisioned. That model stays for `docs`/`integration`/`production` (Azure SQL, provisioned
   separately, connection string supplied as a secret). For `develop`/`personal` specifically, since
@@ -635,11 +656,14 @@ not now).
    wrapped by the SonarQube scan → CodeQL as its own parallel job. **Will fail until its secrets
    exist** (`SNYK_TOKEN`, `SONARQUBE_URL`, `SONARQUBE_TOKEN`, per items 10-11 below) — expected,
    not a bug.
-5. `release-please.yml` (triggered on push to `develop`) + its manifest config for the four
-   `clients/*` components — not yet written, unrelated to getting `develop`/`personal` working.
-6. `publish-client-maui.yml` (triggered on `client-maui-v*` tags) — not yet written, same reason.
-7. `CONTEXT.md`: update the forward-merge description to the five-branch chain, and add the `docs`
-   environment clarification (genuinely public API docs, not just a stage name) — not yet done.
+5. ✅ `.github/workflows/release-please.yml` (triggered on push to `develop`) + its manifest config
+   for all five `clients/*` components (`Client.React` included once discovered mid-implementation
+   — see above).
+6. ✅ `.github/workflows/publish-client-maui.yml` (triggered on `client-maui-v*` tags) — builds the
+   Windows zip + signed MSIX + Android APK, publishes a GitHub Release with all three attached and
+   a note about trusting the self-signed certificate.
+7. ✅ `CONTEXT.md`: forward-merge description updated to the five-branch chain (`personal` inserted
+   between `develop` and `docs`), `docs` environment clarification added.
 
 **Needs your Azure/GitHub/NUC access, can happen in parallel with the above:**
 
