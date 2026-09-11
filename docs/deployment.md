@@ -280,14 +280,16 @@ One reusable workflow with the actual Aspire CLI steps, thin per-branch trigger 
 each environment's trigger/approval stays declarative:
 
 - **`.github/workflows/_deploy.yml`** (`workflow_call`) — checkout, .NET 10 SDK, Aspire CLI
-  install, `dotnet restore`/`build`, GHCR login, Azure login (OIDC, all five environments now, since
-  `develop`/`personal` need it too for Key Vault reads), `aspire deploy --non-interactive` with
-  `Parameters__deploy_target` and target-specific `Azure__*`/`Parameters__*` env vars from the
-  caller. Input: which ref/tag to check out and deploy — defaults to `github.ref` (the tag that
-  triggered the run), but overridable, which is what rollback (below) uses.
-- **`deploy-develop.yml`** — `push: branches: [develop]`; self-hosted `home-pc` runner; no approval.
+  install, `dotnet restore`/`build`, GHCR login, Azure login (OIDC, `docs`/`integration`/
+  `production` only — `develop`/`personal` need no Azure auth at all, their secrets come straight
+  from their GitHub Environment), `aspire deploy --non-interactive` with `Parameters__deploy_target`
+  and target-specific `Azure__*`/`Parameters__*` env vars from the caller. Input: which ref/tag to
+  check out and deploy — defaults to `github.ref` (the tag that triggered the run), but overridable,
+  which is what rollback (below) uses.
+- **`deploy-develop.yml`** — `push: branches: [develop]`; self-hosted `home-pc` (Ubuntu) runner;
+  `environment: develop` (no required reviewer — scopes secrets only, doesn't gate).
 - **`deploy-personal.yml`** — `push: tags: ['personal/v*']` + `workflow_dispatch` (manual rollback,
-  see below); same self-hosted runner; no approval.
+  see below); same self-hosted runner; `environment: personal` (same no-gate scoping).
 - **`deploy-docs.yml`** — `push: tags: ['docs/v*']` + `workflow_dispatch`; `environment: docs`;
   `ubuntu-latest`.
 - **`deploy-integration.yml`** — `push: tags: ['integration/v*']` + `workflow_dispatch`;
@@ -318,25 +320,32 @@ deploy.
 
 None of this can be done by editing the repo:
 
-1. **Self-hosted runner on the home PC** — register from repo Settings → Actions → Runners,
-   labeled e.g. `home-pc`; needs Docker (Compose v2) installed and running.
-2. **GitHub Environments** — create `docs`, `integration`, `production`, each with a required
-   reviewer, for the approval gate. `personal`/`develop` deliberately get no Environment (no gate).
+1. **Self-hosted runner on the home PC** (Ubuntu, not Windows — corrected from an earlier
+   assumption) — register from repo Settings → Actions → Runners, choosing Linux/x64, labeled e.g.
+   `home-pc`. Needs Docker + Compose installed, and the runner's user in the `docker` group
+   (`sudo usermod -aG docker $USER`, then re-login) so it can run `docker compose` without `sudo`.
+   Install as a systemd service via the runner package's `sudo ./svc.sh install && sudo ./svc.sh start`
+   rather than leaving it running in a foreground terminal.
+2. **GitHub Environments** — create all five: `docs`, `integration`, `production` each with a
+   required reviewer (the actual approval gate); `personal` and `develop` too, but with **no**
+   protection rules — an Environment without a required reviewer still deploys automatically, it
+   just gives those two branches a secret-scoping boundary instead of dumping everything into
+   repository-wide secrets. This replaces the Key Vault idea entirely (see "Azure infrastructure"
+   below) — no Azure dependency needed just to hold a connection string.
 3. **Azure** — an app registration with federated credentials (OIDC, `azure/login`) per Azure
    Environment's secrets (`AZURE_CLIENT_ID`/`AZURE_TENANT_ID`/`AZURE_SUBSCRIPTION_ID`), plus
    resource-group name/location as Environment variables — one set for `docs`, two for
-   `integration`/`production` (separate resource groups). **`develop`/`personal` now need an OIDC
-   app registration too** (see "Azure infrastructure" below) — not to deploy Azure compute, just to
-   authenticate the self-hosted runner for Key Vault reads.
+   `integration`/`production` (separate resource groups). **`develop`/`personal` need no Azure login
+   at all** now that Key Vault is out of the picture — whatever ANH/ACS connection strings they end
+   up using are just plain GitHub Environment secrets, no runtime Azure authentication required to
+   read them.
 4. **GHCR** — confirm package visibility for `ghcr.io/dgastaldo/...` and generate whatever pull
    credential the AKS clusters need (PAT with `read:packages`, stored as an Environment secret,
    turned into a k8s imagePullSecret during deploy).
 5. **DB connection strings** — provisioning the actual SQL Server/Azure SQL instance itself stays
-   out of scope for this pass (see "Findings" below) — you provision it. For `docs`/`integration`/
-   `production`, the connection string is a GitHub Environment secret (`Parameters__IdentityDb`);
-   for `develop`/`personal` it instead lives in that environment's Key Vault (see "Azure
-   infrastructure" below) and gets read at deploy time, since those two branches have no GitHub
-   Environment to hold a secret in.
+   out of scope for this pass (see "Findings" below) — you provision it. The connection string is a
+   GitHub Environment secret (`Parameters__IdentityDb`) in all five environments now, `develop`/
+   `personal` included (per point 2 above).
 6. **Windows MSIX signing certificate** — generate a self-signed code-signing certificate
    (`New-SelfSignedCertificate`), export as a password-protected `.pfx`, store the base64-encoded
    `.pfx` and its password as repository secrets `WINDOWS_SIGNING_CERT_BASE64`/
@@ -345,10 +354,10 @@ None of this can be done by editing the repo:
 
 ## Azure infrastructure for `develop`/`personal`
 
-`develop` and `personal` still run entirely on the home PC (Docker Compose, self-hosted runner) —
-that hasn't changed. But three pieces need real Azure resources even though the app itself never
-leaves the PC: two are cloud services the code already calls or will call, one is where secrets for
-these two branches actually live (since neither has a GitHub Environment to hold secrets in):
+`develop` and `personal` still run entirely on a home PC (Ubuntu, Docker Compose, self-hosted
+runner) — that hasn't changed, and neither needs an Azure *subscription* just to deploy the app
+itself. Two pieces are genuinely cloud-only services the code already calls or will call — nothing
+to do with hosting, and both entirely optional to provision right now:
 
 - **Azure Notification Hub (ANH)** — already wired in code (`AzureNotificationHubNotifier`,
   the only `IPushNotifier` implementation) for push-MFA challenge delivery. It no-ops silently if
@@ -356,13 +365,16 @@ these two branches actually live (since neither has a GitHub Environment to hold
 - **Azure Communication Services (ACS)**, for email — not wired in code yet (`SmtpNotificationService`
   is the only `INotificationService` today). Provisioning this now is getting ahead of the code;
   an `IAcsEmailNotificationService`-style implementation is a small follow-up task, not just infra.
-- **Azure Key Vault** — not a code dependency at all, an ops/secrets-management addition: where
-  the DB connection string and the two services' connection strings above are actually stored and
-  read from at deploy time.
+
+Neither is a blocker for the first `develop`/`personal` deploys — the app runs and pushes/emails
+just no-op or fall back to logging until these are provisioned. **No Azure Key Vault** either
+(dropped from the design — see below): secrets for `develop`/`personal` live directly in their
+GitHub Environment secrets, same mechanism as `docs`/`integration`/`production`, no Azure
+authentication needed to read them.
 
 Checked the rest of the codebase for other cloud-only *code* dependencies (Application Insights,
-Service Bus, Event Grid, Blob Storage) — none found beyond ANH. ANH, ACS, and Key Vault are the
-complete list for now.
+Service Bus, Event Grid, Blob Storage) — none found beyond ANH. ANH and ACS are the complete list,
+and both can be provisioned whenever, independent of getting the pipeline itself working.
 
 ### Azure Notification Hub — provisioning checklist
 
@@ -383,26 +395,14 @@ complete list for now.
    SDK wired up yet, per `CONTEXT.md`) — provisioning ANH now gets the server-side infra ready, but
    the MAUI-side integration is a separate, not-yet-scheduled piece of work.
 
-### Azure Key Vault — provisioning checklist
+### Getting secrets into the Compose deploy
 
-Resolves the "where do `develop`/`personal` secrets actually live, given neither has a GitHub
-Environment" gap: instead of raw GitHub Actions secrets, actual secret material (DB connection
-string, ANH connection string, ACS connection string once that exists) lives in Key Vault. GitHub
-only needs to hold the much smaller, non-secret OIDC app registration identifiers that let the
-self-hosted runner authenticate and read it.
-
-1. A **Key Vault** resource (Standard tier — no need for Premium/HSM-backed keys here).
-2. Store as secrets: `IdentityDb` connection string, `Azure:NotificationHub:ConnectionString`/`Name`,
-   the ACS connection string once that code exists.
-3. **Access from the self-hosted runner**: this is a real change to the design so far — until now,
-   only the `docs`/`integration`/`production` workflows were going to run `azure/login`.
-   `develop`/`personal` now need it too, purely to read Key Vault (not to deploy any Azure compute).
-   Same OIDC app registration pattern, granted the **Key Vault Secrets User** role (read-only —
-   the runner never needs to write secrets, only read them at deploy time).
-4. **Getting secrets into the Compose deploy**: a step in `deploy-develop.yml`/`deploy-personal.yml`
-   reads the needed secrets from Key Vault (`az keyvault secret show` or
-   `azure/get-keyvault-secrets@v1`) and exports them as the env vars `aspire deploy`'s Docker Compose
-   target (or a plain `docker compose up`) expects.
+No Key Vault, no Azure authentication step — `deploy-develop.yml`/`deploy-personal.yml` read their
+secrets directly from that branch's GitHub Environment (`secrets.IDENTITY_DB`,
+`secrets.NOTIFICATION_HUB_CONNECTION_STRING`, etc., once those exist) and export them as the env
+vars `aspire deploy`'s Docker Compose target (or a plain `docker compose up`) expects. Simpler than
+the Key Vault path this replaced, at the cost of secrets living in GitHub rather than a dedicated
+secrets-management service — an acceptable tradeoff for two environments you fully control.
 
 ### Azure Communication Services — provisioning checklist
 
@@ -418,7 +418,7 @@ self-hosted runner authenticate and read it.
 
 ### Shared or per-environment resources? — decided
 
-**Split by cost**: the free-tier resource gets isolated, the ones that cost real money get shared.
+**Split by cost**: the free-tier resource gets isolated, the one that costs real money gets shared.
 
 - **Azure Notification Hub — separate per environment** (`develop` gets its own namespace/hub,
   `personal` gets its own). Free/Basic tier, so isolation costs nothing extra — a `develop` test
@@ -426,11 +426,10 @@ self-hosted runner authenticate and read it.
 - **Azure Communication Services — one shared resource** across `develop` and `personal`. Costs
   real money per email sent, so one resource keeps that to a single bill; the two environments stay
   distinguishable by sender address/display name rather than by separate resources.
-- **Azure Key Vault — one shared vault** across `develop` and `personal`, for the same
-  cost-consolidation reason. Secrets stay logically separated by naming (e.g.
-  `develop-identity-db`, `personal-identity-db`, `develop-notification-hub-connection`,
-  `personal-notification-hub-connection`) rather than by separate vaults — less isolation than a
-  vault-per-environment, but the two environments are both under your own control anyway.
+
+(Key Vault dropped from the design entirely — see above — so no sharing question applies to it.
+GitHub Environment secrets are inherently separate per environment already, `develop`'s and
+`personal`'s own Environments each hold their own copies.)
 
 ## Log repository for `develop`/`personal`
 
@@ -497,8 +496,15 @@ maintainability metric, no dedicated dashboard. Revisit then rather than now.
 
 - ~~Coverage-threshold/CodeQL gate placement~~ → **`develop` PRs only**, since promotion merges
   carry no independent code changes.
-- ~~Shared or per-environment ANH/ACS/Key Vault~~ → **ANH separate per environment** (free tier);
-  **ACS and Key Vault shared** across `develop`/`personal` (both cost real money to run twice).
+- ~~Shared or per-environment ANH/ACS~~ → **ANH separate per environment** (free tier); **ACS
+  shared** across `develop`/`personal` (costs real money to run twice). Key Vault later dropped from
+  the design entirely, superseded by GitHub Environment secrets — see "Secrets storage" note below.
+- ~~Where `develop`/`personal` secrets live~~ → **GitHub Environment secrets** (`develop` and
+  `personal` Environments, created with no required reviewer so they stay ungated) — not Azure Key
+  Vault as first proposed. Simpler, no Azure login needed for these two branches at all, at the cost
+  of secrets sitting in GitHub rather than a dedicated secrets service. Also corrected: the actual
+  home PC for `develop`/`personal` is **Ubuntu**, not Windows as first assumed — the self-hosted
+  runner setup and `deploy-develop.yml`/`deploy-personal.yml` target Linux accordingly.
 - ~~Tag creation process~~ → **automatic**, via `promote.yml` for app deploy tags (date+run-number
   scheme), and via **release-please** for `Client.Core`/`Client.Blazor`/`Client.Maui`/`Client.Wpf`
   (real semver from Conventional Commits).
@@ -541,23 +547,24 @@ included since they cost nothing extra to write alongside `develop`/`personal`'s
 
 **Needs your Azure/GitHub access, can happen in parallel with the above:**
 
-8. Self-hosted runner registered on the home PC (Settings → Actions → Runners).
-9. Azure Key Vault (shared) + Notification Hub (separate per environment) + Communication Services
-   (shared, once its consuming code exists) for `develop` and `personal`, per the checklists above.
-10. OIDC app registration(s) for `develop`/`personal` (Key Vault read access) — separate from the
-    `docs`/`integration`/`production` app registrations, since those deploy actual Azure compute and
-    this one only reads secrets.
+8. Self-hosted runner registered on the home PC — **Ubuntu/Linux setup**, not Windows (corrected).
+9. `develop` and `personal` GitHub Environments created (no required reviewer) + their secrets
+   populated (at minimum `Parameters__IdentityDb`; `Azure:NotificationHub:ConnectionString`/`Name`
+   and the ACS connection string once those resources/code exist).
+10. Azure Notification Hub (separate per environment) + Communication Services (shared, once its
+    consuming code exists) for `develop` and `personal`, per the checklists above — optional, not
+    blocking the first deploys (both no-op/fall back gracefully when unconfigured).
 11. GHCR package visibility confirmed for whatever images `develop`/`personal` pull.
 12. Self-signed Windows code-signing certificate generated, exported, and stored as the two
     `WINDOWS_SIGNING_CERT_*` repository secrets — see "`Client.Maui` distribution" above.
 
 **Small code follow-up, not part of the pipeline itself:**
 
-13. An ACS-based `INotificationService` implementation, once the ACS resource exists (item 9) —
+13. An ACS-based `INotificationService` implementation, once the ACS resource exists (item 10) —
     today only `SmtpNotificationService` exists.
 
 **Explicitly not part of this pass:** anything for `docs`/`integration`/`production`'s own Azure
-infrastructure (App Service, the two AKS clusters, their Key Vaults/OIDC/resource groups) — you're
-not provisioning those yet, so items 8-12 above are scoped to `develop`/`personal` only (item 12,
-the signing certificate, is really `Client.Maui`-scoped rather than environment-scoped, but grouped
-here since it's the same "needs your access outside the repo" category).
+infrastructure (App Service, the two AKS clusters, their OIDC app registrations/resource groups) —
+you're not provisioning those yet, so items 8-12 above are scoped to `develop`/`personal` only
+(item 12, the signing certificate, is really `Client.Maui`-scoped rather than environment-scoped,
+but grouped here since it's the same "needs your access outside the repo" category).
