@@ -16,18 +16,36 @@ Actions as the CI/CD engine. Deployment itself goes through the Aspire CLI (`asp
 `aspire deploy`) rather than hand-rolled Dockerfiles/Helm/Bicep — see "Aspire-native deployment
 model" below for why.
 
-## Why `develop` needs its own always-on environment
+## Why `develop` gets an ephemeral test stack, not an always-on deployment
 
-This isn't just "deploy `develop` continuously because it's the newest code" — it specifically
-unblocks real client-side E2E testing. `docs/e2e-testing-strategy.md` already identifies the gap:
-no test exercises `IdentityPlatform` (the admin Blazor app) or `DgDevelopment.Identity.Client.Maui`
-through a real, rendered UI (Playwright for the admin app; FlaUI/WinAppDriver for MAUI on Windows).
-Both of those approaches need something real to point at — a running server, with a real database,
-reachable over HTTP, that reflects the latest code. An always-on `develop` deployment is exactly
-that target. Nothing about UI-level E2E automation is scheduled yet (see that doc's own
-"Recommendation" section), but the backend needs to exist and stay fresh before that work can even
-start, which is the actual reason `develop` gets its own continuous deployment rather than staying
-CI-only/ephemeral.
+**Revised**: `develop` is not a persistently-deployed environment. It never has a running instance
+sitting around between test runs — every time code lands, a throwaway stack (same container
+composition as `personal`: `Server` + `IdentityPlatform` + a containerized SQL Server, auto-migrated
+and auto-seeded on startup) gets spun up specifically to run tests against it, then torn down
+regardless of outcome. `personal` is the one that stays always-on — it's your actual personal
+"production," not a test rig.
+
+This is a **quality gate before promotion**, not just "somewhere to point E2E tests":
+
+1. A PR into `develop` passes build + unit tests + coverage threshold + CodeQL + Snyk (see "Quality
+   Gate tooling" below) — merge if green.
+2. On merge, the ephemeral stack spins up from that new `develop` state.
+3. The integration test suite (`DgDevelopment.Identity.IntegrationTests`) runs against it, plus —
+   once written — UI-level E2E tests (Playwright for `IdentityPlatform`, FlaUI/WinAppDriver for
+   `Client.Maui` on Windows; `docs/e2e-testing-strategy.md` has the gap analysis, nothing scheduled
+   yet). The stack comes down after, win or lose.
+4. Only if that's green do you promote `develop` → `personal` — a **manual, deliberate action** you
+   take once you've seen the run pass, not something that fires on its own.
+
+**`DgDevelopment.Identity.IntegrationTests` stays exactly as it is for the first pass** — still
+`WebApplicationFactory`-based, in-process, no real network, run as part of step 1 (the fast PR gate)
+same as today. **Migrating it to run over real HTTP against the ephemeral stack** (step 3, genuine
+integration testing rather than in-process) is a deliberate, explicitly deferred follow-up — sequenced
+*after* the first working deploy, not part of this initial pass, because it touches nearly every
+existing test file (new `HttpClient` construction pointed at a configurable base URL instead of the
+one `WebApplicationFactory` provides) and changes the CI orchestration (stack must be up and healthy
+before tests run, torn down after, regardless of pass/fail). See "Open items" for this as a tracked
+follow-up phase.
 
 ## Branch chain and environments
 
@@ -43,10 +61,10 @@ with that stale, unrelated history) is a clean fix, not a rebase of real work. O
 `personal` is a normal link in the chain and receives `develop`'s content — this pipeline design
 included — through an ordinary forward merge.
 
-| Branch | Environment | Host | Deploy trigger | Approval |
+| Branch | Environment | Host | Trigger | Approval |
 |---|---|---|---|---|
-| `develop` | develop/e2e | home PC (self-hosted runner), Docker Compose | every push (incl. PR merge) | none — auto |
-| `personal` | personal | same home PC, separate Compose stack | `personal/v*` tag | none — auto |
+| `develop` | develop/e2e (ephemeral — spun up per test run, then torn down) | home PC (Ubuntu, self-hosted runner), Docker Compose | every merge into `develop` | none — auto (the test *results* are the gate on promoting onward) |
+| `personal` | personal (always-on) | same home PC, separate Compose stack | `personal/v*` tag | manual — you promote only after the `develop` test run is green |
 | `docs` | docs | Azure App Service | `docs/v*` tag | manual (GitHub Environment) |
 | `integration` | integration | AKS — first publicly-reachable tier ("preview prod") | `integration/v*` tag | manual |
 | `main` | production | AKS — separate cluster/resource group from integration | `v*` (bare) tag | manual |
@@ -66,20 +84,21 @@ as just a pre-release naming artifact.
 
 Two distinct automations, not one:
 
-1. **`develop`**: every push triggers its own deploy workflow directly — no tag, no approval gate.
-   Nothing upstream of `develop` auto-opens anything into it; regular feature PRs merge into it
-   exactly as today.
+1. **`develop`**: every merge triggers the ephemeral test stack (build → spin up → run tests → tear
+   down) directly — no tag, no deploy, no approval gate. Nothing upstream of `develop` auto-opens
+   anything into it; regular feature PRs merge into it exactly as today. There is no "deploy
+   `develop`" step anymore — see "Why `develop` gets an ephemeral test stack" above.
 2. **`personal → docs → integration → main`**: promoting `develop`'s current state into `personal`
-   is a manual, on-demand action — a PR you open yourself when you actually want to publish. From
-   there, promotion cascades automatically: merging a promotion PR into `personal`, `docs`, or
-   `integration` auto-opens the *next* hop's PR (`personal→docs`, `docs→integration`,
-   `integration→main`) via a `pull_request: closed` (`merged == true`) workflow. Each hop still
-   needs a human merge click — that's the promotion approval gate. **That same workflow also
-   auto-creates and pushes that branch's deploy tag** (see "Tag naming convention" below) right
-   after the merge, which is what actually fires the deploy workflow — so there's no separate manual
-   tagging step. For `docs`/`integration`/`production` there's still a second, later checkpoint: the
-   deploy workflow itself pauses at its GitHub Environment's approval gate before `aspire deploy`
-   actually runs, distinct from (and after) the promotion merge click.
+   is a **manual, on-demand action you take only after seeing the ephemeral test run pass** — a PR
+   you open yourself. From there, promotion cascades automatically: merging a promotion PR into
+   `personal`, `docs`, or `integration` auto-opens the *next* hop's PR (`personal→docs`,
+   `docs→integration`, `integration→main`) via a `pull_request: closed` (`merged == true`) workflow.
+   Each hop still needs a human merge click — that's the promotion approval gate. **That same
+   workflow also auto-creates and pushes that branch's deploy tag** (see "Tag naming convention"
+   below) right after the merge, which is what actually fires the deploy workflow — so there's no
+   separate manual tagging step. For `docs`/`integration`/`production` there's still a second, later
+   checkpoint: the deploy workflow itself pauses at its GitHub Environment's approval gate before
+   `aspire deploy` actually runs, distinct from (and after) the promotion merge click.
 
 ## Tag naming convention (app deploy tags)
 
@@ -90,11 +109,11 @@ package/app versioning" below.
 
 **Decided: deploy tags are created automatically, not by hand.** You don't know the tag by name in
 advance and don't need to — a promotion PR merging into a branch is what triggers its tag, via
-`promote.yml` (and, for `develop`, its own deploy workflow doesn't need a tag at all — it deploys on
-every push). Since promotion merges are fast-forwards carrying no independent code changes (point
-confirmed above — the coverage/CodeQL gate only needs to run once, on the PR into `develop`), there's
-no meaningful "major/minor/patch" decision to automate around for *these* tags; each one is just a
-deployment marker, not a compatibility promise anyone depends on. Proposed scheme:
+`promote.yml` (`develop` needs no tag at all — it has no deploy step, just the ephemeral test stack
+triggered directly by the merge). Since promotion merges are fast-forwards carrying no independent
+code changes (the coverage/CodeQL/Snyk gate only needs to run once, on the PR into `develop`),
+there's no meaningful "major/minor/patch" decision to automate around for *these* tags; each one is
+just a deployment marker, not a compatibility promise anyone depends on. Proposed scheme:
 `<prefix><date>.<run-number>`, generated in
 `promote.yml` from `date +%Y.%m.%d` and `${{ github.run_number }}` (auto-incrementing, unique per
 workflow, needs no external counter):
@@ -229,10 +248,18 @@ and `AppHost.cs` branches on its value to add the one compute-environment resour
 run:
 
 ```csharp
-var deployTarget = builder.AddParameter("deploy-target", "local");
-// "personal" | "develop" | "docs" | "integration" | "main" | "local"
+var deployTarget = builder.Configuration["Parameters:deploy-target"];
+// "personal" | "develop" | "docs" | "integration" | "main" | null (local dev, untouched)
 
-switch (builder.Configuration["Parameters:deploy-target"])
+// IdentityDb: containerized for personal/develop (no external DB to manage), bring-your-own
+// everywhere else (docs/integration/main already expect a real Azure SQL connection string).
+IResourceBuilder<IResourceWithConnectionString> sqlServer = deployTarget is "personal" or "develop"
+    ? builder.AddSqlServer("sql").AddDatabase("IdentityDb")
+    : builder.AddConnectionString("IdentityDb");
+
+// ... server/identityPlatform declared as today, referencing `sqlServer` ...
+
+switch (deployTarget)
 {
     case "personal":
     case "develop":
@@ -251,7 +278,7 @@ switch (builder.Configuration["Parameters:deploy-target"])
         server.WithExternalHttpEndpoints();
         identityPlatform.WithExternalHttpEndpoints();
         break;
-    // default/"local": no environment resource added — today's dev-orchestration behavior, untouched
+    // null/"local": no environment resource added — today's dev-orchestration behavior, untouched
 }
 ```
 
@@ -261,9 +288,15 @@ time**, per the skill's explicit rule against inventing APIs. What's already con
 skill's reference docs and `aspire docs get`:
 
 - `AddDockerComposeEnvironment("name")` — personal/develop.
+- `AddSqlServer("name").AddDatabase("name")` — personal/develop's containerized `IdentityDb`.
+  Confirmed via `aspire docs api search "AddSqlServer"`: `AddSqlServer` returns
+  `IResourceBuilder<SqlServerServerResource>`, `.AddDatabase(...)` on that returns
+  `IResourceBuilder<SqlServerDatabaseResource>`, which — like `ConnectionStringResource` from
+  `AddConnectionString` — implements `IResourceWithConnectionString`, so both branches of the
+  ternary above assign cleanly to one variable of that common interface type.
 - `AddAzureAppServiceEnvironment("name")` — docs. App Service is a public-website-only model
-  (no arbitrary sidecar containers); moot here since Redis is slated for removal and the DB is
-  already external.
+  (no arbitrary sidecar containers); moot here since Redis is already removed and the DB stays
+  external (Azure SQL, bring-your-own connection string) for this target.
 - `AddAzureKubernetesEnvironment("name")` — integration/main. This call **provisions** AKS + ACR +
   identity itself, it doesn't just deploy into a pre-existing cluster — no manual "create the AKS
   cluster" step needed. integration and main get separate resource groups/subscription scoping
@@ -281,22 +314,30 @@ each environment's trigger/approval stays declarative:
 
 - **`.github/workflows/_deploy.yml`** (`workflow_call`) — checkout, .NET 10 SDK, Aspire CLI
   install, `dotnet restore`/`build`, GHCR login, Azure login (OIDC, `docs`/`integration`/
-  `production` only — `develop`/`personal` need no Azure auth at all, their secrets come straight
-  from their GitHub Environment), `aspire deploy --non-interactive` with `Parameters__deploy_target`
-  and target-specific `Azure__*`/`Parameters__*` env vars from the caller. Input: which ref/tag to
-  check out and deploy — defaults to `github.ref` (the tag that triggered the run), but overridable,
-  which is what rollback (below) uses.
-- **`deploy-develop.yml`** — `push: branches: [develop]`; self-hosted `home-pc` (Ubuntu) runner;
-  `environment: develop` (no required reviewer — scopes secrets only, doesn't gate).
+  `production` only — `personal` needs no Azure auth at all, its secrets come straight from its
+  GitHub Environment), `aspire deploy --non-interactive` with `Parameters__deploy_target` and
+  target-specific `Azure__*`/`Parameters__*` env vars from the caller. Input: which ref/tag to check
+  out and deploy — defaults to `github.ref` (the tag that triggered the run), but overridable, which
+  is what rollback (below) uses. **Not used by `develop`** — see `test-develop.yml` below.
+- **`test-develop.yml`** — `push: branches: [develop]` (i.e. every merge); self-hosted `home-pc`
+  (Ubuntu) runner; `environment: develop` (no required reviewer — scopes secrets only, doesn't gate).
+  Build → `aspire deploy` the Docker Compose stack (same mechanism as a real deploy, just an ephemeral
+  target) → wait for health → run `dotnet test` on `DgDevelopment.Identity.IntegrationTests` against
+  it → `aspire destroy` the stack unconditionally (success or failure) → report pass/fail. No tag,
+  no promotion — that's a separate, manual action once this is green.
 - **`deploy-personal.yml`** — `push: tags: ['personal/v*']` + `workflow_dispatch` (manual rollback,
-  see below); same self-hosted runner; `environment: personal` (same no-gate scoping).
+  see below); same self-hosted runner; `environment: personal` (no-gate scoping, but the tag itself
+  only gets created after you've manually opened and merged the `develop→personal` promotion PR,
+  which is the real approval point).
 - **`deploy-docs.yml`** — `push: tags: ['docs/v*']` + `workflow_dispatch`; `environment: docs`;
   `ubuntu-latest`.
 - **`deploy-integration.yml`** — `push: tags: ['integration/v*']` + `workflow_dispatch`;
   `environment: integration`.
 - **`deploy-production.yml`** — `push: tags: ['v*']` + `workflow_dispatch`; `environment: production`.
 - **`promote.yml`** — the merged-PR cascade (`personal→docs→integration→main`) described above,
-  including auto-creating and pushing each branch's deploy tag.
+  including auto-creating and pushing each branch's deploy tag. Does **not** cover `develop→personal`
+  — that first hop is manual end-to-end (you open the PR, you merge it), only the hops after it
+  cascade automatically.
 
 Reference shape for the Azure-targeting jobs already lives in the repo:
 [.agents/skills/aspire-deployment/references/github-actions-azure-csharp.yml](../.agents/skills/aspire-deployment/references/github-actions-azure-csharp.yml)
@@ -342,10 +383,11 @@ None of this can be done by editing the repo:
 4. **GHCR** — confirm package visibility for `ghcr.io/dgastaldo/...` and generate whatever pull
    credential the AKS clusters need (PAT with `read:packages`, stored as an Environment secret,
    turned into a k8s imagePullSecret during deploy).
-5. **DB connection strings** — provisioning the actual SQL Server/Azure SQL instance itself stays
-   out of scope for this pass (see "Findings" below) — you provision it. The connection string is a
-   GitHub Environment secret (`Parameters__IdentityDb`) in all five environments now, `develop`/
-   `personal` included (per point 2 above).
+5. **DB connection strings** — only relevant for `docs`/`integration`/`production` now: provisioning
+   the actual Azure SQL instance stays out of scope for this pass (see "Findings" below), you
+   provision it, the connection string is a GitHub Environment secret (`Parameters__IdentityDb`).
+   `develop`/`personal` need **no manual DB step at all** — `AppHost.cs` containerizes SQL Server for
+   them, Aspire provisions and wires the connection string itself as part of the Compose stack.
 6. **Windows MSIX signing certificate** — generate a self-signed code-signing certificate
    (`New-SelfSignedCertificate`), export as a password-protected `.pfx`, store the base64-encoded
    `.pfx` and its password as repository secrets `WINDOWS_SIGNING_CERT_BASE64`/
@@ -397,7 +439,7 @@ and both can be provisioned whenever, independent of getting the pipeline itself
 
 ### Getting secrets into the Compose deploy
 
-No Key Vault, no Azure authentication step — `deploy-develop.yml`/`deploy-personal.yml` read their
+No Key Vault, no Azure authentication step — `test-develop.yml`/`deploy-personal.yml` read their
 secrets directly from that branch's GitHub Environment (`secrets.IDENTITY_DB`,
 `secrets.NOTIFICATION_HUB_CONNECTION_STRING`, etc., once those exist) and export them as the env
 vars `aspire deploy`'s Docker Compose target (or a plain `docker compose up`) expects. Simpler than
@@ -419,10 +461,15 @@ secrets-management service — an acceptable tradeoff for two environments you f
 ### Shared or per-environment resources? — decided
 
 **Split by cost**: the free-tier resource gets isolated, the one that costs real money gets shared.
+Also revisited now that `develop` is ephemeral rather than always-on: provisioning `develop` its own
+ANH namespace only matters once there's actually a UI-level push-MFA E2E test that needs a real
+device to register against during that short-lived window — not scheduled yet, so **`develop`'s ANH
+namespace can wait**; provision `personal`'s now if you want push working there, add `develop`'s
+later when that specific test gets written.
 
 - **Azure Notification Hub — separate per environment** (`develop` gets its own namespace/hub,
-  `personal` gets its own). Free/Basic tier, so isolation costs nothing extra — a `develop` test
-  run's push traffic never touches `personal`, or vice versa.
+  `personal` gets its own) — free/Basic tier, so isolation costs nothing extra when you do
+  provision both. `develop`'s just isn't urgent per the note above.
 - **Azure Communication Services — one shared resource** across `develop` and `personal`. Costs
   real money per email sent, so one resource keeps that to a single bill; the two environments stay
   distinguishable by sender address/display name rather than by separate resources.
@@ -431,35 +478,42 @@ secrets-management service — an acceptable tradeoff for two environments you f
 GitHub Environment secrets are inherently separate per environment already, `develop`'s and
 `personal`'s own Environments each hold their own copies.)
 
-## Log repository for `develop`/`personal`
+## Log repository for `personal` (and `develop`'s test runs)
 
-For now: **a local folder on the home PC**, not a real log-aggregation service — matches the low
-expected activity on these two environments. Two ways to get there, different amounts of work:
+**`personal`** (always-on): for now, **a local folder on the home PC**, not a real log-aggregation
+service — matches the low expected activity. Two ways to get there, different amounts of work:
 
 - **Zero-code (recommended for now)**: rely on Docker's own log capture. Set the `json-file` log
   driver's rotation options (`max-size`, `max-file`) per service in the Compose output — Aspire's
   per-resource Docker Compose customization API (exact method TBD at implementation time, same
   "confirm via `aspire docs api search`" caveat as elsewhere in this doc) can set this. Logs stay
   retrievable anytime via `docker compose logs`/Docker Desktop's own UI — no app code changes, no
-  new dependency. The one caveat: with Docker Desktop's WSL2 backend, the underlying log files live
-  inside the WSL2 VM's filesystem, not a plain Windows path you can browse in Explorer directly.
+  new dependency.
 - **Real browsable files**: add a file-logging sink (e.g. `Serilog.Sinks.File`, not currently a
   dependency anywhere in the repo — this would be a small new addition to `Server`/`IdentityPlatform`
-  `Program.cs`) writing into a container path, bind-mounted to a real Windows folder (e.g.
-  `C:\IdentityLogs\develop\`, `C:\IdentityLogs\personal\`) via the Compose service definition. More
-  setup, but gives you an actual folder you can open in Explorer.
+  `Program.cs`) writing into a container path, bind-mounted to a real folder (e.g.
+  `~/identity-logs/personal/`) via the Compose service definition. More setup, but gives you an
+  actual folder you can browse.
 
 Recommendation: start with the zero-code option given the "low activity" framing — revisit if
 `docker compose logs` turns out to be too inconvenient in practice.
+
+**`develop`** (ephemeral): no persistent folder needed — the stack doesn't outlive a single test run.
+On failure, `test-develop.yml` should dump `docker compose logs` straight into the GitHub Actions job
+log before tearing the stack down (`aspire destroy`/`docker compose down`), so the failure is
+diagnosable from the workflow run itself without needing anything to persist on disk between runs.
 
 ## Findings behind the design
 
 - **Fully greenfield for CI/CD**: `.github/workflows/` is empty, no Dockerfiles, no Helm/Bicep, no
   `appsettings.Production.json`, no versioning scheme anywhere in the repo.
-- **`IdentityDb`** is already an `AddConnectionString` parameter in `AppHost.cs` — not an
-  Aspire-provisioned database. The app already expects an externally-supplied connection string in
-  every environment, dev included, so this pipeline doesn't need to change that model, just supply
-  a different value per environment.
+- **`IdentityDb`** is today an `AddConnectionString` parameter in `AppHost.cs` — bring-your-own, not
+  Aspire-provisioned. That model stays for `docs`/`integration`/`production` (Azure SQL, provisioned
+  separately, connection string supplied as a secret). For `develop`/`personal` specifically, since
+  the host machine is Ubuntu (no LocalDB) and the whole point is "no manual admin," `AppHost.cs`
+  containerizes SQL Server itself for those two targets (`AddSqlServer().AddDatabase("IdentityDb")`,
+  confirmed via `aspire docs api search`) — Aspire provisions and auto-migrates/seeds it as part of
+  the same Compose stack, nothing for you to install or manage separately.
 - **`Redis` removed from `AppHost.cs`** (done). History check confirmed the intent: commit
   `4902944` ("client ID cache with PeriodicTimer, Redis in Aspire") added it specifically to back
   client/session lookups, but the actual implementation (`ClientIdCache.cs`) ended up as a plain
@@ -470,10 +524,10 @@ Recommendation: start with the zero-code option given the "low activity" framing
   distributed-cache need shows up later, it can be re-added with the same per-environment treatment
   as everything else at that point.
 
-## Quality Gate tooling — decided (phase 1)
+## Quality Gate tooling — decided (phase 1, revised)
 
-**Decided**: start with the zero-cost option — a coverage-threshold check plus CodeQL — and
-revisit SonarCloud later once there's a reason to pay for/operate more than that.
+**Decided**: four checks on every PR into `develop`, all free — coverage threshold, CodeQL, Snyk,
+**and now self-hosted SonarQube** (moved up from "phase 2, deferred" — see below for why).
 
 - **Coverage threshold in CI** — the repo already produces coverage via ReportGenerator
   (`TestResults\html`, see `CONTEXT.md`'s test suite bullet). Add a CI step that runs the test
@@ -481,14 +535,28 @@ revisit SonarCloud later once there's a reason to pay for/operate more than that
   from roughly the current baseline — 418/418 unit tests passing today — rather than an arbitrary
   number; tighten over time). Also tighten the existing Roslyn analyzer config
   (`Directory.Build.props` already sets `AnalysisMode`/`EnforceCodeStyleInBuild`) if it isn't
-  already at its strictest useful setting. Zero new services, runs on every PR into `develop`.
+  already at its strictest useful setting.
 - **CodeQL** — free, GitHub-native security static analysis (`github/codeql-action`), scheduled
-  scan + PR-triggered scan, surfaces results as code-scanning alerts. Near-zero setup, complements
-  the coverage gate (different concern: known vulnerability patterns vs. regressions/dead paths).
+  scan + PR-triggered scan, surfaces results as code-scanning alerts. Analyzes *our* code for
+  vulnerability patterns.
+- **Snyk** — free tier, scans **dependencies** (NuGet packages) for known CVEs, and — newly relevant
+  now that `develop`/`personal` are really containerized — can scan the built **Docker images**
+  themselves for vulnerable base-image/OS-package layers. Complements CodeQL rather than
+  overlapping it (dependency/image vulnerabilities vs. first-party code patterns). Runs early in
+  the pipeline (before the test suite) so a known-bad dependency fails fast and cheap, before
+  spending time on the full test run.
+- **SonarQube Community Edition, self-hosted** — moved from deferred to decided now: you want to run
+  it on your own NUC (the same Ubuntu machine as the self-hosted runner) rather than pay for
+  SonarCloud, which changes the cost/effort calculus that justified deferring it. Runs as a Docker
+  container alongside Postgres (its backing store) — since it's the same machine as the runner, the
+  CI step reaches it over `localhost`/the Docker network, no cross-machine networking or public
+  exposure needed; the analysis never leaves your home network. CI wraps the build with
+  `dotnet-sonarscanner` (`begin` → `dotnet build` → `dotnet test` → `end`), pointed at your local
+  SonarQube URL + a project token. Covers code smells, duplication, and maintainability — the
+  things coverage/CodeQL/Snyk don't.
 
-**Deferred, not rejected**: SonarCloud (or self-hosted SonarQube) stays the phase-2 option once the
-zero-cost gate's limits are actually felt — no coverage/duplication trend over time, no
-maintainability metric, no dedicated dashboard. Revisit then rather than now.
+Ordering in the PR pipeline: Snyk (dependency scan, fast) → build → SonarQube scan + coverage
+(wraps the test run) → CodeQL (runs on its own schedule/trigger independent of this sequence).
 
 ## Open items
 
@@ -504,7 +572,7 @@ maintainability metric, no dedicated dashboard. Revisit then rather than now.
   Vault as first proposed. Simpler, no Azure login needed for these two branches at all, at the cost
   of secrets sitting in GitHub rather than a dedicated secrets service. Also corrected: the actual
   home PC for `develop`/`personal` is **Ubuntu**, not Windows as first assumed — the self-hosted
-  runner setup and `deploy-develop.yml`/`deploy-personal.yml` target Linux accordingly.
+  runner setup and `test-develop.yml`/`deploy-personal.yml` target Linux accordingly.
 - ~~Tag creation process~~ → **automatic**, via `promote.yml` for app deploy tags (date+run-number
   scheme), and via **release-please** for `Client.Core`/`Client.Blazor`/`Client.Maui`/`Client.Wpf`
   (real semver from Conventional Commits).
@@ -516,28 +584,47 @@ maintainability metric, no dedicated dashboard. Revisit then rather than now.
   the app's own promotion cascade — see "Client package/app versioning" above.
 - ~~`Client.Maui`/`Client.Wpf` distribution target~~ → **GitHub Releases**, not the Microsoft
   Store/Google Play — see "`Client.Maui` distribution — decided" above.
+- ~~Is `develop` always-on or ephemeral?~~ → **Ephemeral** — spun up per test run, torn down after,
+  never a persistent deployment. `personal` is the one that's always-on. See "Why `develop` gets an
+  ephemeral test stack" above.
+- ~~Do the existing `IntegrationTests` migrate to real HTTP against the ephemeral stack?~~ → **Yes,
+  eventually, but sequenced as an explicit follow-up phase** — not part of this initial
+  implementation pass. See "Follow-up phase" below.
+- ~~Does `develop→personal` promotion become automatic once tests pass, or stay a manual click?~~ →
+  **Manual** — the test run being green is a precondition you check, not something that fires the
+  promotion PR on its own.
+- ~~Add a Quality Gate scanner before the test suite?~~ → **Snyk**, confirmed — dependency + Docker
+  image vulnerability scanning, runs early (fail fast, before the test suite).
+- ~~SonarQube/SonarCloud, still deferred?~~ → **No longer deferred** — self-hosted SonarQube
+  Community Edition on your own NUC (the same Ubuntu machine as the runner), decided now rather than
+  phase 2, since self-hosting removes the cost/ops reason it was deferred for.
 
 **Still open:** none right now — every decision point raised so far has been resolved. This doc is
 ready to hand off to implementation; re-open a new "Open items" entry if something else surfaces
 while building it.
 
-## Implementation plan (once the open items above are resolved)
+## Implementation plan
 
-Not scheduled yet — this is the ordered breakdown of what's left, split into what only touches the
-repo versus what needs your Azure/GitHub access. `docs`/`integration`/`production` code paths are
-included since they cost nothing extra to write alongside `develop`/`personal`'s, but they won't be
-*exercised* until their Azure infrastructure exists later (out of scope for now, per your call).
+Not scheduled yet — the ordered breakdown of what's left, split into repo-only work, work needing
+your Azure/GitHub/NUC access, and an explicitly deferred follow-up phase. `docs`/`integration`/
+`production` code paths are included since they cost nothing extra to write alongside `develop`/
+`personal`'s, but won't be *exercised* until their Azure infrastructure exists later (your call,
+not now).
 
 **Repo-only (no external access needed):**
 
 1. Re-parent `personal` onto `develop` (git branch surgery, force-push to `origin/personal`).
-2. `AppHost.cs`: add the `deploy-target` parameter and the per-target `switch` (Redis removal
-   already done, see "Findings" above).
-3. `.github/workflows/_deploy.yml` (reusable) + the five thin trigger workflows
-   (`deploy-develop.yml`, `deploy-personal.yml`, `deploy-docs.yml`, `deploy-integration.yml`,
-   `deploy-production.yml`, each with `workflow_dispatch` for rollback) + `promote.yml` (the
-   promotion cascade, including auto-tagging).
-4. Coverage-threshold + CodeQL workflows (Quality Gate phase 1) on `develop` PRs.
+2. `AppHost.cs`: containerized `IdentityDb` for `personal`/`develop` (`AddSqlServer`+`AddDatabase`),
+   the `deploy-target` parameter, and the per-target `switch` (Redis removal already done, see
+   "Findings" above).
+3. `.github/workflows/_deploy.yml` (reusable, used by `docs`/`integration`/`production`/`personal`)
+   + `test-develop.yml` (the ephemeral stack: spin up → run `IntegrationTests` → dump logs on
+   failure → tear down, no tag/deploy) + `deploy-personal.yml`/`deploy-docs.yml`/
+   `deploy-integration.yml`/`deploy-production.yml` (each with `workflow_dispatch` for rollback) +
+   `promote.yml` (the `personal→docs→integration→main` cascade, including auto-tagging — does not
+   cover `develop→personal`, that hop is fully manual).
+4. Quality Gate workflow(s) on `develop` PRs: Snyk (dependency + image scan, early) → build →
+   SonarQube scan + coverage threshold (wraps the test run) → CodeQL (own schedule/trigger).
 5. `release-please.yml` (triggered on push to `develop`) + its manifest config for the four
    `clients/*` components.
 6. `publish-client-maui.yml` (triggered on `client-maui-v*` tags) — build Windows unpackaged zip +
@@ -545,26 +632,39 @@ included since they cost nothing extra to write alongside `develop`/`personal`'s
 7. `CONTEXT.md`: update the forward-merge description to the five-branch chain, and add the `docs`
    environment clarification (genuinely public API docs, not just a stage name).
 
-**Needs your Azure/GitHub access, can happen in parallel with the above:**
+**Needs your Azure/GitHub/NUC access, can happen in parallel with the above:**
 
-8. Self-hosted runner registered on the home PC — **Ubuntu/Linux setup**, not Windows (corrected).
-9. `develop` and `personal` GitHub Environments created (no required reviewer) + their secrets
-   populated (at minimum `Parameters__IdentityDb`; `Azure:NotificationHub:ConnectionString`/`Name`
-   and the ACS connection string once those resources/code exist).
-10. Azure Notification Hub (separate per environment) + Communication Services (shared, once its
-    consuming code exists) for `develop` and `personal`, per the checklists above — optional, not
-    blocking the first deploys (both no-op/fall back gracefully when unconfigured).
-11. GHCR package visibility confirmed for whatever images `develop`/`personal` pull.
-12. Self-signed Windows code-signing certificate generated, exported, and stored as the two
+8. Self-hosted runner registered on the home PC (Ubuntu/Linux setup).
+9. `develop` and `personal` GitHub Environments created (no required reviewer) + `personal`'s
+   secrets populated (`Parameters__IdentityDb` isn't needed for either once step 2 lands — Aspire
+   provisions and wires the containerized DB itself; `develop` mainly needs Snyk/SonarQube-related
+   secrets, see below).
+10. **SonarQube Community Edition + Postgres** running as containers on the NUC (same machine as the
+    runner) — reachable from the runner over `localhost`/Docker network; generate a project token
+    for the `dotnet-sonarscanner` CI step.
+11. **Snyk account + API token**, stored as a repository secret for the CI scan step.
+12. Azure Notification Hub for `personal` (not urgent for `develop` — see "Shared or per-environment
+    resources?" above) + Communication Services (shared, once its consuming code exists) — optional,
+    not blocking the first deploys.
+13. GHCR package visibility confirmed for whatever images `develop`/`personal` pull.
+14. Self-signed Windows code-signing certificate generated, exported, and stored as the two
     `WINDOWS_SIGNING_CERT_*` repository secrets — see "`Client.Maui` distribution" above.
 
 **Small code follow-up, not part of the pipeline itself:**
 
-13. An ACS-based `INotificationService` implementation, once the ACS resource exists (item 10) —
+15. An ACS-based `INotificationService` implementation, once the ACS resource exists (item 12) —
     today only `SmtpNotificationService` exists.
+
+**Explicitly deferred follow-up phase (after the above is working):**
+
+16. Migrate `DgDevelopment.Identity.IntegrationTests` from `WebApplicationFactory` (in-process) to
+    real HTTP against the ephemeral `develop` stack — new `HttpClient` construction pointed at a
+    configurable base URL, `test-develop.yml` orchestrating stack-up/tests/stack-down around it.
+    Touches nearly every existing test file; deliberately sequenced after the first working deploy,
+    not bundled into it.
 
 **Explicitly not part of this pass:** anything for `docs`/`integration`/`production`'s own Azure
 infrastructure (App Service, the two AKS clusters, their OIDC app registrations/resource groups) —
-you're not provisioning those yet, so items 8-12 above are scoped to `develop`/`personal` only
-(item 12, the signing certificate, is really `Client.Maui`-scoped rather than environment-scoped,
-but grouped here since it's the same "needs your access outside the repo" category).
+you're not provisioning those yet, so items 8-14 above are scoped to `develop`/`personal`/`Client.Maui`
+(item 14, the signing certificate, is `Client.Maui`-scoped rather than environment-scoped, but
+grouped here since it's the same "needs your access outside the repo" category).
