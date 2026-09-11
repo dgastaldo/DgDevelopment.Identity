@@ -1,0 +1,106 @@
+name: Quality Gate
+
+# Runs on every PR into develop - this is the gate the ephemeral develop stack (test-develop.yml)
+# and everything downstream implicitly relies on being green before merge. See
+# docs/deployment.md's "Quality Gate tooling" section.
+#
+# Order: Snyk first (dependency scan, fast/cheap - fail before spending time on the rest) -> build
+# + unit tests + coverage threshold, wrapped by the SonarQube scan -> CodeQL runs as its own job in
+# parallel (unrelated concern, its own cadence).
+#
+# Needs two repository secrets that don't exist yet (see docs/deployment.md's "Manual, out-of-band
+# setup"): SNYK_TOKEN, and SONARQUBE_URL/SONARQUBE_TOKEN once SonarQube Community Edition is
+# running on the NUC. This workflow will fail until those are configured - expected for now.
+
+on:
+  pull_request:
+    branches: [develop]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  snyk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # TODO(implementation): confirm the current recommended Snyk GitHub Action for a .NET repo
+      # (snyk/actions/dotnet vs the generic snyk/actions/setup + `snyk test`) against Snyk's own
+      # docs at implementation time rather than assuming this shape is still current.
+      - name: Run Snyk to check for dependency and image vulnerabilities
+        uses: snyk/actions/dotnet@master
+        continue-on-error: false
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+  build-test-sonar:
+    runs-on: ubuntu-latest
+    needs: snyk
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # SonarQube wants full history for blame/new-code analysis
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Setup Java (required by the SonarScanner for .NET)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install SonarScanner for .NET
+        run: dotnet tool install --global dotnet-sonarscanner
+
+      - name: Begin SonarQube analysis
+        run: >
+          dotnet sonarscanner begin
+          /k:"DgDevelopment.Identity"
+          /d:sonar.host.url="${{ secrets.SONARQUBE_URL }}"
+          /d:sonar.token="${{ secrets.SONARQUBE_TOKEN }}"
+          /d:sonar.cs.cobertura.reportsPaths="tests/**/TestResults/coverage/**/coverage.cobertura.xml"
+
+      # Debug config auto-generates coverage via GenerateCoverageAfterBuild in
+      # DgDevelopment.Identity.Server.UnitTests.csproj - no extra --collect flags needed here.
+      - name: Build and generate coverage
+        run: |
+          dotnet restore src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj
+          dotnet build src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj --no-restore
+          dotnet build tests/DgDevelopment.Identity.Server.UnitTests/DgDevelopment.Identity.Server.UnitTests.csproj
+
+      # TODO(implementation): pick a real threshold once there's a stable baseline to tighten from
+      # (see docs/deployment.md - "start from roughly the current baseline"). This just fails the
+      # build if line coverage drops below the placeholder value.
+      - name: Enforce coverage threshold
+        run: |
+          COVERAGE_FILE=$(find tests/DgDevelopment.Identity.Server.UnitTests/TestResults/coverage -name coverage.cobertura.xml | head -1)
+          LINE_RATE=$(grep -oP '(?<=line-rate=")[^"]+' "$COVERAGE_FILE" | head -1)
+          THRESHOLD="0.60"
+          awk -v rate="$LINE_RATE" -v threshold="$THRESHOLD" 'BEGIN { exit (rate < threshold) }' \
+            || { echo "Line coverage $LINE_RATE is below the $THRESHOLD threshold"; exit 1; }
+
+      - name: End SonarQube analysis
+        run: dotnet sonarscanner end /d:sonar.token="${{ secrets.SONARQUBE_TOKEN }}"
+
+  codeql:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: csharp
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3

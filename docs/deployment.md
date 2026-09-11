@@ -393,6 +393,12 @@ None of this can be done by editing the repo:
    `.pfx` and its password as repository secrets `WINDOWS_SIGNING_CERT_BASE64`/
    `WINDOWS_SIGNING_CERT_PASSWORD` — see "`Client.Maui` distribution" above. Repo-level, not an
    Environment secret, since `publish-client-maui.yml` runs unconditionally on its tag, ungated.
+7. **`PROMOTE_PAT` repository secret** — discovered while implementing `promote.yml`: a tag pushed
+   (or PR opened) using the default `GITHUB_TOKEN` does **not** trigger other workflows — GitHub's
+   own anti-recursion safeguard. Since `promote.yml`'s whole job is to push a deploy tag and expect
+   that to fire the matching `deploy-*.yml`, it needs a real PAT instead. Generate a fine-grained
+   Personal Access Token scoped to just this repo with **Contents: write** and **Pull requests:
+   write** permissions, store it as the `PROMOTE_PAT` repository secret.
 
 ## Azure infrastructure for `develop`/`personal`
 
@@ -613,24 +619,27 @@ not now).
 
 **Repo-only (no external access needed):**
 
-1. Re-parent `personal` onto `develop` (git branch surgery, force-push to `origin/personal`).
-2. `AppHost.cs`: containerized `IdentityDb` for `personal`/`develop` (`AddSqlServer`+`AddDatabase`),
-   the `deploy-target` parameter, and the per-target `switch` (Redis removal already done, see
-   "Findings" above).
-3. `.github/workflows/_deploy.yml` (reusable, used by `docs`/`integration`/`production`/`personal`)
-   + `test-develop.yml` (the ephemeral stack: spin up → run `IntegrationTests` → dump logs on
-   failure → tear down, no tag/deploy) + `deploy-personal.yml`/`deploy-docs.yml`/
-   `deploy-integration.yml`/`deploy-production.yml` (each with `workflow_dispatch` for rollback) +
-   `promote.yml` (the `personal→docs→integration→main` cascade, including auto-tagging — does not
-   cover `develop→personal`, that hop is fully manual).
-4. Quality Gate workflow(s) on `develop` PRs: Snyk (dependency + image scan, early) → build →
-   SonarQube scan + coverage threshold (wraps the test run) → CodeQL (own schedule/trigger).
+1. ✅ Re-parent `personal` onto `develop` (git branch surgery, force-pushed to `origin/personal`).
+2. ✅ `AppHost.cs`: containerized `IdentityDb` for `personal`/`develop` (`AddSqlServer`+
+   `AddDatabase`), the `deploy-target` parameter, and the per-target `switch` (Redis removal already
+   done, see "Findings" above).
+3. ✅ `.github/workflows/test-develop.yml` (ephemeral stack: run `IntegrationTests` → `aspire
+   deploy` as a deployment smoke test → dump logs on failure → `aspire destroy`, always) +
+   `deploy-personal.yml` (`workflow_dispatch` included, for rollback) + `promote.yml` (the
+   `personal→docs→integration→main` cascade: auto-tags + opens the next hop's PR — does **not**
+   cover `develop→personal`, that hop is fully manual). A generic reusable `_deploy.yml` for
+   `docs`/`integration`/`production` is deferred until those environments are actually being
+   provisioned — `personal`/`develop`'s workflows are self-contained for now, not worth abstracting
+   with only one real caller each.
+4. ✅ `.github/workflows/quality-gate.yml` on `develop` PRs: Snyk → build/test/coverage threshold
+   wrapped by the SonarQube scan → CodeQL as its own parallel job. **Will fail until its secrets
+   exist** (`SNYK_TOKEN`, `SONARQUBE_URL`, `SONARQUBE_TOKEN`, per items 10-11 below) — expected,
+   not a bug.
 5. `release-please.yml` (triggered on push to `develop`) + its manifest config for the four
-   `clients/*` components.
-6. `publish-client-maui.yml` (triggered on `client-maui-v*` tags) — build Windows unpackaged zip +
-   signed MSIX + Android APK, publish a GitHub Release with all three attached.
+   `clients/*` components — not yet written, unrelated to getting `develop`/`personal` working.
+6. `publish-client-maui.yml` (triggered on `client-maui-v*` tags) — not yet written, same reason.
 7. `CONTEXT.md`: update the forward-merge description to the five-branch chain, and add the `docs`
-   environment clarification (genuinely public API docs, not just a stage name).
+   environment clarification (genuinely public API docs, not just a stage name) — not yet done.
 
 **Needs your Azure/GitHub/NUC access, can happen in parallel with the above:**
 
@@ -646,18 +655,24 @@ not now).
 12. Azure Notification Hub for `personal` (not urgent for `develop` — see "Shared or per-environment
     resources?" above) + Communication Services (shared, once its consuming code exists) — optional,
     not blocking the first deploys.
-13. GHCR package visibility confirmed for whatever images `develop`/`personal` pull.
+13. ~~GHCR package visibility~~ — **not needed for `personal`/`develop`**: the self-hosted runner
+    *is* the deploy target machine, so `docker compose`/`aspire deploy` build and run images
+    locally with no registry round-trip. GHCR only matters later, for `integration`/`main` on AKS.
 14. Self-signed Windows code-signing certificate generated, exported, and stored as the two
     `WINDOWS_SIGNING_CERT_*` repository secrets — see "`Client.Maui` distribution" above.
+15. **`PROMOTE_PAT` fine-grained PAT** (Contents: write, Pull requests: write, scoped to this repo)
+    stored as a repository secret — required for `promote.yml`'s tag-push step to actually trigger
+    downstream deploy workflows (the default `GITHUB_TOKEN` can't). See "Manual, out-of-band setup"
+    above.
 
 **Small code follow-up, not part of the pipeline itself:**
 
-15. An ACS-based `INotificationService` implementation, once the ACS resource exists (item 12) —
+16. An ACS-based `INotificationService` implementation, once the ACS resource exists (item 12) —
     today only `SmtpNotificationService` exists.
 
 **Explicitly deferred follow-up phase (after the above is working):**
 
-16. Migrate `DgDevelopment.Identity.IntegrationTests` from `WebApplicationFactory` (in-process) to
+17. Migrate `DgDevelopment.Identity.IntegrationTests` from `WebApplicationFactory` (in-process) to
     real HTTP against the ephemeral `develop` stack — new `HttpClient` construction pointed at a
     configurable base URL, `test-develop.yml` orchestrating stack-up/tests/stack-down around it.
     Touches nearly every existing test file; deliberately sequenced after the first working deploy,
@@ -665,6 +680,7 @@ not now).
 
 **Explicitly not part of this pass:** anything for `docs`/`integration`/`production`'s own Azure
 infrastructure (App Service, the two AKS clusters, their OIDC app registrations/resource groups) —
-you're not provisioning those yet, so items 8-14 above are scoped to `develop`/`personal`/`Client.Maui`
-(item 14, the signing certificate, is `Client.Maui`-scoped rather than environment-scoped, but
-grouped here since it's the same "needs your access outside the repo" category).
+you're not provisioning those yet, so items 8-15 above are scoped to `develop`/`personal`/
+`Client.Maui`/the promotion mechanism itself (items 14-15, the signing certificate and the PAT, are
+scoped to `Client.Maui`/`promote.yml` respectively rather than to an environment, but grouped here
+since they're the same "needs your access outside the repo" category).

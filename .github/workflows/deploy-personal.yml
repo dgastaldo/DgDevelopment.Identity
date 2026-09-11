@@ -1,0 +1,47 @@
+name: Deploy personal
+
+# personal is the always-on "personal production" environment - unlike develop it never tears
+# down. Deploys only on a personal/v* tag (created automatically by promote.yml once you merge the
+# develop -> personal promotion PR yourself), or manually via workflow_dispatch for rollback to a
+# previous tag. See docs/deployment.md.
+
+on:
+  push:
+    tags: ['personal/v*']
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Tag to (re)deploy, e.g. personal/v2026.09.11.3 - defaults to the latest personal tag if left blank'
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, home-pc]
+    environment: personal
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore and build
+        run: |
+          dotnet restore src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj
+          dotnet build src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj --no-restore
+
+      - name: Install Aspire CLI
+        run: |
+          curl -sSL https://aspire.dev/install.sh | bash
+          echo "$HOME/.aspire/bin" >> "$GITHUB_PATH"
+
+      - name: Deploy with Aspire
+        env:
+          Parameters__deploy_target: personal
+        run: aspire deploy --non-interactive
