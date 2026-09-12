@@ -9,7 +9,7 @@ name: 01 - Quality Gate
 # parallel (unrelated concern, its own cadence).
 #
 # Needs two repository secrets that don't exist yet (see docs/deployment.md's "Manual, out-of-band
-# setup"): SNYK_TOKEN, and SONARQUBE_URL/SONARQUBE_TOKEN once SonarQube Community Edition is
+# setup"): SNYK_TOKEN, and SONAR_HOST_URL/SONAR_TOKEN once SonarQube Community Edition is
 # running on the NUC. This workflow will fail until those are configured - expected for now.
 
 on:
@@ -80,8 +80,8 @@ jobs:
         run: >
           dotnet sonarscanner begin
           /k:"DgDevelopment.Identity"
-          /d:sonar.host.url="${{ secrets.SONARQUBE_URL }}"
-          /d:sonar.token="${{ secrets.SONARQUBE_TOKEN }}"
+          /d:sonar.host.url="${{ secrets.SONAR_HOST_URL }}"
+          /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
           /d:sonar.cs.cobertura.reportsPaths="tests/**/TestResults/coverage/**/coverage.cobertura.xml"
           /d:sonar.exclusions="**/node_modules/**,**/bin/**,**/obj/**,**/dist/**"
 
@@ -105,7 +105,7 @@ jobs:
             || { echo "Line coverage $LINE_RATE is below the $THRESHOLD threshold"; exit 1; }
 
       - name: End SonarQube analysis
-        run: dotnet sonarscanner end /d:sonar.token="${{ secrets.SONARQUBE_TOKEN }}"
+        run: dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
 
   codeql:
     runs-on: ubuntu-latest

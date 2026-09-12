@@ -716,7 +716,7 @@ not now).
    with only one real caller each.
 4. ✅ `.github/workflows/01-quality-gate.yml` on `develop` PRs: Snyk → build/test/coverage threshold
    wrapped by the SonarQube scan → CodeQL as its own parallel job. **Will fail until its secrets
-   exist** (`SNYK_TOKEN`, `SONARQUBE_URL`, `SONARQUBE_TOKEN`, per items 10-11 below) — expected,
+   exist** (`SNYK_TOKEN`, `SONAR_HOST_URL`, `SONAR_TOKEN`, per items 10-11 below) — expected,
    not a bug.
 5. ✅ `.github/workflows/03-release-please.yml` (triggered on push to `develop`) + its manifest config
    for all seven components: the five `clients/*` projects (`Client.React` included once discovered
