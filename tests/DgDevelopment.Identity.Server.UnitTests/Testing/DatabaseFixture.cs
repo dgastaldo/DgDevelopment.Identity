@@ -18,12 +18,15 @@ public class DatabaseFixture<TTestClass> : IAsyncLifetime
 
     private static async Task<MsSqlContainer> StartContainerAsync()
     {
-        // Without MSSQL_MEMORY_LIMIT_MB, SQL Server on Linux claims up to 80% of host physical
-        // RAM by default - on the self-hosted runner (7 GB total, shared with SonarQube/Postgres)
-        // that was starving everything else and triggering the kernel OOM killer. 2 GB is plenty
-        // for this test dataset's size.
+        // Without MSSQL_MEMORY_LIMIT_MB, SQL Server on Linux claims up to 80% of host physical RAM
+        // by default - on the self-hosted runner (7 GB total, shared with SonarQube/Postgres) that
+        // was starving everything else and triggering the kernel OOM killer. Note this is only an
+        // internal soft target SQL Server imposes on itself, not a Docker/cgroup hard limit - a 2
+        // GB cap still crashed sqlservr outright (SQLPAL fatal error, errno 11) even with test
+        // collections serialized, so this needs real headroom above what the rest of the box uses,
+        // not just "enough for this dataset's size."
         var container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2025-latest")
-            .WithEnvironment("MSSQL_MEMORY_LIMIT_MB", "2048")
+            .WithEnvironment("MSSQL_MEMORY_LIMIT_MB", "4096")
             .Build();
         await container.StartAsync();
         return container;
