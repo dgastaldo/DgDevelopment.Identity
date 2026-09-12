@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   deploy:
-    runs-on: [self-hosted, home-pc]
+    runs-on: [self-hosted, dgnuc1]
     environment: personal
     steps:
       - uses: actions/checkout@v4

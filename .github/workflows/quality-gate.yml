@@ -38,7 +38,7 @@ jobs:
   build-test-sonar:
     # Must run on the self-hosted (NUC) runner, not a GitHub-hosted one - SonarQube is only
     # reachable on the home LAN, a GitHub-hosted runner in the cloud couldn't reach it.
-    runs-on: [self-hosted, home-pc]
+    runs-on: [self-hosted, dgnuc1]
     needs: snyk
     steps:
       - uses: actions/checkout@v4
@@ -56,9 +56,24 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # The bundled JS/TS sensor (for clients/DgDevelopment.Identity.Client.React) needs a Node
+      # runtime to execute even though nothing here runs the app itself.
+      - name: Setup Node.js (for the JS/TS analyzer)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+
+      - name: Install React client dependencies (improves type-aware JS/TS analysis)
+        working-directory: clients/DgDevelopment.Identity.Client.React
+        run: npm ci
+
       - name: Install SonarScanner for .NET
         run: dotnet tool install --global dotnet-sonarscanner
 
+      # dotnet-sonarscanner wraps the general SonarScanner engine, which analyzes every recognized
+      # language under sonar.sources (not just C#) in one pass - so the React client's TS/JS is
+      # picked up automatically as long as Node.js is available (setup-node step above). No
+      # separate scanner run needed for the JS/TS side.
       - name: Begin SonarQube analysis
         run: >
           dotnet sonarscanner begin
@@ -66,6 +81,7 @@ jobs:
           /d:sonar.host.url="${{ secrets.SONARQUBE_URL }}"
           /d:sonar.token="${{ secrets.SONARQUBE_TOKEN }}"
           /d:sonar.cs.cobertura.reportsPaths="tests/**/TestResults/coverage/**/coverage.cobertura.xml"
+          /d:sonar.exclusions="**/node_modules/**,**/bin/**,**/obj/**,**/dist/**"
 
       # Debug config auto-generates coverage via GenerateCoverageAfterBuild in
       # DgDevelopment.Identity.Server.UnitTests.csproj - no extra --collect flags needed here.

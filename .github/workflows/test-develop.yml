@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   test:
-    runs-on: [self-hosted, home-pc]
+    runs-on: [self-hosted, dgnuc1]
     environment: develop
     steps:
       - uses: actions/checkout@v4

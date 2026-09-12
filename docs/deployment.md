@@ -333,7 +333,7 @@ each environment's trigger/approval stays declarative:
   target-specific `Azure__*`/`Parameters__*` env vars from the caller. Input: which ref/tag to check
   out and deploy — defaults to `github.ref` (the tag that triggered the run), but overridable, which
   is what rollback (below) uses. **Not used by `develop`** — see `test-develop.yml` below.
-- **`test-develop.yml`** — `push: branches: [develop]` (i.e. every merge); self-hosted `home-pc`
+- **`test-develop.yml`** — `push: branches: [develop]` (i.e. every merge); self-hosted `dgnuc1`
   (Ubuntu) runner; `environment: develop` (no required reviewer — scopes secrets only, doesn't gate).
   Build → `aspire deploy` the Docker Compose stack (same mechanism as a real deploy, just an ephemeral
   target) → wait for health → run `dotnet test` on `DgDevelopment.Identity.IntegrationTests` against
@@ -376,8 +376,8 @@ deploy.
 None of this can be done by editing the repo:
 
 1. **Self-hosted runner on the home PC** (Ubuntu, not Windows — corrected from an earlier
-   assumption) — register from repo Settings → Actions → Runners, choosing Linux/x64, labeled e.g.
-   `home-pc`. Needs Docker + Compose installed, and the runner's user in the `docker` group
+   assumption) — register from repo Settings → Actions → Runners, choosing Linux/x64, labeled
+   `dgnuc1` (the NUC's hostname). Needs Docker + Compose installed, and the runner's user in the `docker` group
    (`sudo usermod -aG docker $USER`, then re-login) so it can run `docker compose` without `sudo`.
    Install as a systemd service via the runner package's `sudo ./svc.sh install && sudo ./svc.sh start`
    rather than leaving it running in a foreground terminal.
@@ -580,7 +580,12 @@ diagnosable from the workflow run itself without needing anything to persist on 
   exposure needed; the analysis never leaves your home network. CI wraps the build with
   `dotnet-sonarscanner` (`begin` → `dotnet build` → `dotnet test` → `end`), pointed at your local
   SonarQube URL + a project token. Covers code smells, duplication, and maintainability — the
-  things coverage/CodeQL/Snyk don't.
+  things coverage/CodeQL/Snyk don't. The solution is mixed-language (.NET + TS/JS in
+  `Client.React`) — `dotnet-sonarscanner` wraps the general SonarScanner engine, which analyzes
+  every recognized language it finds under `sonar.sources` in the same pass, not just C#. The CI
+  job just needs a Node.js runtime available (for the bundled JS/TS sensor) and `node_modules`/
+  `bin`/`obj`/`dist` excluded from analysis — no separate scanner run or second SonarQube project
+  needed for the React client.
 
 Ordering in the PR pipeline: Snyk (dependency scan, fast) → build → SonarQube scan + coverage
 (wraps the test run) → CodeQL (runs on its own schedule/trigger independent of this sequence).
