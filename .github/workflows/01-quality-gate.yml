@@ -26,12 +26,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # TODO(implementation): confirm the current recommended Snyk GitHub Action for a .NET repo
-      # (snyk/actions/dotnet vs the generic snyk/actions/setup + `snyk test`) against Snyk's own
-      # docs at implementation time rather than assuming this shape is still current.
+      # There's no top-level .sln - this is a monorepo of independent .csproj files (src/, tests/,
+      # clients/). Without --all-projects, snyk test only looks at the repo root and finds nothing
+      # ("Could not detect supported target files") - confirmed against Snyk's own docs.
       - name: Run Snyk to check for dependency and image vulnerabilities
         uses: snyk/actions/dotnet@master
         continue-on-error: false
+        with:
+          args: --all-projects
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
