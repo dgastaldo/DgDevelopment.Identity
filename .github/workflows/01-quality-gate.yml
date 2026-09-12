@@ -118,9 +118,11 @@ jobs:
     # A job-level `permissions:` block replaces the workflow-level one entirely rather than adding
     # to it - omitting contents:read here left this job's GITHUB_TOKEN unable to even clone the
     # (private) repo, which is what caused "repository ... not found" / git exit 128.
+    # No security-events:write - GitHub code scanning (the thing that permission gates) isn't
+    # available for private repos below GitHub Team/Enterprise, so analyze below uploads nothing;
+    # see the "upload: never" step below.
     permissions:
       contents: read
-      security-events: write
     steps:
       - uses: actions/checkout@v4
 
@@ -146,5 +148,18 @@ jobs:
           dotnet build tests/DgDevelopment.Identity.Server.UnitTests/DgDevelopment.Identity.Server.UnitTests.csproj
           dotnet build tests/DgDevelopment.Identity.IntegrationTests/DgDevelopment.Identity.IntegrationTests.csproj
 
+      # upload: never - this repo is private, and GitHub code scanning (the Security tab feature
+      # that receives uploaded SARIF) isn't available below GitHub Team/Enterprise. Analysis still
+      # runs in full; the results just aren't uploaded anywhere, only written to disk below.
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v4
+        with:
+          upload: never
+          output: codeql-results
+
+      - name: Upload CodeQL results as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-results
+          path: codeql-results
+          retention-days: 30
