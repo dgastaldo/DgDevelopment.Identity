@@ -625,9 +625,16 @@ diagnosable from the workflow run itself without needing anything to persist on 
   number; tighten over time). Also tighten the existing Roslyn analyzer config
   (`Directory.Build.props` already sets `AnalysisMode`/`EnforceCodeStyleInBuild`) if it isn't
   already at its strictest useful setting.
-- **CodeQL** — free, GitHub-native security static analysis (`github/codeql-action`), scheduled
-  scan + PR-triggered scan, surfaces results as code-scanning alerts. Analyzes *our* code for
-  vulnerability patterns.
+- **CodeQL** — free, GitHub-native security static analysis (`github/codeql-action`), PR-triggered
+  scan. Analyzes *our* code for vulnerability patterns. **Results aren't uploaded as code-scanning
+  alerts** — that Security-tab feature isn't available for private repos below GitHub Team/
+  Enterprise (confirmed against GitHub's own docs when `analyze`'s upload failed with "Code
+  scanning is not enabled for this repository"). Kept both the repo private and CodeQL: `analyze`
+  runs with `upload: never`, and its SARIF output is attached to the run as a downloadable
+  workflow artifact instead — same analysis, just inspected manually rather than surfaced inline.
+  Considered dropping CodeQL in favor of SonarQube's Security Hotspots alone (real overlap: both
+  flag security-sensitive code), but kept it for its deeper dataflow/taint-tracking queries, which
+  Community Edition's hotspot rules don't do.
 - **Snyk** — free tier, scans **dependencies** (NuGet packages) for known CVEs, and — newly relevant
   now that `develop`/`personal` are really containerized — can scan the built **Docker images**
   themselves for vulnerable base-image/OS-package layers. Complements CodeQL rather than
