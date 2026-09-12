@@ -26,9 +26,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # There's no top-level .sln - this is a monorepo of independent .csproj files (src/, tests/,
-      # clients/). Without --all-projects, snyk test only looks at the repo root and finds nothing
-      # ("Could not detect supported target files") - confirmed against Snyk's own docs.
+      # There's a DgDevelopment.Identity.slnx (the newer XML-free solution format), but Snyk's
+      # dotnet plugin doesn't recognize it and, without --all-projects, only looks at the repo root
+      # and finds nothing ("Could not detect supported target files") - confirmed against Snyk's
+      # own docs. --all-projects falls back to detecting each .csproj individually instead.
       - name: Run Snyk to check for dependency and image vulnerabilities
         uses: snyk/actions/dotnet@master
         continue-on-error: false
@@ -118,13 +119,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: csharp
 
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+      # autobuild finds DgDevelopment.Identity.slnx and tries to build the whole solution,
+      # including Client.Maui's net10.0-android target - which needs the maui-android workload,
+      # not installed on ubuntu-latest, and fails the entire build. Build only the AppHost's
+      # dependency graph (Server/IdentityPlatform and everything they reference) plus the test
+      # projects instead - the same buildable-on-Linux subset build-test-sonar already builds.
+      - name: Build the buildable-on-Linux subset (skips Client.Maui/Wpf)
+        run: |
+          dotnet restore src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj
+          dotnet build src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj --no-restore
+          dotnet build tests/DgDevelopment.Identity.Server.UnitTests/DgDevelopment.Identity.Server.UnitTests.csproj
+          dotnet build tests/DgDevelopment.Identity.IntegrationTests/DgDevelopment.Identity.IntegrationTests.csproj
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v3
