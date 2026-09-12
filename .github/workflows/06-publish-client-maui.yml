@@ -17,6 +17,10 @@ permissions:
   contents: write
 
 jobs:
+  # TODO: move to a self-hosted Windows runner once one exists (see docs/deployment.md's "Manual,
+  # out-of-band setup") - windows-latest is the only GitHub-hosted job left in the pipeline,
+  # kept for now because building/signing an MSIX genuinely needs the Windows/WinUI toolchain and
+  # no self-hosted Windows machine is set up yet.
   build-windows:
     runs-on: windows-latest
     steps:
@@ -73,7 +77,7 @@ jobs:
             publish/msix/**/*.msix
 
   build-android:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, dgnuc1]
     steps:
       - uses: actions/checkout@v4
 
@@ -98,7 +102,9 @@ jobs:
 
   release:
     needs: [build-windows, build-android]
-    runs-on: ubuntu-latest
+    # Needs the gh CLI, which GitHub-hosted runners bundle but self-hosted ones don't - install it
+    # on dgnuc1 (see docs/deployment.md's "Manual, out-of-band setup") before this can run here.
+    runs-on: [self-hosted, dgnuc1]
     steps:
       - uses: actions/download-artifact@v4
         with:

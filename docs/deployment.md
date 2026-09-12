@@ -460,6 +460,21 @@ None of this can be done by editing the repo:
    that to fire the matching `deploy-*.yml`, it needs a real PAT instead. Generate a fine-grained
    Personal Access Token scoped to just this repo with **Contents: write** and **Pull requests:
    write** permissions, store it as the `PROMOTE_PAT` repository secret.
+8. **GitHub CLI (`gh`) on `dgnuc1`** — decided to run everything Linux-compatible on the self-hosted
+   runner rather than `ubuntu-latest` (`snyk`, `codeql`, `04-promote.yml`, `03-release-please.yml`,
+   `06-publish-client-maui.yml`'s `build-android`/`release` jobs). GitHub-hosted runners come with
+   `gh` preinstalled; self-hosted ones don't. `04-promote.yml` and the `release` job in
+   `06-publish-client-maui.yml` both call `gh` directly, so install it on the NUC (the official apt
+   repo — `gh`'s own install docs cover Ubuntu) before those jobs will succeed there. Everything else
+   moved to `dgnuc1` needs nothing beyond what's already there (Docker for Snyk's docker-based
+   action, .NET for CodeQL's build step, Node for `release-please-action` — bundled with the runner
+   agent itself, not a separate install).
+9. **A Windows self-hosted runner — not set up yet, tracked here for later.** `06-publish-client-maui.yml`'s
+   `build-windows` job is the one holdout still on `windows-latest`: building/signing the MSIX
+   genuinely needs the Windows/WinUI toolchain, which `dgnuc1` (Ubuntu) can't provide. Once a Windows
+   machine is available, register it as a second self-hosted runner (Settings → Actions → Runners →
+   New self-hosted runner → Windows/x64, its own label e.g. `dgwin1`) and repoint that one job's
+   `runs-on` at it — everything else in the pipeline is already off GitHub-hosted runners.
 
 ## Azure infrastructure for `develop`/`personal`
 

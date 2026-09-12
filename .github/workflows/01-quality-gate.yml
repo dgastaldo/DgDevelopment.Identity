@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   snyk:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, dgnuc1]
     steps:
       - uses: actions/checkout@v4
 

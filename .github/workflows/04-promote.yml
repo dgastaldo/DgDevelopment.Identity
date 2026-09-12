@@ -28,7 +28,9 @@ permissions:
 jobs:
   promote:
     if: github.event.pull_request.merged == true
-    runs-on: ubuntu-latest
+    # Needs the gh CLI, which GitHub-hosted runners bundle but self-hosted ones don't - install it
+    # on dgnuc1 (see docs/deployment.md's "Manual, out-of-band setup") before this can run here.
+    runs-on: [self-hosted, dgnuc1]
     steps:
       - uses: actions/checkout@v4
         with:
