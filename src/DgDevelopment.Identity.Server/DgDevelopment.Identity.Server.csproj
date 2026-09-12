@@ -29,6 +29,10 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <NoWarn>$(NoWarn);CA1707;CA1054;CA1055;CA1056;CA1303;CA1515;CA2007</NoWarn>
+    <!-- Bumped automatically by release-please (component "server") - see docs/deployment.md's
+         "Client and application versioning" section. Not tied to the personal/docs/integration/main
+         deploy tags, which mark deployment events rather than meaningful version history. -->
+    <Version>0.1.0</Version>
   </PropertyGroup>
 
   <Target Name="BuildTailwindCss" BeforeTargets="PrepareForBuild" Condition="Exists('node_modules') And '$(DesignTimeBuild)' != 'true'">

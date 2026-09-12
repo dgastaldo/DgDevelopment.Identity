@@ -1,4 +1,4 @@
-name: Test develop (ephemeral stack)
+name: 02 - Test develop (ephemeral stack)
 
 # develop is never a persistently-deployed environment - every merge spins up a throwaway Docker
 # Compose stack (Server + IdentityPlatform + a containerized SQL Server), proves the deployment

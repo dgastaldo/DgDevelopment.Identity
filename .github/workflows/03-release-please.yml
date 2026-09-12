@@ -1,4 +1,4 @@
-name: release-please
+name: 03 - release-please
 
 # Versions the five clients/* SDKs/apps independently, from Conventional Commits on develop - see
 # docs/deployment.md's "Client package/app versioning" section. Deliberately separate from the

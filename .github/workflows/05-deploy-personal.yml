@@ -1,4 +1,4 @@
-name: Deploy personal
+name: 05 - Deploy personal
 
 # personal is the always-on "personal production" environment - unlike develop it never tears
 # down. Deploys only on a personal/v* tag (created automatically by promote.yml once you merge the

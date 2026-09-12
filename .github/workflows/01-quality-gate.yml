@@ -1,4 +1,4 @@
-name: Quality Gate
+name: 01 - Quality Gate
 
 # Runs on every PR into develop - this is the gate the ephemeral develop stack (test-develop.yml)
 # and everything downstream implicitly relies on being green before merge. See

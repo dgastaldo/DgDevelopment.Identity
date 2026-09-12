@@ -1,4 +1,4 @@
-name: Publish Client.Maui
+name: 06 - Publish Client.Maui
 
 # Fires once release-please's Release PR for Client.Maui gets merged (that merge is what creates
 # the client-maui-v* tag). Builds Windows twice - unpackaged zip and a signed MSIX - plus an
