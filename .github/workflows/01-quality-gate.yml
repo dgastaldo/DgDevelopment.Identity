@@ -41,8 +41,17 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      # snyk/actions/setup@master installs the CLI via `sudo mv` into /usr/local/bin, which works
+      # on GitHub-hosted runners (passwordless sudo preconfigured) but fails here with "sudo: A
+      # terminal is required to authenticate" - dgnuc1's user doesn't have passwordless sudo, and
+      # loosening that is a bigger security change than this needs. Download the static binary
+      # straight into a user-owned directory instead, no sudo involved.
       - name: Install Snyk CLI
-        uses: snyk/actions/setup@master
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -Lo "$HOME/.local/bin/snyk" https://static.snyk.io/cli/latest/snyk-linux
+          chmod +x "$HOME/.local/bin/snyk"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       # There's a DgDevelopment.Identity.slnx (the newer XML-free solution format), but Snyk
       # doesn't recognize it and, without --all-projects, only looks at the repo root and finds
