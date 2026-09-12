@@ -1,23 +1,38 @@
 namespace DgDevelopment.Identity.Server.UnitTests.Testing;
 
 using DgDevelopment.Identity.Infrastructure.Data;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Testcontainers.MsSql;
 using Xunit;
 
 public class DatabaseFixture<TTestClass> : IAsyncLifetime
     where TTestClass : class
 {
-    private const string Server = "Server=(localdb)\\MSSQLLocalDB;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=true";
+    // LocalDB (the previous approach) only exists on Windows, so tests never ran on the Linux
+    // self-hosted CI runner. One SQL Server container is started lazily and shared by every test
+    // class in the process (starting a fresh container per class - 40+ of them - would be far too
+    // slow); each class still gets its own database inside it, same isolation LocalDB gave via
+    // separate databases on one shared engine.
+    private static readonly Lazy<Task<MsSqlContainer>> SharedContainer = new(StartContainerAsync);
 
-    public DatabaseFixture()
+    private static async Task<MsSqlContainer> StartContainerAsync()
     {
-        ConnectionString = $"{Server};Database=DgDevelopment.Identity.Tests.{typeof(TTestClass).Name}";
+        var container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2025-latest").Build();
+        await container.StartAsync();
+        return container;
     }
 
-    protected string ConnectionString { get; }
+    protected string ConnectionString { get; private set; } = string.Empty;
 
     public virtual async Task InitializeAsync()
     {
+        var container = await SharedContainer.Value;
+        ConnectionString = new SqlConnectionStringBuilder(container.GetConnectionString())
+        {
+            InitialCatalog = $"DgDevelopment.Identity.Tests.{typeof(TTestClass).Name}",
+        }.ConnectionString;
+
         await using var context = CreateContext();
         await context.Database.EnsureDeletedAsync();
         await context.Database.MigrateAsync();

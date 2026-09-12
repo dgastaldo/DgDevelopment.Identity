@@ -3,14 +3,27 @@ namespace DgDevelopment.Identity.IntegrationTests;
 using DgDevelopment.Identity.Domain.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Testcontainers.MsSql;
 
 public sealed class IdentityWebApplicationFactory : WebApplicationFactory<Program>
 {
-    public const string ConnectionString =
-        "Server=(localdb)\\MSSQLLocalDB;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=true;Database=DgDevelopment.Identity.IntegrationTests";
+    // LocalDB (the previous approach) only exists on Windows, so this never ran on the Linux
+    // self-hosted CI runner. Shared across every IdentityWebApplicationFactory instance in the
+    // process, same reasoning as DatabaseFixture<T> in Server.UnitTests.
+    private static readonly Lazy<Task<MsSqlContainer>> SharedContainer = new(StartContainerAsync);
+
+    private static async Task<MsSqlContainer> StartContainerAsync()
+    {
+        var container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2025-latest").Build();
+        await container.StartAsync();
+        return container;
+    }
+
+    public string ConnectionString { get; private set; } = string.Empty;
 
     // OidcIssuerProvider stamps the `iss` claim from the request's own scheme+host, but JWT bearer
     // validation checks it against this fixed ValidIssuer - they only agree in real usage because
@@ -20,8 +33,16 @@ public sealed class IdentityWebApplicationFactory : WebApplicationFactory<Progra
 
     public CapturingNotificationService Notifications { get; } = new();
 
-    public IdentityWebApplicationFactory()
+    // Must be awaited (by IntegrationTestFixture.InitializeAsync) before anything else touches
+    // ConnectionString or triggers host startup via Factory.CreateClient()/.Server.
+    public async Task InitializeConnectionAsync()
     {
+        var container = await SharedContainer.Value;
+        ConnectionString = new SqlConnectionStringBuilder(container.GetConnectionString())
+        {
+            InitialCatalog = $"DgDevelopment.Identity.IntegrationTests.{Guid.NewGuid():N}",
+        }.ConnectionString;
+
         // Program.cs reads ConnectionStrings:IdentityDb into a local variable right after
         // WebApplication.CreateBuilder(args), before builder.Build() runs. ConfigureAppConfiguration
         // below only takes effect at Build() time, which is too late - the value is already captured.
