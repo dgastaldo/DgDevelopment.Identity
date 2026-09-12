@@ -18,7 +18,13 @@ public sealed class IdentityWebApplicationFactory : WebApplicationFactory<Progra
 
     private static async Task<MsSqlContainer> StartContainerAsync()
     {
-        var container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2025-latest").Build();
+        // Without MSSQL_MEMORY_LIMIT_MB, SQL Server on Linux claims up to 80% of host physical
+        // RAM by default - on the self-hosted runner (7 GB total, shared with SonarQube/Postgres)
+        // that was starving everything else and triggering the kernel OOM killer. 2 GB is plenty
+        // for this test dataset's size.
+        var container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2025-latest")
+            .WithEnvironment("MSSQL_MEMORY_LIMIT_MB", "2048")
+            .Build();
         await container.StartAsync();
         return container;
     }
