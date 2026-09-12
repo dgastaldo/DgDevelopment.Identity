@@ -109,7 +109,7 @@ jobs:
         run: dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
 
   codeql:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, dgnuc1]
     # A job-level `permissions:` block replaces the workflow-level one entirely rather than adding
     # to it - omitting contents:read here left this job's GITHUB_TOKEN unable to even clone the
     # (private) repo, which is what caused "repository ... not found" / git exit 128.
