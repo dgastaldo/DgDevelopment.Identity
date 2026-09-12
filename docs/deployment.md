@@ -32,7 +32,7 @@ regardless of outcome. `personal` is the one that stays always-on — it's your 
 
 This is a **quality gate before promotion**, not just "somewhere to point E2E tests":
 
-1. A PR into `develop` passes build + unit tests + coverage threshold + CodeQL + Snyk (see "Quality
+1. A PR into `develop` passes build + unit tests + coverage threshold + Snyk (see "Quality
    Gate tooling" below) — merge if green.
 2. On merge, the ephemeral stack spins up from that new `develop` state.
 3. The integration test suite (`DgDevelopment.Identity.IntegrationTests`) runs against it, plus —
@@ -118,7 +118,7 @@ side by side and don't collide.
 advance and don't need to — a promotion PR merging into a branch is what triggers its tag, via
 `04-promote.yml` (`develop` needs no tag at all — it has no deploy step, just the ephemeral test stack
 triggered directly by the merge). Since promotion merges are fast-forwards carrying no independent
-code changes (the coverage/CodeQL/Snyk gate only needs to run once, on the PR into `develop`),
+code changes (the coverage/Snyk/SonarQube gate only needs to run once, on the PR into `develop`),
 there's no meaningful "major/minor/patch" decision to automate around for *these* tags; each one is
 just a deployment marker, not a compatibility promise anyone depends on. Proposed scheme:
 `<prefix><date>.<run-number>`, generated in
@@ -461,14 +461,14 @@ None of this can be done by editing the repo:
    Personal Access Token scoped to just this repo with **Contents: write** and **Pull requests:
    write** permissions, store it as the `PROMOTE_PAT` repository secret.
 8. **GitHub CLI (`gh`) on `dgnuc1`** — decided to run everything Linux-compatible on the self-hosted
-   runner rather than `ubuntu-latest` (`snyk`, `codeql`, `04-promote.yml`, `03-release-please.yml`,
+   runner rather than `ubuntu-latest` (`snyk`, `04-promote.yml`, `03-release-please.yml`,
    `06-publish-client-maui.yml`'s `build-android`/`release` jobs). GitHub-hosted runners come with
    `gh` preinstalled; self-hosted ones don't. `04-promote.yml` and the `release` job in
    `06-publish-client-maui.yml` both call `gh` directly, so install it on the NUC (the official apt
    repo — `gh`'s own install docs cover Ubuntu) before those jobs will succeed there. Everything else
    moved to `dgnuc1` needs nothing beyond what's already there (Docker for Snyk's docker-based
-   action, .NET for CodeQL's build step, Node for `release-please-action` — bundled with the runner
-   agent itself, not a separate install).
+   action, Node for `release-please-action` — bundled with the runner agent itself, not a separate
+   install).
 9. **A Windows self-hosted runner — not set up yet, tracked here for later.** `06-publish-client-maui.yml`'s
    `build-windows` job is the one holdout still on `windows-latest`: building/signing the MSIX
    genuinely needs the Windows/WinUI toolchain, which `dgnuc1` (Ubuntu) can't provide. Once a Windows
@@ -615,8 +615,9 @@ diagnosable from the workflow run itself without needing anything to persist on 
 
 ## Quality Gate tooling — decided (phase 1, revised)
 
-**Decided**: four checks on every PR into `develop`, all free — coverage threshold, CodeQL, Snyk,
-**and now self-hosted SonarQube** (moved up from "phase 2, deferred" — see below for why).
+**Decided**: three checks on every PR into `develop`, all free — coverage threshold, Snyk, and
+self-hosted SonarQube (moved up from "phase 2, deferred" — see below for why). **CodeQL was tried
+and removed** — see its own note below.
 
 - **Coverage threshold in CI** — the repo already produces coverage via ReportGenerator
   (`TestResults\html`, see `CONTEXT.md`'s test suite bullet). Add a CI step that runs the test
@@ -625,22 +626,11 @@ diagnosable from the workflow run itself without needing anything to persist on 
   number; tighten over time). Also tighten the existing Roslyn analyzer config
   (`Directory.Build.props` already sets `AnalysisMode`/`EnforceCodeStyleInBuild`) if it isn't
   already at its strictest useful setting.
-- **CodeQL** — free, GitHub-native security static analysis (`github/codeql-action`), PR-triggered
-  scan. Analyzes *our* code for vulnerability patterns. **Results aren't uploaded as code-scanning
-  alerts** — that Security-tab feature isn't available for private repos below GitHub Team/
-  Enterprise (confirmed against GitHub's own docs when `analyze`'s upload failed with "Code
-  scanning is not enabled for this repository"). Kept both the repo private and CodeQL: `analyze`
-  runs with `upload: never`, and its SARIF output is attached to the run as a downloadable
-  workflow artifact instead — same analysis, just inspected manually rather than surfaced inline.
-  Considered dropping CodeQL in favor of SonarQube's Security Hotspots alone (real overlap: both
-  flag security-sensitive code), but kept it for its deeper dataflow/taint-tracking queries, which
-  Community Edition's hotspot rules don't do.
 - **Snyk** — free tier, scans **dependencies** (NuGet packages) for known CVEs, and — newly relevant
   now that `develop`/`personal` are really containerized — can scan the built **Docker images**
-  themselves for vulnerable base-image/OS-package layers. Complements CodeQL rather than
-  overlapping it (dependency/image vulnerabilities vs. first-party code patterns). Runs early in
-  the pipeline (before the test suite) so a known-bad dependency fails fast and cheap, before
-  spending time on the full test run.
+  themselves for vulnerable base-image/OS-package layers. Runs early in the pipeline (before the
+  test suite) so a known-bad dependency fails fast and cheap, before spending time on the full test
+  run.
 - **SonarQube Community Edition, self-hosted** — moved from deferred to decided now: you want to run
   it on your own NUC (the same Ubuntu machine as the self-hosted runner) rather than pay for
   SonarCloud, which changes the cost/effort calculus that justified deferring it. Runs as a Docker
@@ -648,16 +638,48 @@ diagnosable from the workflow run itself without needing anything to persist on 
   CI step reaches it over `localhost`/the Docker network, no cross-machine networking or public
   exposure needed; the analysis never leaves your home network. CI wraps the build with
   `dotnet-sonarscanner` (`begin` → `dotnet build` → `dotnet test` → `end`), pointed at your local
-  SonarQube URL + a project token. Covers code smells, duplication, and maintainability — the
-  things coverage/CodeQL/Snyk don't. The solution is mixed-language (.NET + TS/JS in
-  `Client.React`) — `dotnet-sonarscanner` wraps the general SonarScanner engine, which analyzes
-  every recognized language it finds under `sonar.sources` in the same pass, not just C#. The CI
-  job just needs a Node.js runtime available (for the bundled JS/TS sensor) and `node_modules`/
-  `bin`/`obj`/`dist` excluded from analysis — no separate scanner run or second SonarQube project
-  needed for the React client.
+  SonarQube URL + a project token. Covers code smells, duplication, and maintainability, plus
+  Security Hotspots — security-sensitive code flagged for manual review (not the deeper
+  dataflow/taint-tracking CodeQL does, but real coverage). The solution is mixed-language (.NET +
+  TS/JS in `Client.React`) — `dotnet-sonarscanner` wraps the general SonarScanner engine, which
+  analyzes every recognized language it finds under `sonar.sources` in the same pass, not just C#.
+  The CI job just needs a Node.js runtime available (for the bundled JS/TS sensor) and
+  `node_modules`/`bin`/`obj`/`dist` excluded from analysis — no separate scanner run or second
+  SonarQube project needed for the React client.
+
+### CodeQL — tried, then removed (revisit on a paid GitHub tier)
+
+Added initially as a fourth, free, GitHub-native security scanner. Dropped after hitting three
+compounding problems, none fatal individually but adding up to more friction than it was worth for
+now:
+
+1. **No code-scanning upload on this plan.** GitHub code scanning (the Security-tab feature
+   `codeql-action/analyze` uploads SARIF to) isn't available for private repos below GitHub Team/
+   Enterprise — confirmed against GitHub's own docs after `analyze` failed with "Code scanning is
+   not enabled for this repository." Worked around with `upload: never` + attaching the SARIF as a
+   plain workflow artifact, which technically ran, but with no inline PR annotations or Security
+   tab, most of CodeQL's usual value was already gone.
+2. **`autobuild` couldn't handle this repo's shape.** It found `DgDevelopment.Identity.slnx` and
+   tried to build the *entire* solution, including `Client.Maui`'s `net10.0-android` target — which
+   needs the `maui-android` workload, not present by default, so the whole build failed. Fixed by
+   replacing `autobuild` with an explicit build of just the AppHost's dependency graph + test
+   projects (the same buildable-on-Linux subset `build-test-sonar` already builds), but that's more
+   hand-maintained surface area for something that was supposed to be a low-effort addition.
+3. **A third job competing for `dgnuc1`'s one execution slot.** Once moved to the self-hosted runner
+   (see "everything self-hosted" below), CodeQL needed an explicit `needs` chain (`snyk` →
+   `codeql` → `build-test-sonar`) to avoid racing the other two jobs for the runner's single
+   concurrent-job capacity — workable, but it's real overlap with SonarQube's Security Hotspots
+   (both flag security-sensitive code) for a check whose main differentiator (deeper
+   dataflow/taint-tracking) wasn't reaching anywhere visible anyway given point 1.
+
+**Decision: remove it for now, revisit if/when this repo moves to a paid GitHub tier** (Team or
+Enterprise) that actually unlocks code-scanning upload for private repos — at that point CodeQL's
+upload-based value proposition (inline PR annotations, Security tab, no artifact-digging) is real
+again and worth the reintroduction.
 
 Ordering in the PR pipeline: Snyk (dependency scan, fast) → build → SonarQube scan + coverage
-(wraps the test run) → CodeQL (runs on its own schedule/trigger independent of this sequence).
+(wraps the test run). Both jobs run on `dgnuc1` (see "Manual, out-of-band setup" item 8), chained
+with `needs` since the single self-hosted runner has one execution slot.
 
 ## Open items
 
@@ -737,9 +759,9 @@ not now).
    provisioned — `personal`/`develop`'s workflows are self-contained for now, not worth abstracting
    with only one real caller each.
 4. ✅ `.github/workflows/01-quality-gate.yml` on `develop` PRs: Snyk → build/test/coverage threshold
-   wrapped by the SonarQube scan → CodeQL as its own parallel job. **Will fail until its secrets
-   exist** (`SNYK_TOKEN`, `SONAR_HOST_URL`, `SONAR_TOKEN`, per items 10-11 below) — expected,
-   not a bug.
+   wrapped by the SonarQube scan (CodeQL tried and removed — see "Quality Gate tooling" above).
+   **Will fail until its secrets exist** (`SNYK_TOKEN`, `SONAR_HOST_URL`, `SONAR_TOKEN`, per items
+   10-11 below) — expected, not a bug.
 5. ✅ `.github/workflows/03-release-please.yml` (triggered on push to `develop`) + its manifest config
    for all seven components: the five `clients/*` projects (`Client.React` included once discovered
    mid-implementation — see above) plus `Server`/`IdentityPlatform` (added later — see "Client and
