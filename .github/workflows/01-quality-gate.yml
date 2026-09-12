@@ -31,15 +31,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # There's a DgDevelopment.Identity.slnx (the newer XML-free solution format), but Snyk's
-      # dotnet plugin doesn't recognize it and, without --all-projects, only looks at the repo root
-      # and finds nothing ("Could not detect supported target files") - confirmed against Snyk's
-      # own docs. --all-projects falls back to detecting each .csproj individually instead.
-      - name: Run Snyk to check for dependency and image vulnerabilities
-        uses: snyk/actions/dotnet@master
-        continue-on-error: false
+      # snyk/actions/dotnet is deprecated (confirmed against snyk/actions' own repo, which lists it
+      # under "Deprecated Actions"), with no drop-in dotnet-specific replacement - the recommended
+      # path is the generic setup action + the CLI directly. Also drops the Docker-container
+      # overhead the old action had (it ran `docker run snyk/snyk:dotnet`); this shells out to the
+      # dotnet SDK already on the runner instead.
+      - name: Setup .NET (Snyk's CLI shells out to dotnet to resolve NuGet dependencies)
+        uses: actions/setup-dotnet@v4
         with:
-          args: --all-projects
+          dotnet-version: 10.0.x
+
+      - name: Install Snyk CLI
+        uses: snyk/actions/setup@master
+
+      # There's a DgDevelopment.Identity.slnx (the newer XML-free solution format), but Snyk
+      # doesn't recognize it and, without --all-projects, only looks at the repo root and finds
+      # nothing ("Could not detect supported target files") - confirmed against Snyk's own docs.
+      # --all-projects falls back to detecting each .csproj individually instead.
+      - name: Run Snyk to check for dependency and image vulnerabilities
+        run: snyk test --all-projects
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 

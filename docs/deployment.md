@@ -466,9 +466,9 @@ None of this can be done by editing the repo:
    `gh` preinstalled; self-hosted ones don't. `04-promote.yml` and the `release` job in
    `06-publish-client-maui.yml` both call `gh` directly, so install it on the NUC (the official apt
    repo — `gh`'s own install docs cover Ubuntu) before those jobs will succeed there. Everything else
-   moved to `dgnuc1` needs nothing beyond what's already there (Docker for Snyk's docker-based
-   action, Node for `release-please-action` — bundled with the runner agent itself, not a separate
-   install).
+   moved to `dgnuc1` needs nothing beyond what's already there (.NET for Snyk's CLI to shell out to
+   when resolving NuGet dependencies, Node for `release-please-action` — bundled with the runner
+   agent itself, not a separate install).
 9. **A Windows self-hosted runner — not set up yet, tracked here for later.** `06-publish-client-maui.yml`'s
    `build-windows` job is the one holdout still on `windows-latest`: building/signing the MSIX
    genuinely needs the Windows/WinUI toolchain, which `dgnuc1` (Ubuntu) can't provide. Once a Windows
@@ -626,11 +626,14 @@ and removed** — see its own note below.
   number; tighten over time). Also tighten the existing Roslyn analyzer config
   (`Directory.Build.props` already sets `AnalysisMode`/`EnforceCodeStyleInBuild`) if it isn't
   already at its strictest useful setting.
-- **Snyk** — free tier, scans **dependencies** (NuGet packages) for known CVEs, and — newly relevant
-  now that `develop`/`personal` are really containerized — can scan the built **Docker images**
-  themselves for vulnerable base-image/OS-package layers. Runs early in the pipeline (before the
-  test suite) so a known-bad dependency fails fast and cheap, before spending time on the full test
-  run.
+- **Snyk** — free tier, scans **dependencies** (NuGet packages) for known CVEs. Runs early in the
+  pipeline (before the test suite) so a known-bad dependency fails fast and cheap, before spending
+  time on the full test run. Uses `snyk/actions/setup` (installs the CLI) + `snyk test
+  --all-projects` directly, not the dotnet-specific `snyk/actions/dotnet` action — that one is
+  deprecated (confirmed against `snyk/actions`' own repo, listed under "Deprecated Actions"), with
+  no dotnet-specific replacement; the generic setup-action-plus-CLI path is what Snyk recommends
+  instead. Also drops the Docker-container overhead the old action had (`docker run
+  snyk/snyk:dotnet`) in favor of shelling out to the .NET SDK already on the runner.
 - **SonarQube Community Edition, self-hosted** — moved from deferred to decided now: you want to run
   it on your own NUC (the same Ubuntu machine as the self-hosted runner) rather than pay for
   SonarCloud, which changes the cost/effort calculus that justified deferring it. Runs as a Docker
