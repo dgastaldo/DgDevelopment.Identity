@@ -4,9 +4,10 @@ name: 01 - Quality Gate
 # and everything downstream implicitly relies on being green before merge. See
 # docs/deployment.md's "Quality Gate tooling" section.
 #
-# Order: Snyk first (dependency scan, fast/cheap - fail before spending time on the rest) -> build
-# + unit tests + coverage threshold, wrapped by the SonarQube scan -> CodeQL runs as its own job in
-# parallel (unrelated concern, its own cadence).
+# Order: Snyk first (dependency scan, fast/cheap - fail before spending time on the rest) -> CodeQL
+# -> build + unit tests + coverage threshold, wrapped by the SonarQube scan. All three jobs run on
+# dgnuc1 (see docs/deployment.md's "everything self-hosted" decision), which only has one execution
+# slot, so this is an explicit `needs` chain rather than three parallel jobs racing for it.
 #
 # Needs two repository secrets that don't exist yet (see docs/deployment.md's "Manual, out-of-band
 # setup"): SNYK_TOKEN, and SONAR_HOST_URL/SONAR_TOKEN once SonarQube Community Edition is
@@ -42,7 +43,7 @@ jobs:
     # Must run on the self-hosted (NUC) runner, not a GitHub-hosted one - SonarQube is only
     # reachable on the home LAN, a GitHub-hosted runner in the cloud couldn't reach it.
     runs-on: [self-hosted, dgnuc1]
-    needs: snyk
+    needs: codeql
     steps:
       - uses: actions/checkout@v4
         with:
@@ -110,6 +111,10 @@ jobs:
 
   codeql:
     runs-on: [self-hosted, dgnuc1]
+    # Explicit ordering (snyk -> codeql -> build-test-sonar) now that all three share the single
+    # dgnuc1 runner - without a `needs` chain they'd just race for that one execution slot in
+    # whatever order the runner happens to pick them up, not the intended sequence.
+    needs: snyk
     # A job-level `permissions:` block replaces the workflow-level one entirely rather than adding
     # to it - omitting contents:read here left this job's GITHUB_TOKEN unable to even clone the
     # (private) repo, which is what caused "repository ... not found" / git exit 128.
