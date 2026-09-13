@@ -5,10 +5,12 @@ name: 01 - Quality Gate
 # docs/deployment.md's "Quality Gate tooling" section.
 #
 # Order: Snyk first (dependency scan, fast/cheap - fail before spending time on the rest) -> CodeQL
-# -> build + unit tests + coverage threshold, wrapped by the SonarCloud scan. All jobs run on
+# -> build + unit tests + coverage threshold, wrapped by the SonarCloud scan. That chain runs on
 # GitHub-hosted ubuntu-latest - moved off the self-hosted NUC runner deliberately: this workflow
 # triggers on every PR, including (once the repo is public) PRs from forks, and self-hosted
-# runners must never execute code reachable from an untrusted PR.
+# runners must never execute code reachable from an untrusted PR. Platform-specific clients
+# (Client.Wpf today, a Mac/iOS target later) get their own compile-only job per OS in parallel -
+# see build-windows/build-macos below.
 #
 # CodeQL's GitHub UI upload (security-events: write) is a public-repo feature (free tier) - not
 # worth the friction on a private repo without GitHub Team/Enterprise, which is why it was dropped
@@ -162,3 +164,20 @@ jobs:
 
       - name: End SonarQube analysis
         run: dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+
+  # Platform-specific clients can't build on ubuntu-latest (a job is pinned to one runs-on, and
+  # there's no shared logic worth forcing into one matrix - Wpf and a future Mac target build
+  # nothing in common), so they get their own job per OS instead, in parallel with the Linux-only
+  # chain above. Not Sonar/CodeQL-analyzed here - a compile-only check, same as
+  # 06-publish-client-maui.yml's build-windows job.
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet build clients/DgDevelopment.Identity.Client.Wpf/DgDevelopment.Identity.Client.Wpf.csproj -c Release
+
+  # build-macos: add once there's a real Mac/iOS target (e.g. Client.Maui gains a
+  # net10.0-maccatalyst/net10.0-ios TFM) - same shape as build-windows above, runs-on: macos-latest.
