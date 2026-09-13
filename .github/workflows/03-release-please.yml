@@ -25,7 +25,7 @@ permissions:
 
 jobs:
   release-please:
-    runs-on: [self-hosted, dgnuc1]
+    runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@v4
         with:

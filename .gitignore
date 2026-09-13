@@ -1,3 +1,6 @@
+## Personal deploy secrets
+deploy/personal/.env
+
 ## .NET
 bin/
 obj/

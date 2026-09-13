@@ -1,9 +1,11 @@
 name: 05 - Deploy personal
 
-# personal is the always-on "personal production" environment - unlike develop it never tears
-# down. Deploys only on a personal/v* tag (created automatically by promote.yml once you merge the
-# develop -> personal promotion PR yourself), or manually via workflow_dispatch for rollback to a
-# previous tag. See docs/deployment.md.
+# personal is the always-on "personal production" environment. This workflow does NOT deploy
+# directly - it only builds identity-server/identity-platform container images and pushes them to
+# GHCR (private package). A Watchtower container running on the NUC (see deploy/personal/) polls
+# GHCR on its own and pulls+recreates the containers when the `personal-latest` tag's digest
+# changes - no self-hosted runner needed, no inbound connection into the home network required.
+# See deploy/personal/README.md for the one-time NUC setup and the rollback procedure.
 
 on:
   push:
@@ -11,15 +13,16 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Tag to (re)deploy, e.g. personal/v2026.09.11.3 - defaults to the latest personal tag if left blank'
+        description: 'Ref to build and publish, e.g. personal/v2026.09.11.3 - defaults to the latest personal tag if left blank'
         required: false
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
-  deploy:
-    runs-on: [self-hosted, dgnuc1]
+  build-and-push:
+    runs-on: ubuntu-latest
     environment: personal
     steps:
       - uses: actions/checkout@v4
@@ -31,17 +34,33 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Restore and build
+      - name: Compute image tag
+        id: vars
         run: |
-          dotnet restore src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj
-          dotnet build src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj --no-restore
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#personal/v}"
+          else
+            version="$(date +%Y.%m.%d).${{ github.run_number }}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - name: Install Aspire CLI
-        run: |
-          curl -sSL https://aspire.dev/install.sh | bash
-          echo "$HOME/.aspire/bin" >> "$GITHUB_PATH"
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-      - name: Deploy with Aspire
-        env:
-          Parameters__deploy_target: personal
-        run: aspire deploy --non-interactive
+      # .NET SDK container publish is daemon-less but reuses the Docker CLI's own credential store
+      # (populated by the login step above) - no separate registry auth wiring needed here.
+      - name: Build and push identity-server image
+        run: >
+          dotnet publish src/DgDevelopment.Identity.Server/DgDevelopment.Identity.Server.csproj
+          -c Release --os linux --arch x64 /t:PublishContainer
+          -p:ContainerRegistry=ghcr.io
+          -p:ContainerRepository=dgastaldo/dgdevelopment-identity-server
+          -p:ContainerImageTags="personal-latest personal-${{ steps.vars.outputs.version }}"
+
+      - name: Build and push identity-platform image
+        run: >
+          dotnet publish "src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform.csproj"
+          -c Release --os linux --arch x64 /t:PublishContainer
+          -p:ContainerRegistry=ghcr.io
+          -p:ContainerRepository=dgastaldo/dgdevelopment-identity-platform
+          -p:ContainerImageTags="personal-latest personal-${{ steps.vars.outputs.version }}"

@@ -4,19 +4,18 @@ name: 01 - Quality Gate
 # and everything downstream implicitly relies on being green before merge. See
 # docs/deployment.md's "Quality Gate tooling" section.
 #
-# Order: Snyk first (dependency scan, fast/cheap - fail before spending time on the rest) -> build
-# + unit tests + coverage threshold, wrapped by the SonarQube scan. Both jobs run on dgnuc1 (see
-# docs/deployment.md's "everything self-hosted" decision), which only has one execution slot, so
-# this is an explicit `needs` chain rather than two parallel jobs racing for it.
+# Order: Snyk first (dependency scan, fast/cheap - fail before spending time on the rest) -> CodeQL
+# -> build + unit tests + coverage threshold, wrapped by the SonarCloud scan. All jobs run on
+# GitHub-hosted ubuntu-latest - moved off the self-hosted NUC runner deliberately: this workflow
+# triggers on every PR, including (once the repo is public) PRs from forks, and self-hosted
+# runners must never execute code reachable from an untrusted PR.
 #
-# CodeQL was tried and removed (see docs/deployment.md's "Quality Gate tooling" - not worth the
-# friction on a private repo without GitHub Team/Enterprise: no code-scanning upload, ubuntu-latest
-# autobuild couldn't handle the solution, self-hosted build was workable but added a third job
-# competing for dgnuc1's one slot). Revisit once/if this moves to a paid GitHub tier.
+# CodeQL's GitHub UI upload (security-events: write) is a public-repo feature (free tier) - not
+# worth the friction on a private repo without GitHub Team/Enterprise, which is why it was dropped
+# earlier. Re-added now that the repo is public.
 #
-# Needs two repository secrets that don't exist yet (see docs/deployment.md's "Manual, out-of-band
-# setup"): SNYK_TOKEN, and SONAR_HOST_URL/SONAR_TOKEN once SonarQube Community Edition is
-# running on the NUC. This workflow will fail until those are configured - expected for now.
+# Needs repository secrets: SNYK_TOKEN, and SONAR_TOKEN (SonarCloud - no SONAR_HOST_URL needed,
+# it defaults to sonarcloud.io), plus the SONAR_ORGANIZATION repository variable.
 
 on:
   pull_request:
@@ -24,10 +23,11 @@ on:
 
 permissions:
   contents: read
+  security-events: write
 
 jobs:
   snyk:
-    runs-on: [self-hosted, dgnuc1]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -41,17 +41,8 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      # snyk/actions/setup@master installs the CLI via `sudo mv` into /usr/local/bin, which works
-      # on GitHub-hosted runners (passwordless sudo preconfigured) but fails here with "sudo: A
-      # terminal is required to authenticate" - dgnuc1's user doesn't have passwordless sudo, and
-      # loosening that is a bigger security change than this needs. Download the static binary
-      # straight into a user-owned directory instead, no sudo involved.
       - name: Install Snyk CLI
-        run: |
-          mkdir -p "$HOME/.local/bin"
-          curl -Lo "$HOME/.local/bin/snyk" https://static.snyk.io/cli/latest/snyk-linux
-          chmod +x "$HOME/.local/bin/snyk"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        uses: snyk/actions/setup@master
 
       # There's a DgDevelopment.Identity.slnx (the newer XML-free solution format), but Snyk
       # doesn't recognize it and, without --all-projects, only looks at the repo root and finds
@@ -62,11 +53,49 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
-  build-test-sonar:
-    # Must run on the self-hosted (NUC) runner, not a GitHub-hosted one - SonarQube is only
-    # reachable on the home LAN, a GitHub-hosted runner in the cloud couldn't reach it.
-    runs-on: [self-hosted, dgnuc1]
+  codeql:
+    runs-on: ubuntu-latest
     needs: snyk
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: csharp
+            build-mode: manual
+          - language: javascript-typescript
+            build-mode: none
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        if: matrix.language == 'csharp'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      # Not the full .slnx: it also includes Client.Maui (needs mobile workloads) and Client.Wpf
+      # (net-windows TFM, can't build on Linux at all). AppHost + the two test projects reference
+      # everything else transitively (the same projects build-test-sonar below builds), so this
+      # covers all the Linux-buildable C# without those two.
+      - name: Build (C# only - manual build-mode, see comment above)
+        if: matrix.language == 'csharp'
+        run: |
+          dotnet build src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj -c Release
+          dotnet build tests/DgDevelopment.Identity.Server.UnitTests/DgDevelopment.Identity.Server.UnitTests.csproj -c Release
+          dotnet build tests/DgDevelopment.Identity.IntegrationTests/DgDevelopment.Identity.IntegrationTests.csproj -c Release
+
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  build-test-sonar:
+    runs-on: ubuntu-latest
+    needs: codeql
     steps:
       - uses: actions/checkout@v4
         with:
@@ -101,11 +130,13 @@ jobs:
       # language under sonar.sources (not just C#) in one pass - so the React client's TS/JS is
       # picked up automatically as long as Node.js is available (setup-node step above). No
       # separate scanner run needed for the JS/TS side.
-      - name: Begin SonarQube analysis
+      # No sonar.host.url - defaults to sonarcloud.io. sonar.organization must match the
+      # organization key shown on the SonarCloud project's Administration > General page.
+      - name: Begin SonarCloud analysis
         run: >
           dotnet sonarscanner begin
           /k:"DgDevelopment.Identity"
-          /d:sonar.host.url="${{ secrets.SONAR_HOST_URL }}"
+          /o:"${{ vars.SONAR_ORGANIZATION }}"
           /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
           /d:sonar.cs.cobertura.reportsPaths="tests/**/TestResults/coverage/**/coverage.cobertura.xml"
           /d:sonar.exclusions="**/node_modules/**,**/bin/**,**/obj/**,**/dist/**"

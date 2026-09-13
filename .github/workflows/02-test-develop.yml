@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   test:
-    runs-on: [self-hosted, dgnuc1]
+    runs-on: ubuntu-latest
     environment: develop
     steps:
       - uses: actions/checkout@v4

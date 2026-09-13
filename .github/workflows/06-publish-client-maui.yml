@@ -1,13 +1,13 @@
 name: 06 - Publish Client.Maui
 
 # Fires once release-please's Release PR for Client.Maui gets merged (that merge is what creates
-# the client-maui-v* tag). Builds Windows twice - unpackaged zip and a signed MSIX - plus an
-# Android APK, and publishes all three to a GitHub Release. See docs/deployment.md's
-# "Client.Maui distribution" section for the full reasoning (GitHub Releases, not the Store; a
-# self-signed cert for the MSIX, not a paid CA certificate).
+# the client-maui-v* tag). Builds an unpackaged Windows zip plus an Android APK, and publishes
+# both to a GitHub Release. See docs/deployment.md's "Client.Maui distribution" section.
 #
-# Needs three repository secrets that don't exist yet (see docs/deployment.md's "Manual,
-# out-of-band setup"): WINDOWS_SIGNING_CERT_BASE64, WINDOWS_SIGNING_CERT_PASSWORD.
+# TODO(implementation): a signed MSIX build was dropped for now - no signing certificate exists
+# yet (see docs/deployment.md's "Manual, out-of-band setup"). Re-add the "Decode the signing
+# certificate" / "Publish signed MSIX" steps once WINDOWS_SIGNING_CERT_BASE64 and
+# WINDOWS_SIGNING_CERT_PASSWORD are provisioned.
 
 on:
   push:
@@ -17,10 +17,6 @@ permissions:
   contents: write
 
 jobs:
-  # TODO: move to a self-hosted Windows runner once one exists (see docs/deployment.md's "Manual,
-  # out-of-band setup") - windows-latest is the only GitHub-hosted job left in the pipeline,
-  # kept for now because building/signing an MSIX genuinely needs the Windows/WinUI toolchain and
-  # no self-hosted Windows machine is set up yet.
   build-windows:
     runs-on: windows-latest
     steps:
@@ -45,39 +41,13 @@ jobs:
         run: Compress-Archive -Path publish/unpackaged/* -DestinationPath client-maui-windows.zip
         shell: pwsh
 
-      # TODO(implementation): confirm the exact MSBuild properties for a signed MSIX against
-      # current MAUI/WinUI packaging docs - PackageCertificateKeyFile/PackageCertificatePassword
-      # (or an equivalent) is the expected shape, not verified here.
-      - name: Decode the signing certificate
-        shell: pwsh
-        run: |
-          $bytes = [Convert]::FromBase64String("${{ secrets.WINDOWS_SIGNING_CERT_BASE64 }}")
-          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP/signing-cert.pfx", $bytes)
-
-      - name: Publish signed MSIX
-        run: >
-          dotnet publish clients/DgDevelopment.Identity.Client.Maui
-          -f net10.0-windows10.0.19041.0 -c Release
-          -p:WindowsPackageType=MSIX
-          -p:PackageCertificateKeyFile="$env:RUNNER_TEMP/signing-cert.pfx"
-          -p:PackageCertificatePassword="${{ secrets.WINDOWS_SIGNING_CERT_PASSWORD }}"
-          -o publish/msix
-        shell: pwsh
-
-      - name: Clean up the certificate
-        if: always()
-        shell: pwsh
-        run: Remove-Item -Path "$env:RUNNER_TEMP/signing-cert.pfx" -ErrorAction SilentlyContinue
-
       - uses: actions/upload-artifact@v4
         with:
           name: windows-artifacts
-          path: |
-            client-maui-windows.zip
-            publish/msix/**/*.msix
+          path: client-maui-windows.zip
 
   build-android:
-    runs-on: [self-hosted, dgnuc1]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -102,9 +72,7 @@ jobs:
 
   release:
     needs: [build-windows, build-android]
-    # Needs the gh CLI, which GitHub-hosted runners bundle but self-hosted ones don't - install it
-    # on dgnuc1 (see docs/deployment.md's "Manual, out-of-band setup") before this can run here.
-    runs-on: [self-hosted, dgnuc1]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -116,8 +84,6 @@ jobs:
         run: |
           gh release create "${{ github.ref_name }}" \
             artifacts/windows-artifacts/client-maui-windows.zip \
-            artifacts/windows-artifacts/publish/msix/*.msix \
             artifacts/android-artifact/publish/android/*.apk \
             --title "Client.Maui ${{ github.ref_name }}" \
-            --generate-notes \
-            --notes "Installing the MSIX requires trusting its self-signed certificate first (import the .pfx's public half into Trusted People or Trusted Root Certification Authorities) - see docs/deployment.md's \"Client.Maui distribution\" section."
+            --generate-notes
