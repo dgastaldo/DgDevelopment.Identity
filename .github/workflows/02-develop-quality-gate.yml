@@ -1,4 +1,4 @@
-name: 02 - Test develop (ephemeral stack)
+name: 02 - Develop Quality Gate (ephemeral stack)
 
 # develop is never a persistently-deployed environment - every merge spins up a throwaway Docker
 # Compose stack (Server + IdentityPlatform + a containerized SQL Server), proves the deployment
@@ -20,10 +20,10 @@ permissions:
   security-events: write
 
 jobs:
-  # CodeQL lives here (push to develop, the default branch) rather than in 01-quality-gate.yml's
+  # CodeQL lives here (push to develop, the default branch) rather than in 01-pr-quality-gate.yml's
   # PR gate - GitHub only populates the Security tab's code scanning baseline from analysis of the
   # default branch, so it needs to run on commits actually landing in develop, not on PRs. See
-  # 01-quality-gate.yml's git history for the version that ran it as part of the PR gate instead.
+  # 01-pr-quality-gate.yml's git history for the version that ran it as part of the PR gate instead.
   codeql:
     runs-on: ubuntu-latest
     strategy:

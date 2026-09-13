@@ -4,12 +4,12 @@
 
 Living design doc, mostly implemented as of 2026-09-12. Originally written 2026-08-29 as a
 reference/planning-only document; the design has since been built out: `AppHost.cs`'s per-target
-`deploy-target` switch, all six numbered workflows (`01-quality-gate.yml` through
+`deploy-target` switch, all six numbered workflows (`01-pr-quality-gate.yml` through
 `06-publish-client-maui.yml`), the release-please config for all seven components, and the manual
 out-of-band setup (self-hosted runner `dgnuc1`, `develop`/`personal` GitHub Environments,
 `PROMOTE_PAT`, Snyk, self-hosted SonarQube) are all in place — see "Implementation plan" at the
 bottom for the itemized checklist. Not yet exercised end-to-end (no PR has gone through
-`01-quality-gate.yml` yet), and `docs`/`integration`/`main`'s own Azure infrastructure is still
+`01-pr-quality-gate.yml` yet), and `docs`/`integration`/`main`'s own Azure infrastructure is still
 entirely unprovisioned — those branches' deploy workflows don't exist yet, only `develop`/`personal`
 do. See "Open items" for what's still genuinely undecided.
 
@@ -379,8 +379,8 @@ each environment's trigger/approval stays declarative:
   GitHub Environment), `aspire deploy --non-interactive` with `Parameters__deploy_target` and
   target-specific `Azure__*`/`Parameters__*` env vars from the caller. Input: which ref/tag to check
   out and deploy — defaults to `github.ref` (the tag that triggered the run), but overridable, which
-  is what rollback (below) uses. **Not used by `develop`** — see `02-test-develop.yml` below.
-- **`02-test-develop.yml`** — `push: branches: [develop]` (i.e. every merge); self-hosted `dgnuc1`
+  is what rollback (below) uses. **Not used by `develop`** — see `02-develop-quality-gate.yml` below.
+- **`02-develop-quality-gate.yml`** — `push: branches: [develop]` (i.e. every merge); self-hosted `dgnuc1`
   (Ubuntu) runner; `environment: develop` (no required reviewer — scopes secrets only, doesn't gate).
   Build → `aspire deploy` the Docker Compose stack (same mechanism as a real deploy, just an ephemeral
   target) → wait for health → run `dotnet test` on `DgDevelopment.Identity.IntegrationTests` against
@@ -521,7 +521,7 @@ and both can be provisioned whenever, independent of getting the pipeline itself
 
 ### Getting secrets into the Compose deploy
 
-No Key Vault, no Azure authentication step — `02-test-develop.yml`/`05-deploy-personal.yml` read their
+No Key Vault, no Azure authentication step — `02-develop-quality-gate.yml`/`05-deploy-personal.yml` read their
 secrets directly from that branch's GitHub Environment (`secrets.IDENTITY_DB`,
 `secrets.NOTIFICATION_HUB_CONNECTION_STRING`, etc., once those exist) and export them as the env
 vars `aspire deploy`'s Docker Compose target (or a plain `docker compose up`) expects. Simpler than
@@ -581,7 +581,7 @@ Recommendation: start with the zero-code option given the "low activity" framing
 `docker compose logs` turns out to be too inconvenient in practice.
 
 **`develop`** (ephemeral): no persistent folder needed — the stack doesn't outlive a single test run.
-On failure, `02-test-develop.yml` should dump `docker compose logs` straight into the GitHub Actions job
+On failure, `02-develop-quality-gate.yml` should dump `docker compose logs` straight into the GitHub Actions job
 log before tearing the stack down (`aspire destroy`/`docker compose down`), so the failure is
 diagnosable from the workflow run itself without needing anything to persist on disk between runs.
 
@@ -698,7 +698,7 @@ with `needs` since the single self-hosted runner has one execution slot.
   Vault as first proposed. Simpler, no Azure login needed for these two branches at all, at the cost
   of secrets sitting in GitHub rather than a dedicated secrets service. Also corrected: the actual
   home PC for `develop`/`personal` is **Ubuntu**, not Windows as first assumed — the self-hosted
-  runner setup and `02-test-develop.yml`/`05-deploy-personal.yml` target Linux accordingly.
+  runner setup and `02-develop-quality-gate.yml`/`05-deploy-personal.yml` target Linux accordingly.
 - ~~Tag creation process~~ → **automatic**, via `04-promote.yml` for app deploy tags (date+run-number
   scheme), and via **release-please** for `Client.Core`/`Client.Blazor`/`Client.Maui`/`Client.Wpf`/
   `Client.React`/`Server`/`IdentityPlatform` (real semver from Conventional Commits).
@@ -753,7 +753,7 @@ not now).
 2. ✅ `AppHost.cs`: containerized `IdentityDb` for `personal`/`develop` (`AddSqlServer`+
    `AddDatabase`), the `deploy-target` parameter, and the per-target `switch` (Redis removal already
    done, see "Findings" above).
-3. ✅ `.github/workflows/02-test-develop.yml` (ephemeral stack: run `IntegrationTests` → `aspire
+3. ✅ `.github/workflows/02-develop-quality-gate.yml` (ephemeral stack: run `IntegrationTests` → `aspire
    deploy` as a deployment smoke test → dump logs on failure → `aspire destroy`, always) +
    `05-deploy-personal.yml` (`workflow_dispatch` included, for rollback) + `04-promote.yml` (the
    `personal→docs→integration→main` cascade: auto-tags + opens the next hop's PR — does **not**
@@ -761,7 +761,7 @@ not now).
    `docs`/`integration`/`production` is deferred until those environments are actually being
    provisioned — `personal`/`develop`'s workflows are self-contained for now, not worth abstracting
    with only one real caller each.
-4. ✅ `.github/workflows/01-quality-gate.yml` on `develop` PRs: Snyk → build/test/coverage threshold
+4. ✅ `.github/workflows/01-pr-quality-gate.yml` on `develop` PRs: Snyk → build/test/coverage threshold
    wrapped by the SonarQube scan (CodeQL tried and removed — see "Quality Gate tooling" above).
    **Will fail until its secrets exist** (`SNYK_TOKEN`, `SONAR_HOST_URL`, `SONAR_TOKEN`, per items
    10-11 below) — expected, not a bug.
@@ -808,7 +808,7 @@ not now).
 
 17. Migrate `DgDevelopment.Identity.IntegrationTests` from `WebApplicationFactory` (in-process) to
     real HTTP against the ephemeral `develop` stack — new `HttpClient` construction pointed at a
-    configurable base URL, `02-test-develop.yml` orchestrating stack-up/tests/stack-down around it.
+    configurable base URL, `02-develop-quality-gate.yml` orchestrating stack-up/tests/stack-down around it.
     Touches nearly every existing test file; deliberately sequenced after the first working deploy,
     not bundled into it.
 

@@ -1,4 +1,4 @@
-name: 01 - Quality Gate
+name: 01 - PR Quality Gate
 
 # Runs on every PR into develop - this is the gate the ephemeral develop stack (test-develop.yml)
 # and everything downstream implicitly relies on being green before merge. See
@@ -10,8 +10,8 @@ name: 01 - Quality Gate
 # every PR, including (once the repo is public) PRs from forks, and self-hosted runners must never
 # execute code reachable from an untrusted PR. Platform-specific clients (Client.Wpf today, a
 # Mac/iOS target later) get their own compile-only job per OS in parallel - see
-# build-windows/build-macos below. CodeQL runs separately, in 02-test-develop.yml on push to
-# develop - GitHub only populates the Security tab's baseline from the default branch, not PRs.
+# build-windows/build-macos below. CodeQL runs separately, in 02-develop-quality-gate.yml on push
+# to develop - GitHub only populates the Security tab's baseline from the default branch, not PRs.
 #
 # Needs repository secrets: SNYK_TOKEN, and SONAR_TOKEN (SonarCloud - no SONAR_HOST_URL needed,
 # it defaults to sonarcloud.io), plus the SONAR_ORGANIZATION repository variable.
