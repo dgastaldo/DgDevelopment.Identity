@@ -18,9 +18,16 @@ name: 01 - Quality Gate
 #
 # Needs repository secrets: SNYK_TOKEN, and SONAR_TOKEN (SonarCloud - no SONAR_HOST_URL needed,
 # it defaults to sonarcloud.io), plus the SONAR_ORGANIZATION repository variable.
+#
+# Also runs on push to develop (the default branch), CodeQL only - GitHub only populates the
+# Security tab's code scanning baseline from analysis of the default branch, PR-only runs don't
+# count. Snyk/Sonar stay PR-only: 02-test-develop.yml already builds/tests every push to develop,
+# no need to duplicate that here.
 
 on:
   pull_request:
+    branches: [develop]
+  push:
     branches: [develop]
 
 permissions:
@@ -29,6 +36,7 @@ permissions:
 
 jobs:
   snyk:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -56,6 +64,9 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
   codeql:
+    # Runs on both events (push to develop for the Security tab baseline, pull_request for the
+    # gate) - snyk only runs for pull_request, so this only waits on it then, via always().
+    if: always() && (needs.snyk.result == 'success' || github.event_name == 'push')
     runs-on: ubuntu-latest
     needs: snyk
     strategy:
@@ -96,6 +107,7 @@ jobs:
           category: "/language:${{ matrix.language }}"
 
   build-test-sonar:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     needs: codeql
     steps:
