@@ -4,39 +4,27 @@ name: 01 - Quality Gate
 # and everything downstream implicitly relies on being green before merge. See
 # docs/deployment.md's "Quality Gate tooling" section.
 #
-# Order: Snyk first (dependency scan, fast/cheap - fail before spending time on the rest) -> CodeQL
-# -> build + unit tests + coverage threshold, wrapped by the SonarCloud scan. That chain runs on
-# GitHub-hosted ubuntu-latest - moved off the self-hosted NUC runner deliberately: this workflow
-# triggers on every PR, including (once the repo is public) PRs from forks, and self-hosted
-# runners must never execute code reachable from an untrusted PR. Platform-specific clients
-# (Client.Wpf today, a Mac/iOS target later) get their own compile-only job per OS in parallel -
-# see build-windows/build-macos below.
-#
-# CodeQL's GitHub UI upload (security-events: write) is a public-repo feature (free tier) - not
-# worth the friction on a private repo without GitHub Team/Enterprise, which is why it was dropped
-# earlier. Re-added now that the repo is public.
+# Order: Snyk first (dependency scan, fast/cheap - fail before spending time on the rest) -> build
+# + unit tests + coverage threshold, wrapped by the SonarCloud scan. Both jobs run on GitHub-hosted
+# ubuntu-latest - moved off the self-hosted NUC runner deliberately: this workflow triggers on
+# every PR, including (once the repo is public) PRs from forks, and self-hosted runners must never
+# execute code reachable from an untrusted PR. Platform-specific clients (Client.Wpf today, a
+# Mac/iOS target later) get their own compile-only job per OS in parallel - see
+# build-windows/build-macos below. CodeQL runs separately, in 02-test-develop.yml on push to
+# develop - GitHub only populates the Security tab's baseline from the default branch, not PRs.
 #
 # Needs repository secrets: SNYK_TOKEN, and SONAR_TOKEN (SonarCloud - no SONAR_HOST_URL needed,
 # it defaults to sonarcloud.io), plus the SONAR_ORGANIZATION repository variable.
-#
-# Also runs on push to develop (the default branch), CodeQL only - GitHub only populates the
-# Security tab's code scanning baseline from analysis of the default branch, PR-only runs don't
-# count. Snyk/Sonar stay PR-only: 02-test-develop.yml already builds/tests every push to develop,
-# no need to duplicate that here.
 
 on:
   pull_request:
     branches: [develop]
-  push:
-    branches: [develop]
 
 permissions:
   contents: read
-  security-events: write
 
 jobs:
   snyk:
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -63,53 +51,9 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
-  codeql:
-    # Runs on both events (push to develop for the Security tab baseline, pull_request for the
-    # gate) - snyk only runs for pull_request, so this only waits on it then, via always().
-    if: always() && (needs.snyk.result == 'success' || github.event_name == 'push')
+  build-test-sonar:
     runs-on: ubuntu-latest
     needs: snyk
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - language: csharp
-            build-mode: manual
-          - language: javascript-typescript
-            build-mode: none
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup .NET
-        if: matrix.language == 'csharp'
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
-
-      - uses: github/codeql-action/init@v3
-        with:
-          languages: ${{ matrix.language }}
-          build-mode: ${{ matrix.build-mode }}
-
-      # Not the full .slnx: it also includes Client.Maui (needs mobile workloads) and Client.Wpf
-      # (net-windows TFM, can't build on Linux at all). AppHost + the two test projects reference
-      # everything else transitively (the same projects build-test-sonar below builds), so this
-      # covers all the Linux-buildable C# without those two.
-      - name: Build (C# only - manual build-mode, see comment above)
-        if: matrix.language == 'csharp'
-        run: |
-          dotnet build src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj -c Release
-          dotnet build tests/DgDevelopment.Identity.Server.UnitTests/DgDevelopment.Identity.Server.UnitTests.csproj -c Release
-          dotnet build tests/DgDevelopment.Identity.IntegrationTests/DgDevelopment.Identity.IntegrationTests.csproj -c Release
-
-      - uses: github/codeql-action/analyze@v3
-        with:
-          category: "/language:${{ matrix.language }}"
-
-  build-test-sonar:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    needs: codeql
     steps:
       - uses: actions/checkout@v4
         with:

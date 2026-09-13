@@ -17,8 +17,52 @@ on:
 
 permissions:
   contents: read
+  security-events: write
 
 jobs:
+  # CodeQL lives here (push to develop, the default branch) rather than in 01-quality-gate.yml's
+  # PR gate - GitHub only populates the Security tab's code scanning baseline from analysis of the
+  # default branch, so it needs to run on commits actually landing in develop, not on PRs. See
+  # 01-quality-gate.yml's git history for the version that ran it as part of the PR gate instead.
+  codeql:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: csharp
+            build-mode: manual
+          - language: javascript-typescript
+            build-mode: none
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        if: matrix.language == 'csharp'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      # Not the full .slnx: it also includes Client.Maui (needs mobile workloads) and Client.Wpf
+      # (net-windows TFM, can't build on Linux at all). AppHost + the two test projects reference
+      # everything else transitively (the same projects the test job below builds), so this covers
+      # all the Linux-buildable C# without those two.
+      - name: Build (C# only - manual build-mode, see comment above)
+        if: matrix.language == 'csharp'
+        run: |
+          dotnet build src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj -c Release
+          dotnet build tests/DgDevelopment.Identity.Server.UnitTests/DgDevelopment.Identity.Server.UnitTests.csproj -c Release
+          dotnet build tests/DgDevelopment.Identity.IntegrationTests/DgDevelopment.Identity.IntegrationTests.csproj -c Release
+
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
   test:
     runs-on: ubuntu-latest
     environment: develop
