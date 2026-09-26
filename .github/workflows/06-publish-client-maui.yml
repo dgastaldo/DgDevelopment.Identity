@@ -14,7 +14,7 @@ on:
     tags: ['client-maui-v*']
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-windows:
@@ -73,6 +73,8 @@ jobs:
   release:
     needs: [build-windows, build-android]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # only this job actually creates the GitHub Release
     steps:
       - uses: actions/download-artifact@v4
         with:

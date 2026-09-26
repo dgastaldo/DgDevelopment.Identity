@@ -40,7 +40,7 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Install Snyk CLI
-        uses: snyk/actions/setup@master
+        uses: snyk/actions/setup@9adf32b1121593767fc3c057af55b55db032dc04 # v1
 
       # There's a DgDevelopment.Identity.slnx (the newer XML-free solution format), but Snyk
       # doesn't recognize it and, without --all-projects, only looks at the repo root and finds
@@ -77,9 +77,12 @@ jobs:
         with:
           node-version: 22.x
 
+      # --ignore-scripts: this only needs the installed packages on disk for the analyzer to read,
+      # not to actually build/run anything - no reason to let install-time lifecycle scripts
+      # (postinstall etc.) execute arbitrary code from third-party packages.
       - name: Install React client dependencies (improves type-aware JS/TS analysis)
         working-directory: clients/DgDevelopment.Identity.Client.React
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Install SonarScanner for .NET
         run: dotnet tool install --global dotnet-sonarscanner

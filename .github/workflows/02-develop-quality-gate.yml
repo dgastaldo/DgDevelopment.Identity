@@ -17,7 +17,6 @@ on:
 
 permissions:
   contents: read
-  security-events: write
 
 jobs:
   # CodeQL lives here (push to develop, the default branch) rather than in 01-pr-quality-gate.yml's
@@ -26,6 +25,9 @@ jobs:
   # 01-pr-quality-gate.yml's git history for the version that ran it as part of the PR gate instead.
   codeql:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # only this job actually uploads to the Security tab
     strategy:
       fail-fast: false
       matrix:
@@ -84,9 +86,15 @@ jobs:
           dotnet test tests/DgDevelopment.Identity.IntegrationTests/DgDevelopment.Identity.IntegrationTests.csproj
           --no-build --configuration Debug
 
+      # Fetch-then-execute (not curl | bash) and --proto/--tlsv1.2 pinned so a redirect can't
+      # silently downgrade to plain HTTP: reduces MITM/downgrade risk, though this still can't
+      # verify the script's contents against a checksum or signature - Aspire's install.sh doesn't
+      # publish one to check against.
       - name: Install Aspire CLI
         run: |
-          curl -sSL https://aspire.dev/install.sh | bash
+          curl -fsSL --proto '=https' --tlsv1.2 -o install-aspire.sh https://aspire.dev/install.sh
+          bash install-aspire.sh
+          rm install-aspire.sh
           echo "$HOME/.aspire/bin" >> "$GITHUB_PATH"
 
       - name: Smoke-test the deployment (spin up the ephemeral Compose stack)
