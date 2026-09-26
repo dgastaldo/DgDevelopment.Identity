@@ -55,7 +55,7 @@ jobs:
           -c Release --os linux --arch x64 /t:PublishContainer
           -p:ContainerRegistry=ghcr.io
           -p:ContainerRepository=dgastaldo/dgdevelopment-identity-server
-          -p:ContainerImageTags="personal-latest;personal-${{ steps.vars.outputs.version }}"
+          -p:ContainerImageTags="personal-latest%3Bpersonal-${{ steps.vars.outputs.version }}"
 
       - name: Build and push identity-platform image
         run: >
@@ -63,4 +63,4 @@ jobs:
           -c Release --os linux --arch x64 /t:PublishContainer
           -p:ContainerRegistry=ghcr.io
           -p:ContainerRepository=dgastaldo/dgdevelopment-identity-platform
-          -p:ContainerImageTags="personal-latest;personal-${{ steps.vars.outputs.version }}"
+          -p:ContainerImageTags="personal-latest%3Bpersonal-${{ steps.vars.outputs.version }}"
