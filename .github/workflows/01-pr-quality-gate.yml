@@ -100,16 +100,11 @@ jobs:
           /d:sonar.cs.cobertura.reportsPaths="tests/**/TestResults/coverage/**/coverage.cobertura.xml"
           /d:sonar.exclusions="**/node_modules/**,**/bin/**,**/obj/**,**/dist/**"
 
-      # GenerateCoverageAfterBuild (in DgDevelopment.Identity.Server.UnitTests.csproj) shells out to
-      # `dotnet tool run reportgenerator`, which resolves to a global tool install when no local
-      # tool manifest exists (there isn't one committed here) - reportgenerator just happens to
-      # already be installed globally on dev machines, never checked into the repo or this
-      # workflow, so this only ever ran successfully locally, never on a fresh CI checkout.
-      - name: Install ReportGenerator
-        run: dotnet tool install -g dotnet-reportgenerator-globaltool
-
-      # Debug config auto-generates coverage via GenerateCoverageAfterBuild in
-      # DgDevelopment.Identity.Server.UnitTests.csproj - no extra --collect flags needed here.
+      # Debug config auto-generates coverage.cobertura.xml via GenerateCoverageAfterBuild in
+      # DgDevelopment.Identity.Server.UnitTests.csproj - no extra --collect flags needed here, and
+      # no reportgenerator/tool install needed either: that project's separate
+      # GenerateCoverageReport target (HTML report, needs reportgenerator) is a manual local-only
+      # convenience, never run here - CI only needs the raw cobertura.xml SonarCloud reads below.
       - name: Build and generate coverage
         run: |
           dotnet restore src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj
