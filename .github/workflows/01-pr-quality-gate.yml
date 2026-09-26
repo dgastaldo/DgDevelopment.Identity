@@ -94,6 +94,11 @@ jobs:
       # No sonar.host.url - defaults to sonarcloud.io. Project key is "{organization}_{repo}" -
       # SonarCloud generates it in that shape when a project is imported via the GitHub App, shown
       # on the project's own page.
+      #
+      # sonar.coverage.exclusions: these two Program.cs are entry points - literal top-level
+      # statements that build the host/DI container, not unit-testable without actually running
+      # the app as a subprocess. Same reasoning as excluding EF Core's migrations from coverage in
+      # coverlet.runsettings: wiring, not business logic.
       - name: Begin SonarCloud analysis
         run: >
           dotnet sonarscanner begin
@@ -102,6 +107,7 @@ jobs:
           /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
           /d:sonar.cs.cobertura.reportsPaths="tests/**/TestResults/coverage/**/coverage.cobertura.xml"
           /d:sonar.exclusions="**/node_modules/**,**/bin/**,**/obj/**,**/dist/**"
+          /d:sonar.coverage.exclusions="src/DgDevelopment.Identity.Server/Program.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/Program.cs"
 
       # Debug config auto-generates coverage.cobertura.xml via GenerateCoverageAfterBuild in
       # DgDevelopment.Identity.Server.UnitTests.csproj - no extra --collect flags needed here, and
