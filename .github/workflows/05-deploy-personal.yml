@@ -38,8 +38,8 @@ jobs:
       - name: Read versions from the release-please manifest
         id: vars
         run: |
-          server_version=$(jq -r '["src/DgDevelopment.Identity.Server"]' .release-please-manifest.json)
-          platform_version=$(jq -r '["src/DgDevelopment.Identity.IdentityPlatform"]' .release-please-manifest.json)
+          server_version=$(jq -r '.["src/DgDevelopment.Identity.Server"]' .release-please-manifest.json)
+          platform_version=$(jq -r '.["src/DgDevelopment.Identity.IdentityPlatform"]' .release-please-manifest.json)
           echo "server_version=$server_version" >> "$GITHUB_OUTPUT"
           echo "platform_version=$platform_version" >> "$GITHUB_OUTPUT"
 
