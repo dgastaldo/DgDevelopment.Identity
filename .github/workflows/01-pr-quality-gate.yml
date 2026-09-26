@@ -111,14 +111,16 @@ jobs:
           dotnet build src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj --no-restore
           dotnet build tests/DgDevelopment.Identity.Server.UnitTests/DgDevelopment.Identity.Server.UnitTests.csproj
 
-      # TODO(implementation): pick a real threshold once there's a stable baseline to tighten from
-      # (see docs/deployment.md - "start from roughly the current baseline"). This just fails the
-      # build if line coverage drops below the placeholder value.
+      # Real baseline established once EF Core's auto-generated migrations were excluded from
+      # coverage (coverlet.runsettings) - they were ~94% of Infrastructure's coverable lines, all
+      # at 0%, dragging the aggregate down to ~13% even though every real package sits at 83-100%.
+      # With migrations excluded, actual coverage is ~85% - 80% leaves a margin without being a
+      # rubber stamp.
       - name: Enforce coverage threshold
         run: |
           COVERAGE_FILE=$(find tests/DgDevelopment.Identity.Server.UnitTests/TestResults/coverage -name coverage.cobertura.xml | head -1)
           LINE_RATE=$(grep -oP '(?<=line-rate=")[^"]+' "$COVERAGE_FILE" | head -1)
-          THRESHOLD="0.60"
+          THRESHOLD="0.80"
           awk -v rate="$LINE_RATE" -v threshold="$THRESHOLD" 'BEGIN { exit (rate < threshold) }' \
             || { echo "Line coverage $LINE_RATE is below the $THRESHOLD threshold"; exit 1; }
 

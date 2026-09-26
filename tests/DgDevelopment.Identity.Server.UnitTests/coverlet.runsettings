@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Excludes EF Core's auto-generated migrations from coverage: ~48.6k of Infrastructure's ~52k
+     coverable lines are migration scaffolding (Migrations/*.cs and *.Designer.cs), all at 0%
+     coverage since testing generated migration code would mean testing EF Core itself, not our
+     code - not something a coverage gate should be measuring. Without this exclusion the
+     aggregate line-rate reads ~13% even though every real package (Application, Domain, OAuth,
+     Saml, and Infrastructure once migrations are excluded) sits at 83-100%. -->
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <ExcludeByFile>**/Migrations/**/*.cs</ExcludeByFile>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>
