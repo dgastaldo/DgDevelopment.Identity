@@ -1,0 +1,11 @@
+{
+  "name": "dgdevelopment.identity.adminui",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i ./wwwroot/css/input.css -o ./wwwroot/css/tailwind.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "^4.1.0",
+    "@tailwindcss/cli": "^4.1.0"
+  }
+}

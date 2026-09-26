@@ -1,0 +1,33 @@
+name: 03 - release-please
+
+# Versions the five clients/* SDKs/apps independently, from Conventional Commits on develop - see
+# docs/deployment.md's "Client package/app versioning" section. Deliberately separate from the
+# app's own deploy tags (personal/docs/integration/main): these are real semver releases consumers
+# depend on, not deployment markers.
+#
+# Nothing is published by this workflow - it only maintains the standing Release PR per component
+# and, once you merge one, creates that component's tag (e.g. client-core-v1.2.0). What (if
+# anything) consumes that tag - dotnet nuget push, npm publish, GitHub Releases - is each
+# component's own concern, wired up separately (see publish-client-maui.yml for Client.Maui;
+# nothing yet for the NuGet/npm packages).
+#
+# TODO(implementation): confirm the current release-please-action version/inputs shape against its
+# own docs - the config below (release-please-config.json / .release-please-manifest.json) is the
+# well-documented core mechanism, but the Action's exact interface has moved before.
+
+on:
+  push:
+    branches: [develop]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

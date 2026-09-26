@@ -1,0 +1,150 @@
+@page "/account/mfa"
+@model DgDevelopment.Identity.Server.Pages.Account.MfaModel
+@inject DgDevelopment.Identity.Server.Security.CspNonceService CspNonce
+@{
+    ViewData["Title"] = "Two-factor verification";
+}
+
+<div class="auth-card">
+    <h1 class="auth-brand">DgDevelopment Identity Server</h1>
+    <h2 class="text-lg font-semibold text-gray-800 mb-2">Two-factor verification</h2>
+
+    @if (!ViewData.ModelState.IsValid)
+    {
+        <div class="auth-alert">@Html.ValidationSummary()</div>
+    }
+
+    @if (Model.NeedsEnrollment)
+    {
+        <p class="text-sm text-gray-600 mb-4">
+            Your account requires two-factor authentication. Scan the QR code with an authenticator app,
+            then enter the 6-digit code to confirm.
+        </p>
+
+        <div class="flex justify-center mb-4">
+            <img src="@Model.QrCodeDataUri" alt="TOTP provisioning QR code" class="h-48 w-48" />
+        </div>
+
+        <div class="mb-4 text-center">
+            <p class="text-xs text-gray-500 mb-1">Or enter this key manually:</p>
+            <code class="bg-gray-100 rounded px-2 py-1 text-sm break-all">@Model.EnrollmentSecret</code>
+        </div>
+
+        <form method="post" asp-page-handler="enroll">
+            <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+            <div class="mb-3">
+                <label class="auth-label" for="code">6-digit code</label>
+                <input class="auth-input" id="code" name="Code" type="text" inputmode="numeric"
+                       pattern="[0-9]*" maxlength="6" required autofocus autocomplete="one-time-code" />
+            </div>
+            <button type="submit" class="auth-btn">Verify and continue</button>
+        </form>
+    }
+    else if (Model.TotpEnabled && Model.HasPushDevices)
+    {
+        <div class="space-y-4">
+            <form method="post" asp-page-handler="totp">
+                <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                <div class="mb-3">
+                    <label class="auth-label" for="code">Authenticator code</label>
+                    <input class="auth-input" id="code" name="Code" type="text" inputmode="numeric"
+                           pattern="[0-9]*" maxlength="6" required autofocus autocomplete="one-time-code" />
+                </div>
+                <button type="submit" class="auth-btn">Verify</button>
+            </form>
+
+            <div class="relative">
+                <div class="absolute inset-0 flex items-center">
+                    <div class="w-full border-t border-gray-200"></div>
+                </div>
+                <div class="relative flex justify-center text-sm">
+                    <span class="bg-white px-2 text-gray-400">or</span>
+                </div>
+            </div>
+
+            <div id="push-section">
+                <button type="button" id="start-push" class="w-full rounded-md bg-gray-200 px-4 py-2 text-gray-800 font-medium hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    Approve on my device
+                </button>
+                <div id="push-waiting" class="hidden text-sm text-gray-600 text-center py-3">
+                    Waiting for your approval...
+                </div>
+            </div>
+        </div>
+    }
+    else if (Model.TotpEnabled)
+    {
+        <p class="text-sm text-gray-600 mb-4">Enter the 6-digit code from your authenticator app.</p>
+        <form method="post" asp-page-handler="totp">
+            <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+            <div class="mb-3">
+                <label class="auth-label" for="code">Authenticator code</label>
+                <input class="auth-input" id="code" name="Code" type="text" inputmode="numeric"
+                       pattern="[0-9]*" maxlength="6" required autofocus autocomplete="one-time-code" />
+            </div>
+            <button type="submit" class="auth-btn">Verify</button>
+        </form>
+    }
+    else if (Model.HasPushDevices)
+    {
+        <p class="text-sm text-gray-600 mb-4">Approve the sign-in request on your device.</p>
+        <div id="push-section">
+            <button type="button" id="start-push" class="auth-btn">Send push notification</button>
+            <div id="push-waiting" class="hidden text-sm text-gray-600 text-center py-3">
+                Waiting for your approval...
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script src="~/lib/signalr/signalr.min.js"></script>
+    <script nonce="@CspNonce.Nonce">
+        (function () {
+            const startPush = document.getElementById('start-push');
+            const waiting = document.getElementById('push-waiting');
+            if (!startPush) return;
+
+            const returnUrl = encodeURIComponent('@Model.ReturnUrl');
+            const userId = '@Model.UserId';
+
+            startPush.addEventListener('click', async function () {
+                startPush.disabled = true;
+                waiting.classList.remove('hidden');
+
+                try {
+                    const response = await fetch('@Url.Page("/Account/Mfa", "start-push")' + (returnUrl ? '?returnUrl=' + returnUrl : ''), { method: 'POST' });
+                    const result = await response.json();
+                    if (result.error) {
+                        waiting.textContent = result.error;
+                        startPush.disabled = false;
+                        return;
+                    }
+
+                    const connection = new signalR.HubConnectionBuilder()
+                        .withUrl('@Url.Content("~/hubs/mfa")')
+                        .withAutomaticReconnect()
+                        .build();
+
+                    connection.on('OnChallengeResolved', function (challengeId, approved) {
+                        if (String(challengeId) !== String(result.challengeId)) return;
+                        if (!approved) {
+                            waiting.textContent = 'The request was denied.';
+                            startPush.disabled = false;
+                            return;
+                        }
+
+                        const completeUrl = '@Url.Page("/Account/Mfa", "complete-push")' + '?challengeId=' + encodeURIComponent(result.challengeId) + (returnUrl ? '&returnUrl=' + returnUrl : '');
+                        window.location.href = completeUrl;
+                    });
+
+                    await connection.start();
+                    await connection.invoke('SubscribeToUser', userId);
+                } catch (error) {
+                    waiting.textContent = 'Could not start the push request.';
+                    startPush.disabled = false;
+                }
+            });
+        })();
+    </script>
+}

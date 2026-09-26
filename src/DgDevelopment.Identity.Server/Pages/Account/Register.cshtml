@@ -1,0 +1,57 @@
+@page "/account/register"
+@model DgDevelopment.Identity.Server.Pages.Account.RegisterModel
+@{
+    ViewData["Title"] = "Create account";
+}
+
+<div class="auth-card">
+    <h1 class="auth-brand">DgDevelopment Identity Server</h1>
+    @if (Model.IsJoiningExistingTenant)
+    {
+        <p class="text-sm text-gray-600 mb-4 text-center">Create your account to join <span class="font-medium">@Model.TenantName</span>.</p>
+    }
+    else
+    {
+        <p class="text-sm text-gray-600 mb-4 text-center">Create your account and organization.</p>
+    }
+    <form method="post">
+        <div class="mb-3">
+            <label class="auth-label" for="username">Username</label>
+            <input class="auth-input" id="username" name="Username" type="text"
+                   value="@Model.Username" required autofocus autocomplete="username" spellcheck="false" />
+        </div>
+        <div class="mb-3">
+            <label class="auth-label" for="email">Email</label>
+            <input class="auth-input" id="email" name="Email" type="email"
+                   value="@Model.Email" required autocomplete="email" spellcheck="false" />
+        </div>
+        <div class="mb-3">
+            <label class="auth-label" for="password">Password</label>
+            <input class="auth-input" id="password" name="Password" type="password"
+                   required autocomplete="new-password" />
+        </div>
+        <div class="mb-3">
+            <label class="auth-label" for="confirmPassword">Confirm password</label>
+            <input class="auth-input" id="confirmPassword" name="ConfirmPassword" type="password"
+                   required autocomplete="new-password" />
+        </div>
+        @if (!Model.IsJoiningExistingTenant)
+        {
+            <div class="mb-3">
+                <label class="auth-label" for="organizationName">Organization name</label>
+                <input class="auth-input" id="organizationName" name="OrganizationName" type="text"
+                       value="@Model.OrganizationName" required autocomplete="organization" />
+            </div>
+            <div class="mb-3">
+                <label class="auth-label" for="organizationSlug">Organization slug</label>
+                <input class="auth-input" id="organizationSlug" name="OrganizationSlug" type="text"
+                       value="@Model.OrganizationSlug" required spellcheck="false" placeholder="acme-corp" />
+            </div>
+        }
+        <button type="submit" class="auth-btn">Create account</button>
+    </form>
+    @if (!ViewData.ModelState.IsValid)
+    {
+        <div class="auth-alert">@Html.ValidationSummary()</div>
+    }
+</div>

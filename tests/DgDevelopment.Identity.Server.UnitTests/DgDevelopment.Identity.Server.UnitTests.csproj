@@ -1,0 +1,68 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <GenerateCoverageOnBuild Condition="'$(GenerateCoverageOnBuild)' == '' and '$(Configuration)' == 'Debug'">true</GenerateCoverageOnBuild>
+    <!-- Test assembly: types must be public for xunit discovery; no synchronization context so
+         ConfigureAwait is irrelevant; CA1001 doesn't recognize xunit's IAsyncLifetime.DisposeAsync
+         as a disposal contract on fixtures owning a disposable field (e.g. DatabaseFixture<T>'s
+         SqliteConnection) the way it recognizes IDisposable/IAsyncDisposable. -->
+    <NoWarn>$(NoWarn);CA1001;CA1515;CA2007</NoWarn>
+  </PropertyGroup>
+
+  <!-- Runs automatically after every Debug build (CI included) and produces just the raw
+       coverage.cobertura.xml SonarCloud reads (sonar.cs.cobertura.reportsPaths in
+       01-pr-quality-gate.yml) - no reportgenerator dependency, so CI needs nothing installed
+       beyond the SDK itself. Forward slashes throughout, not $(MSBuildProjectDirectory)'s native
+       backslash on Windows - these paths are passed as literal string arguments to `dotnet test`
+       (not resolved by an MSBuild file-system task), so on Linux a backslash is just another
+       filename character rather than a path separator. -->
+  <Target Name="GenerateCoverageAfterBuild" AfterTargets="Build" Condition="'$(GenerateCoverageOnBuild)' == 'true'">
+    <RemoveDir Directories="$(MSBuildProjectDirectory)/TestResults" />
+    <Exec Command="dotnet test &quot;$(MSBuildProjectFullPath)&quot; --no-build --collect:&quot;XPlat Code Coverage&quot; --settings &quot;$(MSBuildProjectDirectory)/coverlet.runsettings&quot; --results-directory &quot;$(MSBuildProjectDirectory)/TestResults/coverage&quot; --logger &quot;console;verbosity=minimal&quot;" />
+  </Target>
+
+  <!-- Not run automatically - a local convenience for browsing coverage as HTML, run explicitly
+       with `dotnet build -t:GenerateCoverageReport` after a normal build. Needs
+       dotnet-reportgenerator-globaltool installed (`dotnet tool install -g
+       dotnet-reportgenerator-globaltool`) - deliberately not something CI installs, since CI only
+       needs the raw cobertura.xml above. -->
+  <Target Name="GenerateCoverageReport">
+    <Exec Command="dotnet tool run reportgenerator -- -reports:&quot;$(MSBuildProjectDirectory)/TestResults/coverage/**/coverage.cobertura.xml&quot; -targetdir:&quot;$(MSBuildProjectDirectory)/TestResults/html&quot; -reporttypes:Html" />
+  </Target>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="10.0.1">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.11" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DgDevelopment.Identity.Domain\DgDevelopment.Identity.Domain.csproj" />
+    <ProjectReference Include="..\..\src\DgDevelopment.Identity.Application\DgDevelopment.Identity.Application.csproj" />
+    <ProjectReference Include="..\..\src\DgDevelopment.Identity.OAuth\DgDevelopment.Identity.OAuth.csproj" />
+    <ProjectReference Include="..\..\src\DgDevelopment.Identity.Saml\DgDevelopment.Identity.Saml.csproj" />
+    <ProjectReference Include="..\..\src\DgDevelopment.Identity.Infrastructure\DgDevelopment.Identity.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\DgDevelopment.Identity.Server\DgDevelopment.Identity.Server.csproj" />
+  </ItemGroup>
+
+</Project>

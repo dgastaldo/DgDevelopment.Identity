@@ -39,7 +39,9 @@ DgDevelopment.Identity.slnx
 │   ├── DgDevelopment.Identity.Infrastructure/   EF Core, SQL Server, Repositories
 │   ├── DgDevelopment.Identity.Server/           ASP.NET Core host (API + Razor Pages)
 │   ├── DgDevelopment.Identity.OAuth/            OAuth 2.0 / OIDC custom engine
-│   └── DgDevelopment.Identity.Saml/             SAML 2.0 custom engine
+│   ├── DgDevelopment.Identity.Saml/             SAML 2.0 custom engine
+│   ├── DgDevelopment.Identity.IdentityPlatform/        Blazor Server host (prerender)
+│   └── DgDevelopment.Identity.IdentityPlatform.Client/ Blazor WASM interactive pages/layout
 ├── clients/
 │   ├── DgDevelopment.Identity.Client.Core/      Base .NET SDK
 │   ├── DgDevelopment.Identity.Client.Blazor/     Blazor components (Razor Class Library)
@@ -47,7 +49,7 @@ DgDevelopment.Identity.slnx
 │   ├── DgDevelopment.Identity.Client.Maui/       .NET MAUI integration
 │   └── DgDevelopment.Identity.Client.React/      TypeScript SDK (package.json)
 └── tests/
-    ├── DgDevelopment.Identity.UnitTests/         xUnit unit tests
+    ├── DgDevelopment.Identity.Server.UnitTests/         xUnit unit tests
     └── DgDevelopment.Identity.IntegrationTests/  xUnit integration tests
 ```
 
@@ -65,19 +67,79 @@ Server ──> Application ──> Domain
 
 AppHost ──> Server
 
+AdminUi ──> Client.Blazor ──> Client.Core
+AdminUi.Client ──> Client.Blazor ──> Client.Core
+
 Client.[Platform] ──> Client.Core
 ```
 
 ### Key NuGet Dependencies
 
 | Project | Key Packages |
-|---|---|
+|---|---|---|
 | AppHost | `Aspire.Hosting.SqlServer` |
 | ServiceDefaults | `Microsoft.Extensions.ServiceDiscovery`, `Microsoft.Extensions.Http.Resilience` |
-| Infrastructure | EF Core (to be added in domain implementation) |
-| Server | ASP.NET Core (implicit via SDK) |
+| Domain | None (pure POCO) |
+| Application | None (references only Domain) |
+| Infrastructure | `Microsoft.EntityFrameworkCore.SqlServer`, `Konscious.Security.Cryptography.Argon2` |
+| OAuth | `Microsoft.IdentityModel.Tokens`, `System.IdentityModel.Tokens.Jwt` |
+| Server | `Microsoft.AspNetCore.OpenApi`, `Scalar.AspNetCore`, `Microsoft.EntityFrameworkCore.Design` |
+| AdminUi | `Microsoft.AspNetCore.Components.Web` (implicit), references `Client.Blazor` |
+| AdminUi.Client | Blazor WASM SDK, references `Client.Blazor` |
+| Client.Core | None (pure library) |
+| Client.Blazor | `Microsoft.AspNetCore.Components.Authorization`, `Microsoft.JSInterop` |
 
-## 3. Clean Architecture (Internal)
+## 3. AdminUi & Client Architecture
+
+```
+┌────────────────────────────────────────────────────────────┐
+│  AdminUi — Blazor Server + WASM hybrid                     │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  AdminUi (Server host)                               │  │
+│  │  ┌──────────────────────────────────────────────┐    │  │
+│  │  │ ServerIdentityAuthStateProvider              │    │  │
+│  │  │ (reads identity_marker cookie, no network)   │    │  │
+│  │  └──────────────────────────────────────────────┘    │  │
+│  └──────────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  AdminUi.Client (WASM interactive pages)             │  │
+│  │  Login · Callback · Home · NavMenu · MainLayout      │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                                                             │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  Client.Blazor SDK                                    │  │
+│  │  ┌────────────────────┐  ┌────────────────────────┐  │  │
+│  │  │ IdentityAuthState │  │ Token Store             │  │  │
+│  │  │ Provider          │  │ (SessionStorage,        │  │  │
+│  │  ├────────────────────┤  │  identity_tokens)      │  │  │
+│  │  │ SessionMarkerService│ │ RefreshHandler         │  │  │
+│  │  │ (identity_marker)  │  └────────────────────────┘  │  │
+│  │  └────────┬──────────┘                                │  │
+│  └───────────┼──────────────────────────────────────────┘  │
+│              │ references                                    │
+│  ┌───────────▼────────────────────────────────────────────┐  │
+│  │  Client.Core SDK                                        │  │
+│  │  ┌──────────────────────────────────────────────────┐  │  │
+│  │  │ IdentityClient (OIDC flows)                       │  │  │
+│  │  │ OidcOptions, TokenResponse, UserInfo (snake_case) │  │  │
+│  │  └──────────────────────────────────────────────────┘  │  │
+│  └────────────────────────────────────────────────────────┘  │
+│                                                               │
+│  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─  │
+│             OAuth 2.0 / OIDC                                  │
+│                                                               │
+│  AdminUi ──(authorize+PKCE)──> IDP /connect/authorize         │
+│  AdminUi <──(code)──────────── IDP                            │
+│  AdminUi ──(token)──────────> IDP /connect/token              │
+│  AdminUi <──(tokens)───────── IDP (sessionStorage + marker)   │
+│  AdminUi ──(userinfo)───────> IDP /connect/userinfo           │
+└────────────────────────────────────────────────────────────┘
+```
+
+> The token store lives in the browser `sessionStorage` (`identity_tokens` key).
+> `SessionMarkerService` mirrors the authenticated `sub`/`name`/`email` into the `identity_marker` cookie (non-`HttpOnly`) so the **server prerender** can restore the auth state without network calls via `ServerIdentityAuthStateProvider`.
+
+## 4. Clean Architecture (Internal)
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -114,9 +176,9 @@ Client.[Platform] ──> Client.Core
 
 Dependency rule: dependencies point inward. Outer layers depend on inner layers. Domain has zero external dependencies.
 
-## 4. Domain Model
+## 5. Domain Model
 
-### 4.1 Core Entities
+### 5.1 Core Entities
 
 ```
 User (Aggregate Root)
@@ -212,16 +274,37 @@ TotpSecret
     ├── Code: string (hashed)
     └── IsUsed: bool
 
+PushDevice
+├── Id: Guid
+├── UserId: Guid
+├── Platform: string (enum)
+├── PushToken: string
+├── DeviceName: string?
+├── IsActive: bool
+├── CreatedAt: DateTime
+└── LastSeenAt: DateTime
+
+MfaChallenge
+├── Id: Guid
+├── UserId: Guid
+├── Provider: string
+├── ChallengeCodeHash: string (SHA-256)
+├── Status: Pending | Approved | Denied
+├── CreatedAt: DateTime
+├── ExpiresAt: DateTime (5 min)
+└── ResolvedAt: DateTime?
+
 UserSession
 ├── Id: Guid
 ├── UserId: Guid
 ├── SessionId: string
+├── AuthMethods: List<string> (e.g. ["pwd"], ["pwd","totp"])
 ├── CreatedAt: DateTime
 ├── ExpiresAt: DateTime
 └── IsRevoked: bool
 ```
 
-### 4.2 Token Entities
+### 5.2 Token Entities
 
 ```
 AuthorizationCode
@@ -261,7 +344,7 @@ DeviceCode
 └── ExpiresAt: DateTime
 ```
 
-### 4.3 Audit & Event Store
+### 5.3 Audit & Event Store
 
 ```
 AuditLog
@@ -277,7 +360,7 @@ AuditLog
 ├── UserAgent: string?
 └── Timestamp: DateTime
 
-Event (Event Store)
+Event (Event Store) — see status note below
 ├── Id: Guid
 ├── AggregateId: Guid
 ├── AggregateType: string
@@ -287,9 +370,14 @@ Event (Event Store)
 └── Timestamp: DateTime
 ```
 
-## 5. OAuth 2.0 / OIDC Flows
+> **Implementation status:** `AuditLog` is fully implemented (API + admin UI). The Event Store above was scaffolded early on (before `AuditLog` existed) but was **removed** during the M1 close-out: it had zero consumers anywhere in the codebase, and everything it could offer is already covered by `AuditLog` (`TargetId`/`TargetType` ≈ `AggregateId`/`AggregateType`, `Details` ≈ `Data`) except the per-aggregate `Version` counter, which only matters for actual event-sourcing/replay - a use case with no named consumer today. Kept here as a design reference; rebuild it purposefully if a real consumer shows up (a webhook, an external integration, a replay/projection use case) rather than reviving it speculatively.
 
-### 5.1 Authorization Code + PKCE
+## 6. OAuth 2.0 / OIDC Flows
+
+> **Implementation status (M1):** `/connect/authorize` (with the consent screen), `/connect/token` (`authorization_code` + PKCE, `client_credentials`, rotating `refresh_token`, `device_code`), `/connect/deviceauthorization` + user-code approval UI, `/connect/introspect` (RFC 7662), `/connect/revoke` (RFC 7009), `/connect/userinfo`, `/connect/jwks`, `/connect/endsession` and `/.well-known/openid-configuration` are implemented.
+> The following are open work: the advanced security features PAR, JAR, DPoP, mTLS and Token Binding.
+
+### 6.1 Authorization Code + PKCE
 
 ```
 Client (SPA/Mobile)                Identity Server            User (Browser)
@@ -329,7 +417,7 @@ Client (SPA/Mobile)                Identity Server            User (Browser)
       │<─────────────────────────────────│                         │
 ```
 
-### 5.2 Device Code Flow
+### 6.2 Device Code Flow
 
 ```
 Device Client                     Identity Server            User (Browser)
@@ -355,7 +443,48 @@ Device Client                     Identity Server            User (Browser)
       │<─────────────────────────────────│                         │
 ```
 
-## 6. SAML 2.0 SSO Flow
+### 6.3 MFA Login Step
+
+```
+User (Browser)              Identity Server
+      │                            │
+      │  1. Password page          │
+      │  (username + password)     │
+      │───────────────────────────>│
+      │                            │  RequiresMfaStepAsync?
+      │                            │  (RequireMfa, TOTP enabled,
+      │                            │   active push devices)
+      │  2. Redirect to /Account/Mfa
+      │     with Identity.Partial  │
+      │     cookie (15 min, amr=pwd│
+      │<───────────────────────────│
+      │                            │
+      │  TOTP path:                │
+      │  3a. POST totp (code)      │
+      │      ─────────────────────>│  VerifyAsync (TOTP or backup)
+      │                            │
+      │  Enrollment path (first):  │
+      │  3b. QR code (otpauth://)  │
+      │      <──────────────────── │
+      │  4b. POST enroll (code)    │
+      │      ─────────────────────>│  EnableAsync → 10 backup codes
+      │                            │
+      │  Push path:                │
+      │  3c. POST start-push       │
+      │      ─────────────────────>│  StartChallengeAsync → MfaChallenge
+      │      notifier fan-out → phone app approves/denies
+      │  4c. Poll challenge status │
+      │      (SignalR /api poll)   │
+      │  <─────────────────────────│
+      │                            │
+      │  5. CompleteLoginAsync     │
+      │     (full session cookie,  │
+      │      amr merged into ID    │
+      │      token)                │
+      │<───────────────────────────│
+```
+
+## 7. SAML 2.0 SSO Flow
 
 ```
 Service Provider (SP)            Identity Provider (IdP)         User (Browser)
@@ -380,9 +509,9 @@ Service Provider (SP)            Identity Provider (IdP)         User (Browser)
       │     User is authenticated        │                              │
 ```
 
-## 7. JWT Token Structure
+## 8. JWT Token Structure
 
-### 7.1 ID Token
+### 8.1 ID Token
 
 ```json
 {
@@ -400,7 +529,7 @@ Service Provider (SP)            Identity Provider (IdP)         User (Browser)
 }
 ```
 
-### 7.2 Access Token (IdentityManaged mode)
+### 8.2 Access Token (IdentityManaged mode)
 
 ```json
 {
@@ -419,7 +548,7 @@ Service Provider (SP)            Identity Provider (IdP)         User (Browser)
 }
 ```
 
-## 8. Effective Permissions Algorithm
+## 9. Effective Permissions Algorithm
 
 ```
 GetEffectivePermissions(userId):
@@ -458,7 +587,7 @@ GetEffectivePermissions(userId):
   return ResolvePermissionConflicts(permissions)
 ```
 
-## 9. Database Schema (SQL Server)
+## 10. Database Schema (SQL Server)
 
 ```
 ┌─────────────────────┐     ┌─────────────────────┐
@@ -589,9 +718,9 @@ GetEffectivePermissions(userId):
 └─────────────────────┘
 ```
 
-## 10. API Design
+## 11. API Design
 
-### 10.1 URL Convention
+### 11.1 URL Convention
 
 | Type | Pattern | Example |
 |---|---|---|
@@ -600,7 +729,7 @@ GetEffectivePermissions(userId):
 | Admin API | `/api/v1/{resource}` | `/api/v1/users` |
 | UI Pages | `/{page}` | `/login`, `/consent` |
 
-### 10.2 Error Responses (RFC 7807)
+### 11.2 Error Responses (RFC 7807)
 
 ```json
 {
@@ -613,7 +742,7 @@ GetEffectivePermissions(userId):
 }
 ```
 
-### 10.3 OAuth Error Responses
+### 11.3 OAuth Error Responses
 
 Per RFC 6749, errors from OAuth endpoints use the standard format:
 
@@ -624,7 +753,7 @@ Per RFC 6749, errors from OAuth endpoints use the standard format:
 }
 ```
 
-## 11. Key Rotation Strategy
+## 12. Key Rotation Strategy
 
 - Signing keys (RSA 2048-bit or ECDSA P-256) managed via JWKS
 - Active key + up to N previous keys for validation during rotation
@@ -632,7 +761,7 @@ Per RFC 6749, errors from OAuth endpoints use the standard format:
 - Keys never hardcoded; generated at startup and persisted securely
 - Certificate-based keys for SAML signing
 
-## 12. Security Considerations
+## 13. Security Considerations
 
 - **Passwords**: hashed with Argon2id
 - **Secrets**: client secrets hashed with HMAC-SHA256
@@ -640,7 +769,8 @@ Per RFC 6749, errors from OAuth endpoints use the standard format:
 - **Transport**: TLS 1.3 enforced for all endpoints
 - **PKCE**: mandatory for public clients (S256 only)
 - **Refresh Token Rotation**: each use invalidates the old refresh token
-- **DPoP**: proof-of-possession binding to prevent token replay
-- **Rate Limiting**: on login, token, and userinfo endpoints
+- **DPoP**: proof-of-possession binding to prevent token replay (not yet implemented)
+- **Rate Limiting**: ✅ implemented on `DgDevelopment.Identity.Server` - per-client-IP sliding windows, a stricter tier on login/registration/password-recovery/MFA pages and `/connect/token`+`/connect/userinfo` (`Microsoft.AspNetCore.RateLimiting`, see `RateLimiterFactory`)
 - **CORS**: whitelist of allowed origins per client
-- **CSP Headers**: Content-Security-Policy on all UI pages
+- **CSP Headers**: ✅ implemented on `DgDevelopment.Identity.Server`, nonce-based (`SecurityHeadersMiddleware`) - **not yet extended to `IdentityPlatform`** (the Blazor admin UI), whose CSP needs differ (Blazor Server's SignalR circuit, WASM's `wasm-unsafe-eval`)
+- **TOTP secret**: encrypted at rest (AES) via `ISecretProtector`; backup codes and push challenge codes stored as SHA-256 hashes; challenge-code comparison uses constant-time comparison

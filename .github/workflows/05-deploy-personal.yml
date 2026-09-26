@@ -1,0 +1,79 @@
+name: 05 - Deploy personal
+
+# personal is the always-on "personal production" environment. This workflow does NOT deploy
+# directly - it only builds identity-server/identity-platform container images and pushes them to
+# GHCR (private package). A Watchtower container running on the NUC (see deploy/personal/) polls
+# GHCR on its own and pulls+recreates the containers when the `personal-latest` tag's digest
+# changes - no self-hosted runner needed, no inbound connection into the home network required.
+# See deploy/personal/README.md for the one-time NUC setup and the rollback procedure.
+#
+# Versioning: image tags are read straight from .release-please-manifest.json instead of a
+# hand-rolled scheme - release-please already tracks a real semantic version per app, no reason to
+# invent a second one. Each app gets exactly one tag out of `dotnet publish` (ContainerImageTag,
+# singular - no delimited list, no MSBuild command-line escaping to fight); `personal-latest` is
+# then pointed at that same manifest with a plain `docker buildx imagetools create`, entirely
+# outside MSBuild.
+
+on:
+  push:
+    branches: [personal]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    environment: personal
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Read versions from the release-please manifest
+        id: vars
+        run: |
+          server_version=$(jq -r '.["src/DgDevelopment.Identity.Server"]' .release-please-manifest.json)
+          platform_version=$(jq -r '.["src/DgDevelopment.Identity.IdentityPlatform"]' .release-please-manifest.json)
+          echo "server_version=$server_version" >> "$GITHUB_OUTPUT"
+          echo "platform_version=$platform_version" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      # .NET SDK container publish is daemon-less but reuses the Docker CLI's own credential store
+      # (populated by the login step above) - no separate registry auth wiring needed here.
+      - name: Build and push identity-server image
+        run: >
+          dotnet publish src/DgDevelopment.Identity.Server/DgDevelopment.Identity.Server.csproj
+          -c Release --os linux --arch x64 /t:PublishContainer
+          -p:ContainerRegistry=ghcr.io
+          -p:ContainerRepository=dgastaldo/dgdevelopment-identity-server
+          -p:ContainerImageTag=personal-${{ steps.vars.outputs.server_version }}
+
+      # imagetools points a new tag at an existing manifest via the registry API - no image pull,
+      # no local Docker daemon involvement, so it sidesteps the MSBuild multi-tag escaping entirely.
+      - name: Point personal-latest at the identity-server image
+        run: >
+          docker buildx imagetools create
+          --tag ghcr.io/dgastaldo/dgdevelopment-identity-server:personal-latest
+          ghcr.io/dgastaldo/dgdevelopment-identity-server:personal-${{ steps.vars.outputs.server_version }}
+
+      - name: Build and push identity-platform image
+        run: >
+          dotnet publish "src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform.csproj"
+          -c Release --os linux --arch x64 /t:PublishContainer
+          -p:ContainerRegistry=ghcr.io
+          -p:ContainerRepository=dgastaldo/dgdevelopment-identity-platform
+          -p:ContainerImageTag=personal-${{ steps.vars.outputs.platform_version }}
+
+      - name: Point personal-latest at the identity-platform image
+        run: >
+          docker buildx imagetools create
+          --tag ghcr.io/dgastaldo/dgdevelopment-identity-platform:personal-latest
+          ghcr.io/dgastaldo/dgdevelopment-identity-platform:personal-${{ steps.vars.outputs.platform_version }}

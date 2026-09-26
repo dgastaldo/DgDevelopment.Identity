@@ -1,0 +1,97 @@
+using Microsoft.EntityFrameworkCore;
+using DgDevelopment.Identity.Domain.Entities;
+using DgDevelopment.Identity.Domain.Repositories;
+using DgDevelopment.Identity.Infrastructure.Data;
+
+namespace DgDevelopment.Identity.Infrastructure.Repositories;
+
+public sealed class RoleRepository : IRoleRepository
+{
+    private readonly IdentityDbContext _context;
+
+    public RoleRepository(IdentityDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<Role?> GetByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        return await _context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Id == id, ct).ConfigureAwait(false);
+    }
+
+    public async Task<Role?> GetByNameAsync(string name, CancellationToken ct = default)
+    {
+        return await _context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            .FirstOrDefaultAsync(r => r.Name == name, ct).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyCollection<Role>> GetAllAsync(CancellationToken ct = default)
+    {
+        return await _context.Roles
+            .AsNoTracking()
+            .Include(r => r.Permissions)
+            // Explicit case-insensitive sort: SQL Server's default collation is already
+            // case-insensitive, but SQLite's default is binary/case-sensitive - .ToLower()
+            // translates to LOWER() on both, making the ordering explicit instead of an
+            // accident of whichever provider's default collation happens to be running.
+            .OrderBy(r => r.Name.ToLower())
+            .ToListAsync(ct).ConfigureAwait(false);
+    }
+
+    public async Task AddAsync(Role role, CancellationToken ct = default)
+    {
+        await _context.Roles.AddAsync(role, ct).ConfigureAwait(false);
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    public async Task UpdateAsync(Role role, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(role);
+
+        // Role is loaded AsNoTracking; attaching the whole graph via Update() would mark
+        // client-generated-key children (RolePermission) as Modified instead of Added,
+        // since EF can't tell new rows from existing ones by key alone. Attach only the
+        // root and reconcile the child collection explicitly against what's in the database.
+        //
+        // The root itself may already be tracked by this same context (e.g. it was just Added
+        // earlier in the same unit of work - see TenantProvisioningService.ReconcileAsync running
+        // against a tenant's role right after ProvisionAsync created it in the same DbContext).
+        // Attaching a second, distinct instance with the same key would throw, so update the
+        // already-tracked instance's values instead of attaching this detached one.
+        var trackedRole = _context.ChangeTracker.Entries<Role>().FirstOrDefault(e => e.Entity.Id == role.Id);
+        if (trackedRole is null)
+            _context.Entry(role).State = EntityState.Modified;
+        else if (!ReferenceEquals(trackedRole.Entity, role))
+            trackedRole.CurrentValues.SetValues(role);
+
+        var existingPermissionIds = await _context.RolePermissions
+            .Where(rp => rp.RoleId == role.Id)
+            .Select(rp => rp.PermissionId)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        var currentPermissionIds = role.Permissions.Select(p => p.PermissionId).ToHashSet();
+
+        foreach (var removedPermissionId in existingPermissionIds.Where(id => !currentPermissionIds.Contains(id)))
+            _context.RolePermissions.Remove(new RolePermission(role.Id, removedPermissionId));
+
+        foreach (var permission in role.Permissions.Where(p => !existingPermissionIds.Contains(p.PermissionId)))
+            _context.RolePermissions.Add(permission);
+
+        await _context.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    public async Task DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        var role = await _context.Roles.FindAsync([id], ct).ConfigureAwait(false);
+        if (role is not null)
+        {
+            _context.Roles.Remove(role);
+            await _context.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+    }
+}

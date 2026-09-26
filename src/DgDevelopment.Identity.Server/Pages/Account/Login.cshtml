@@ -1,0 +1,26 @@
+@page "/account/login"
+@model DgDevelopment.Identity.Server.Pages.Account.LoginModel
+@{
+    ViewData["Title"] = "Sign in";
+}
+
+<div class="auth-card">
+    <h1 class="auth-brand">DgDevelopment Identity Server</h1>
+    <form method="post">
+        <div class="mb-3">
+            <label class="auth-label" for="identifier">Username or email</label>
+            <input class="auth-input" id="identifier" name="Identifier" type="text"
+                   value="@Model.Identifier" placeholder="name@example.com"
+                   required autofocus autocomplete="username" spellcheck="false" />
+        </div>
+        <button type="submit" class="auth-btn">Next</button>
+    </form>
+    @if (!ViewData.ModelState.IsValid)
+    {
+        <div class="auth-alert">@Html.ValidationSummary()</div>
+    }
+    <p class="text-sm text-center mt-4">
+        <a href="/account/forgot-password">Forgot your password?</a> &middot;
+        <a href="/account/register">Create an account</a>
+    </p>
+</div>
