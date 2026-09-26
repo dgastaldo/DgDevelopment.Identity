@@ -1,69 +1,48 @@
 namespace DgDevelopment.Identity.Server.UnitTests.Testing;
 
 using DgDevelopment.Identity.Infrastructure.Data;
-using Microsoft.Data.SqlClient;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Testcontainers.MsSql;
 using Xunit;
 
+// Was a shared Testcontainers SQL Server instance (LocalDB, the previous approach, only exists on
+// Windows so never ran on the Linux CI runner) - moved to a private SQLite in-memory database per
+// fixture instance instead. No Docker container, no shared-instance memory tuning to fight over
+// (see git history for the MSSQL_MEMORY_LIMIT_MB saga that motivated this move), and each of the
+// 40+ test classes using this fixture now gets a fully isolated database instead of a separate
+// database on one shared engine - xunit.runner.json's parallelizeTestCollections can go back to
+// true as a result.
+//
+// A SQLite in-memory database (`Data Source=:memory:`) lives only as long as its one connection
+// stays open, and a fresh SqliteConnection against that same connection string is a *different*,
+// empty database - not the same one. So this keeps one connection open for the fixture's lifetime
+// and hands it to every DbContext via UseSqlite(connection) (not a connection string), which is
+// the standard EF Core pattern for this: https://learn.microsoft.com/ef/core/testing/testing-sample
+//
+// EnsureCreated() (from the current model snapshot) instead of MigrateAsync(): the SQL Server
+// migrations under Infrastructure/Migrations contain provider-specific SQL (raw NEWID() etc.) that
+// doesn't apply to SQLite, and tests don't need migration history anyway, just the current schema.
 public class DatabaseFixture<TTestClass> : IAsyncLifetime
     where TTestClass : class
 {
-    // LocalDB (the previous approach) only exists on Windows, so tests never ran on the Linux
-    // self-hosted CI runner. One SQL Server container is started lazily and shared by every test
-    // class in the process (starting a fresh container per class - 40+ of them - would be far too
-    // slow); each class still gets its own database inside it, same isolation LocalDB gave via
-    // separate databases on one shared engine.
-    private static readonly Lazy<Task<MsSqlContainer>> SharedContainer = new(StartContainerAsync);
-
-    private static async Task<MsSqlContainer> StartContainerAsync()
-    {
-        // Without MSSQL_MEMORY_LIMIT_MB, SQL Server on Linux claims up to 80% of host physical RAM
-        // by default - on the self-hosted runner (7 GB total, shared with SonarQube/Postgres) that
-        // was starving everything else and triggering the kernel OOM killer. Note this is only an
-        // internal soft target SQL Server imposes on itself, not a Docker/cgroup hard limit - a 2
-        // GB cap still crashed sqlservr outright (SQLPAL fatal error, errno 11) even with test
-        // collections serialized, so this needs real headroom above what the rest of the box uses,
-        // not just "enough for this dataset's size." On GitHub-hosted ubuntu-latest, tried bumping
-        // to 6 GB assuming the larger 16 GB box gave more room than the 7 GB self-hosted one - that
-        // made it worse: this job's `dotnet sonarscanner begin` leaves a Java scanner engine process
-        // running in the background for the whole job, concurrently with the .NET build and this
-        // container, and the OS genuinely had ~175 MB free when SQL Server tried to claim 6 GB
-        // ("Detected 6144 MB of RAM, 175 MB of available memory" -> FAIL_PAGE_ALLOCATION, container
-        // exits). Settled on 3 GB: below what real concurrent memory pressure from Java+build can
-        // leave available, but still above the ~2 GB level that crashes sqlservr outright.
-        var container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2025-latest")
-            .WithEnvironment("MSSQL_MEMORY_LIMIT_MB", "3072")
-            .Build();
-        await container.StartAsync();
-        return container;
-    }
-
-    protected string ConnectionString { get; private set; } = string.Empty;
+    private SqliteConnection _connection = null!;
 
     public virtual async Task InitializeAsync()
     {
-        var container = await SharedContainer.Value;
-        ConnectionString = new SqlConnectionStringBuilder(container.GetConnectionString())
-        {
-            InitialCatalog = $"DgDevelopment.Identity.Tests.{typeof(TTestClass).Name}",
-        }.ConnectionString;
+        _connection = new SqliteConnection("Data Source=:memory:");
+        await _connection.OpenAsync();
 
         await using var context = CreateContext();
-        await context.Database.EnsureDeletedAsync();
-        await context.Database.MigrateAsync();
+        await context.Database.EnsureCreatedAsync();
         await TestDbSeeder.SeedAsync(context);
     }
 
     public virtual async Task DisposeAsync()
-    {
-        await using var context = CreateContext();
-        await context.Database.EnsureDeletedAsync();
-    }
+        => await _connection.DisposeAsync();
 
     public IdentityDbContext CreateContext()
         => new(new DbContextOptionsBuilder<IdentityDbContext>()
-            .UseSqlServer(ConnectionString)
+            .UseSqlite(_connection)
             .Options);
 
     public async Task<Guid> GetSeededClientIdAsync(CancellationToken ct = default)

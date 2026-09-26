@@ -17,8 +17,6 @@ public sealed class PushDeviceConfiguration : IEntityTypeConfiguration<PushDevic
         builder.Property(x => x.PushToken).HasMaxLength(512);
         builder.Property(x => x.DeviceName).HasMaxLength(256);
         builder.Property(x => x.IsActive);
-        builder.Property(x => x.CreatedAt).HasColumnType("datetime2");
-        builder.Property(x => x.LastSeenAt).HasColumnType("datetime2");
 
         builder.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
     }

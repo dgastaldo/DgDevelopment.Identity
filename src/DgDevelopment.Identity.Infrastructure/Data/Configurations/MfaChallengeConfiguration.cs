@@ -16,9 +16,6 @@ public sealed class MfaChallengeConfiguration : IEntityTypeConfiguration<MfaChal
         builder.Property(x => x.Provider).HasMaxLength(50);
         builder.Property(x => x.ChallengeCodeHash).HasMaxLength(512);
         builder.Property(x => x.Status).HasConversion<string>().HasMaxLength(50);
-        builder.Property(x => x.CreatedAt).HasColumnType("datetime2");
-        builder.Property(x => x.ExpiresAt).HasColumnType("datetime2");
-        builder.Property(x => x.ResolvedAt).HasColumnType("datetime2");
 
         builder.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
     }

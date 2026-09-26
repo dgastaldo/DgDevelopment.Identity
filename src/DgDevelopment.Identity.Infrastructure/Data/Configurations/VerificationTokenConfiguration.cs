@@ -16,8 +16,6 @@ public sealed class VerificationTokenConfiguration : IEntityTypeConfiguration<Ve
         builder.Property(x => x.TokenHash).HasMaxLength(512);
         builder.Property(x => x.Purpose).HasConversion<string>().HasMaxLength(50);
         builder.Property(x => x.TargetEmail).HasMaxLength(320);
-        builder.Property(x => x.CreatedAt).HasColumnType("datetime2");
-        builder.Property(x => x.ExpiresAt).HasColumnType("datetime2");
 
         builder.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(x => x.UserId);

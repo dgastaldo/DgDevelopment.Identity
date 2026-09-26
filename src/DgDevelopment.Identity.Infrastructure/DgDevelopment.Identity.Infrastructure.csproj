@@ -14,7 +14,12 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <NoWarn>$(NoWarn);CA1861</NoWarn>
+    <!-- CA1304/CA1311 (culture-aware ToLower) fire on RoleRepository/GroupRepository's
+         .OrderBy(x => x.Name.ToLower()) - deliberately the culture-dependent parameterless
+         overload, not an oversight: it's inside a LINQ query EF Core translates to SQL, and EF
+         Core only recognizes the parameterless ToLower()/ToUpper() for that translation, not the
+         CultureInfo-accepting overload the analyzer wants. -->
+    <NoWarn>$(NoWarn);CA1304;CA1311;CA1861</NoWarn>
   </PropertyGroup>
 
 </Project>

@@ -15,16 +15,11 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.Property(x => x.Username).HasMaxLength(256);
         builder.Property(x => x.PasswordHash);
-        builder.Property(x => x.PasswordChangedAt).HasColumnType("datetime2");
         builder.Property(x => x.IsActive);
         builder.Property(x => x.IsLocked);
-        builder.Property(x => x.LockoutEnd).HasColumnType("datetime2");
         builder.Property(x => x.FailedLoginAttempts);
         builder.Property(x => x.IsSystemAccount);
         builder.Property(x => x.RequireMfa);
-        builder.Property(x => x.MfaGracePeriodStartedAt).HasColumnType("datetime2");
-        builder.Property(x => x.CreatedAt).HasColumnType("datetime2");
-        builder.Property(x => x.UpdatedAt).HasColumnType("datetime2");
 
         builder.OwnsMany(x => x.Emails, email =>
         {
@@ -37,7 +32,6 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             });
             email.Property(e => e.IsPrimary);
             email.Property(e => e.IsVerified);
-            email.Property(e => e.VerifiedAt).HasColumnType("datetime2");
         });
 
         builder.OwnsMany(x => x.Claims, claim =>

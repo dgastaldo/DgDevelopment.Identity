@@ -16,8 +16,6 @@ public sealed class UserSessionConfiguration : IEntityTypeConfiguration<UserSess
         builder.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
 
         builder.Property(x => x.SessionId).HasMaxLength(256);
-        builder.Property(x => x.CreatedAt).HasColumnType("datetime2");
-        builder.Property(x => x.ExpiresAt).HasColumnType("datetime2");
         builder.Property(x => x.IsRevoked);
         builder.Property(x => x.AuthMethods);
     }

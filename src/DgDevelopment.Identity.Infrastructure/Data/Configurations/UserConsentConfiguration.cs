@@ -18,7 +18,5 @@ public sealed class UserConsentConfiguration : IEntityTypeConfiguration<UserCons
         builder.HasIndex(x => x.TenantId);
 
         builder.Property(x => x.GrantedScopes);
-        builder.Property(x => x.CreatedAt).HasColumnType("datetime2");
-        builder.Property(x => x.ExpiresAt).HasColumnType("datetime2");
     }
 }

@@ -6,8 +6,11 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <GenerateCoverageOnBuild Condition="'$(GenerateCoverageOnBuild)' == '' and '$(Configuration)' == 'Debug'">true</GenerateCoverageOnBuild>
-    <!-- Test assembly: types must be public for xunit discovery; no synchronization context so ConfigureAwait is irrelevant -->
-    <NoWarn>$(NoWarn);CA1515;CA2007</NoWarn>
+    <!-- Test assembly: types must be public for xunit discovery; no synchronization context so
+         ConfigureAwait is irrelevant; CA1001 doesn't recognize xunit's IAsyncLifetime.DisposeAsync
+         as a disposal contract on fixtures owning a disposable field (e.g. DatabaseFixture<T>'s
+         SqliteConnection) the way it recognizes IDisposable/IAsyncDisposable. -->
+    <NoWarn>$(NoWarn);CA1001;CA1515;CA2007</NoWarn>
   </PropertyGroup>
 
   <Target Name="GenerateCoverageAfterBuild" AfterTargets="Build" Condition="'$(GenerateCoverageOnBuild)' == 'true'">
@@ -21,8 +24,8 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.11" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
-    <PackageReference Include="Testcontainers.MsSql" Version="4.15.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
       <PrivateAssets>all</PrivateAssets>
@@ -35,11 +38,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Serializes test collections against the one shared Testcontainers SQL Server instance (see
-         DatabaseFixture<T>) - xunit's default full parallelism ran enough concurrent EF Core
-         migrate/seed/drop cycles against it to crash sqlservr on the self-hosted runner (7 GB
-         total, shared with SonarQube/Postgres). Slower, but the point is to remove concurrent load
-         as a variable while we confirm this is actually the fix, not the memory cap. -->
     <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
