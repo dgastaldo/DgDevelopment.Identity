@@ -67,8 +67,8 @@ jobs:
       - name: Setup Java (required by the SonarScanner for .NET)
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: '17'
+          distribution: zulu
+          java-version: '21'
 
       # The bundled JS/TS sensor (for clients/DgDevelopment.Identity.Client.React) needs a Node
       # runtime to execute even though nothing here runs the app itself.
@@ -88,12 +88,13 @@ jobs:
       # language under sonar.sources (not just C#) in one pass - so the React client's TS/JS is
       # picked up automatically as long as Node.js is available (setup-node step above). No
       # separate scanner run needed for the JS/TS side.
-      # No sonar.host.url - defaults to sonarcloud.io. sonar.organization must match the
-      # organization key shown on the SonarCloud project's Administration > General page.
+      # No sonar.host.url - defaults to sonarcloud.io. Project key is "{organization}_{repo}" -
+      # SonarCloud generates it in that shape when a project is imported via the GitHub App, shown
+      # on the project's own page.
       - name: Begin SonarCloud analysis
         run: >
           dotnet sonarscanner begin
-          /k:"DgDevelopment.Identity"
+          /k:"dgastaldo_DgDevelopment.Identity"
           /o:"${{ vars.SONAR_ORGANIZATION }}"
           /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
           /d:sonar.cs.cobertura.reportsPaths="tests/**/TestResults/coverage/**/coverage.cobertura.xml"
