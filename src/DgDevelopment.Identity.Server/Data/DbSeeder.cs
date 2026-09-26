@@ -4,14 +4,16 @@ using DgDevelopment.Identity.Domain.ValueObjects;
 using DgDevelopment.Identity.Infrastructure.Data;
 using DgDevelopment.Identity.OAuth.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Diagnostics;
 using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace DgDevelopment.Identity.Server.Data;
 
-public sealed class DbSeeder(IServiceProvider serviceProvider)
+public sealed class DbSeeder(IServiceProvider serviceProvider, IConfiguration configuration)
 {
 
     public async Task SeedAsync()
@@ -48,7 +50,28 @@ public sealed class DbSeeder(IServiceProvider serviceProvider)
         {
             WriteClientCredentials(contentRoot, credentials.ClientId, credentials.ClientSecret);
             await SyncClientSecretToAppHostAsync(contentRoot, credentials.ClientId, credentials.ClientSecret).ConfigureAwait(false);
+            WriteAdminClientConfigForPlatform(configuration, credentials.ClientId, credentials.ClientSecret);
         }
+    }
+
+    // Writes the admin client id/secret to a file on a volume shared with identity-platform (see
+    // deploy/personal/docker-compose.yml's `admin-client-config` volume and
+    // IdentityPlatform/Program.cs, which layers this file on top of its own configuration) - so
+    // identity-platform picks up fresh credentials automatically on its next start, no manual copy
+    // step. A no-op when AdminClientConfigFile isn't set (e.g. local dev), same as
+    // SyncClientSecretToAppHostAsync above for that case.
+    internal static void WriteAdminClientConfigForPlatform(IConfiguration configuration, Guid clientId, string clientSecret)
+    {
+        var path = configuration["AdminClientConfigFile"];
+        if (string.IsNullOrWhiteSpace(path)) return;
+
+        Directory.CreateDirectory(Path.GetDirectoryName(path) ?? ".");
+        var json = JsonSerializer.Serialize(new
+        {
+            Identity = new { AdminClientId = clientId.ToString(), AdminClientSecret = clientSecret }
+        });
+        File.WriteAllText(path, json);
+        Console.WriteLine($"Admin client config for identity-platform written to: {path}");
     }
 
     private static async Task<(Guid ClientId, string ClientSecret)?> SeedClientsAsync(IdentityDbContext db, Guid tenantId)

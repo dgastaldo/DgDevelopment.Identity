@@ -8,6 +8,16 @@ using Microsoft.AspNetCore.Components.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Layered on top of appsettings/env vars so it wins when present - written by identity-server's
+// DbSeeder (first boot) or its `rotate-admin-client-secret` command (later rotations) onto a
+// volume shared between the two containers, see deploy/personal/docker-compose.yml. Optional: a
+// no-op both locally (no AdminClientConfigFile set) and before identity-server's first seed
+// completes, in which case Identity:AdminClientId/Secret below fall back to "" until the next
+// restart picks up the file.
+var adminClientConfigFile = builder.Configuration["AdminClientConfigFile"];
+if (!string.IsNullOrWhiteSpace(adminClientConfigFile))
+    builder.Configuration.AddJsonFile(adminClientConfigFile, optional: true, reloadOnChange: false);
+
 builder.AddServiceDefaults();
 
 builder.Services.AddRazorComponents()

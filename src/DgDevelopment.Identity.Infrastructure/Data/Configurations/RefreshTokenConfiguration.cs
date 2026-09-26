@@ -17,8 +17,6 @@ public sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refresh
         builder.Property(x => x.Scopes);
         builder.Property(x => x.PreviousTokenId);
         builder.Property(x => x.IsRevoked);
-        builder.Property(x => x.CreatedAt).HasColumnType("datetime2");
-        builder.Property(x => x.ExpiresAt).HasColumnType("datetime2");
 
         builder.HasOne<Client>().WithMany().HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);

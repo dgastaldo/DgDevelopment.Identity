@@ -5,6 +5,7 @@ using System.Text;
 using DgDevelopment.Identity.Domain.Repositories;
 using DgDevelopment.Identity.OAuth.Services;
 using DgDevelopment.Identity.Server.Models;
+using DgDevelopment.Identity.Server.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -23,6 +24,7 @@ public sealed partial class ConnectController : Controller
     private readonly ITokenIntrospectionService _tokenIntrospectionService;
     private readonly ITokenRevocationService _tokenRevocationService;
     private readonly IRevokedTokenRepository _revokedTokenRepository;
+    private readonly ICorsOriginCache _corsOriginCache;
     private readonly ILogger<ConnectController> _logger;
 
     private static readonly string[] _supportedScopes = ["openid", "profile", "email"];
@@ -42,6 +44,7 @@ public sealed partial class ConnectController : Controller
         ITokenIntrospectionService tokenIntrospectionService,
         ITokenRevocationService tokenRevocationService,
         IRevokedTokenRepository revokedTokenRepository,
+        ICorsOriginCache corsOriginCache,
         ILogger<ConnectController> logger)
     {
         _tokenService = tokenService;
@@ -55,6 +58,7 @@ public sealed partial class ConnectController : Controller
         _tokenIntrospectionService = tokenIntrospectionService;
         _tokenRevocationService = tokenRevocationService;
         _revokedTokenRepository = revokedTokenRepository;
+        _corsOriginCache = corsOriginCache;
         _logger = logger;
     }
 
@@ -290,11 +294,16 @@ public sealed partial class ConnectController : Controller
         return Ok(claims);
     }
 
+    // CodeQL cs/web/unvalidated-url-redirection: post_logout_redirect_uri came straight from the
+    // query string with no check - an open redirect. Now only honored when it exactly matches one
+    // of the URIs actually registered on some client (the same set ICorsOriginCache already
+    // maintains for CORS), not full per-client OIDC id_token_hint validation, but closes the
+    // "redirect anywhere" gap.
     [HttpGet("endsession")]
     public async Task<IActionResult> EndSession([FromQuery] string? post_logout_redirect_uri = null)
     {
         await HttpContext.SignOutAsync().ConfigureAwait(false);
-        if (!string.IsNullOrWhiteSpace(post_logout_redirect_uri))
+        if (!string.IsNullOrWhiteSpace(post_logout_redirect_uri) && _corsOriginCache.IsAllowedRedirectUri(post_logout_redirect_uri))
             return Redirect(post_logout_redirect_uri);
         return Ok();
     }

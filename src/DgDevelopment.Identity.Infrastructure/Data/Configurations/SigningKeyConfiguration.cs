@@ -16,7 +16,5 @@ public sealed class SigningKeyConfiguration : IEntityTypeConfiguration<SigningKe
         builder.Property(x => x.KeyData);
         builder.Property(x => x.PublicKeyData);
         builder.Property(x => x.IsActive);
-        builder.Property(x => x.CreatedAt).HasColumnType("datetime2");
-        builder.Property(x => x.ExpiresAt).HasColumnType("datetime2");
     }
 }

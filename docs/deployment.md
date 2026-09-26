@@ -2,11 +2,16 @@
 
 ## Status
 
-Reference/planning document only. Nothing here is implemented yet, except the Redis cleanup (see
-"Findings" below), which is done — written 2026-08-29 to capture a design discussion so the
-reasoning doesn't need to be re-derived later, and so we can keep iterating on it here before any
-`AppHost.cs`/workflow code is written. See "Open items" at the bottom for what's still pending.
-Everything else is the current working design, not yet built.
+Living design doc, mostly implemented as of 2026-09-12. Originally written 2026-08-29 as a
+reference/planning-only document; the design has since been built out: `AppHost.cs`'s per-target
+`deploy-target` switch, all six numbered workflows (`01-pr-quality-gate.yml` through
+`06-publish-client-maui.yml`), the release-please config for all seven components, and the manual
+out-of-band setup (self-hosted runner `dgnuc1`, `develop`/`personal` GitHub Environments,
+`PROMOTE_PAT`, Snyk, self-hosted SonarQube) are all in place — see "Implementation plan" at the
+bottom for the itemized checklist. Not yet exercised end-to-end (no PR has gone through
+`01-pr-quality-gate.yml` yet), and `docs`/`integration`/`main`'s own Azure infrastructure is still
+entirely unprovisioned — those branches' deploy workflows don't exist yet, only `develop`/`personal`
+do. See "Open items" for what's still genuinely undecided.
 
 ## Goal
 
@@ -27,7 +32,7 @@ regardless of outcome. `personal` is the one that stays always-on — it's your 
 
 This is a **quality gate before promotion**, not just "somewhere to point E2E tests":
 
-1. A PR into `develop` passes build + unit tests + coverage threshold + CodeQL + Snyk (see "Quality
+1. A PR into `develop` passes build + unit tests + coverage threshold + Snyk (see "Quality
    Gate tooling" below) — merge if green.
 2. On merge, the ephemeral stack spins up from that new `develop` state.
 3. The integration test suite (`DgDevelopment.Identity.IntegrationTests`) runs against it, plus —
@@ -103,19 +108,21 @@ Two distinct automations, not one:
 ## Tag naming convention (app deploy tags)
 
 This section is about the *app's* deploy tags only — `personal`/`docs`/`integration`/production
-snapshots of `Server`/`IdentityPlatform`. The `clients/*` projects (`Client.Core`, `Client.Blazor`,
-`Client.Maui`, `Client.Wpf`) use a deliberately separate, real-semver scheme — see "Client
-package/app versioning" below.
+snapshots of `Server`/`IdentityPlatform`. These mark **deployment events** ("this build is now
+running on X"), not meaningful version history. `Server`/`IdentityPlatform` *also* get a completely
+separate, real-semver tag family via release-please (`server-v*`/`identity-platform-v*`), same as
+every `clients/*` project — see "Client and application versioning" below for why both exist
+side by side and don't collide.
 
 **Decided: deploy tags are created automatically, not by hand.** You don't know the tag by name in
 advance and don't need to — a promotion PR merging into a branch is what triggers its tag, via
-`promote.yml` (`develop` needs no tag at all — it has no deploy step, just the ephemeral test stack
+`04-promote.yml` (`develop` needs no tag at all — it has no deploy step, just the ephemeral test stack
 triggered directly by the merge). Since promotion merges are fast-forwards carrying no independent
-code changes (the coverage/CodeQL/Snyk gate only needs to run once, on the PR into `develop`),
+code changes (the coverage/Snyk/SonarQube gate only needs to run once, on the PR into `develop`),
 there's no meaningful "major/minor/patch" decision to automate around for *these* tags; each one is
 just a deployment marker, not a compatibility promise anyone depends on. Proposed scheme:
 `<prefix><date>.<run-number>`, generated in
-`promote.yml` from `date +%Y.%m.%d` and `${{ github.run_number }}` (auto-incrementing, unique per
+`04-promote.yml` from `date +%Y.%m.%d` and `${{ github.run_number }}` (auto-incrementing, unique per
 workflow, needs no external counter):
 
 | Environment | Tag pattern | Example |
@@ -125,21 +132,48 @@ workflow, needs no external counter):
 | integration | `integration/v*` | `integration/v2026.08.30.1` |
 | production | `v*` (bare) | `v2026.08.30.1` |
 
-`promote.yml`, after a promotion PR merges into branch X: computes this tag name, `git tag` +
+`04-promote.yml`, after a promotion PR merges into branch X: computes this tag name, `git tag` +
 `git push` it against X's new HEAD (this push is what triggers `deploy-X.yml`'s tag-based trigger),
 then — if X has a next branch in the chain — opens the `X→next` promotion PR. One workflow, two
 side effects.
 
-## Client package/app versioning (`Client.Core`, `Client.Blazor`, `Client.Maui`, `Client.Wpf`)
+## Client and application versioning (`Client.Core`, `Client.Blazor`, `Client.Maui`, `Client.Wpf`, `Client.React`, `Server`, `IdentityPlatform`)
 
 **Decided**: a separate, real-semver scheme from the app deploy tags above, driven automatically by
-Conventional Commits — and it applies to **all four** `clients/*` projects, not just the two NuGet
-libraries. `Client.Core`/`Client.Blazor` ship to NuGet, where consumers depend on the version number
-meaning something (breaking change → major, new capability → minor, fix → patch); `Client.Maui`/
-`Client.Wpf` are apps (not NuGet packages — `OutputType=Exe`) but still need their own independent
-version numbers (MSIX/store package version, `ApplicationDisplayVersion` in the `.csproj`, etc.) on
-their own release cadence, for whatever their eventual distribution channel turns out to be. Four
-independent components, same versioning mechanism.
+Conventional Commits — and it applies to **all seven** independently-versioned components, not just
+the two NuGet libraries. `Client.Core`/`Client.Blazor` ship to NuGet, where consumers depend on the
+version number meaning something (breaking change → major, new capability → minor, fix → patch);
+`Client.Maui`/`Client.Wpf` are apps (not NuGet packages — `OutputType=Exe`) but still need their own
+independent version numbers (MSIX/store package version, `ApplicationDisplayVersion` in the
+`.csproj`, etc.) on their own release cadence, for whatever their eventual distribution channel
+turns out to be. **`Client.React`** — discovered mid-implementation to already have real scaffolding
+(`package.json` as `@dgdevelopment/identity-client`, `tsconfig.json`, `src/`), further along than
+`CONTEXT.md`/`functional-specification.md` suggested ("Planned", Milestone 3) but still presumably
+embryonic — is an npm package, not NuGet, so it gets release-please's `node` release type instead
+(bumps `package.json`'s `version` field directly) rather than the `.NET`/`csproj` machinery the
+other components use.
+
+**`Server` and `IdentityPlatform` also get their own semver components**, added after initially
+being left out of this scheme entirely (their deploy events already had the date+run-number tags
+from "Tag naming convention" above). The reason to add real semver *in addition* to those deploy
+tags: a deploy tag only says "this build is what's running on `personal` as of this date" — it
+says nothing about whether this build of the IDP is compatible with a given build of a client
+(`Client.Core`/`Client.Blazor`/`Client.Maui`/`Client.Wpf`/`Client.React`). A meaningful,
+independently-bumped version number for `Server` and `IdentityPlatform` — with `feat!:`/
+`BREAKING CHANGE:` commits forcing a major bump exactly like the clients — gives you (and, if
+`docs` ever gets real external integrators, them too) something to actually check compatibility
+against, plus a real changelog of what changed release-to-release, which a deploy-tag timestamp
+alone can't provide. **This is purely an additional, parallel versioning axis — it changes nothing
+about how deploys are triggered.** The date+run-number deploy tags remain the only thing
+`05-deploy-personal.yml`/the `docs`/`integration`/`main` deploy workflows actually key off of;
+`server-v*`/`identity-platform-v*` tags are for humans (and future automated compatibility checks),
+not CI triggers. Both tag families coexist without collision — `server-v1.2.0` doesn't match any
+`push: tags:` glob used by a deploy workflow.
+
+Seven independent components, same versioning mechanism (Conventional Commits → release-please),
+three release-type strategies under the hood: `simple` (.NET `.csproj`, bumping a `<Version>`
+element via an `extra-files` XML patch) for `Client.Core`/`Client.Blazor`/`Client.Maui`/`Client.Wpf`/
+`Server`/`IdentityPlatform`, and `node` (bumps `package.json` directly) for `Client.React`.
 
 **Proposed tool: [release-please](https://github.com/googleapis/release-please)** (Google), not
 semantic-release — the deciding factor is that this is a **monorepo with independent components**,
@@ -152,12 +186,35 @@ review/approval moment for free, in the same spirit as this design's other promo
 than every commit silently shipping a new release. For `Client.Core`/`Client.Blazor`, release-please
 has a native .NET/NuGet release type that bumps the version directly in the `.csproj`; for
 `Client.Maui`/`Client.Wpf` the "release type" is more generic (bump `ApplicationDisplayVersion`/
-equivalent) since there's no NuGet publish step to hand off to yet — see the open question below.
+equivalent) since there's no NuGet publish step to hand off to yet — see the open question below;
+for `Client.React`, the native `node` release type bumps `package.json` and generates a
+`CHANGELOG.md`, same as the npm ecosystem convention.
 
 Consequence worth flagging: this needs **Conventional Commit discipline** going forward on commits
-touching any of the four `clients/*` project directories — release-please can't compute a bump from
-a commit message that doesn't follow the convention. Not a concern for commits touching only `src/`
-or `tests/`.
+touching any of the five `clients/*` project directories, plus now `src/DgDevelopment.Identity.Server`
+and `src/DgDevelopment.Identity.IdentityPlatform` — release-please can't compute a bump from a commit
+message that doesn't follow the convention.
+
+**Open question, not resolved yet**: release-please computes each component's bump strictly from
+commits whose diff touches that component's *own* path (`git log -- <path>`) — it doesn't know
+about project references. Most real feature/fix work for the IDP happens in `Application`, `Domain`,
+`Infrastructure`, `OAuth`, or `Saml` (per the Clean Architecture split), not in `Server` itself
+(mostly composition root/`Program.cs`/controllers) — so a typical `feat:`/`fix:` commit touching only
+`Infrastructure` would **not** bump `Server`'s version at all under today's config, since only
+`src/DgDevelopment.Identity.Server` is a tracked path. Needs a decision before this is actually
+useful: either widen `Server`'s tracked path to cover its shared dependencies too (release-please
+doesn't natively support "watch multiple paths, bump on any" per component, so this would likely mean
+restructuring the config, e.g. treating the whole `src/` tree minus `IdentityPlatform` as one path),
+or accept that `Server`'s version only moves on commits that literally touch `src/Server` and rely on
+release-please's manual-override escape hatch (editing the Release PR's version before merging) when
+a shared-library change should count. Not blocking — the component exists and works for commits that
+do touch `Server` directly — but flagging now so it isn't a surprise when a real `fix:` in
+`Infrastructure` doesn't produce the version bump you expected.
+
+`Client.React` publishing itself (an actual `npm publish` step, an npm account/token) is **not**
+part of this pass — release-please will version and tag it once it feeds real commits, but nothing
+consumes that tag yet, mirroring exactly the still-open `Client.Maui`/`Client.Wpf` distribution
+question below. Flagging now so it isn't a surprise later, not solving it now.
 
 **How the bump is decided** — from the prefix of each commit message touching that component's
 path, since the last release for it; the highest-priority type found wins (one `feat!:` among ten
@@ -179,7 +236,11 @@ normal path.
 Tag prefixes (release-please's default per-component format), independent version numbers since one
 component changing shouldn't bump another's: `client-core-v1.2.0`, `client-blazor-v1.2.0`,
 `client-maui-v1.0.0`, `client-wpf-v1.0.0` (the latter presumably starting once `Client.Wpf` is more
-than a scaffold).
+than a scaffold), `client-react-v0.2.0` (`Client.React` already has `"version": "0.1.0"` in its
+`package.json` — release-please picks up from whatever's there, no manual reset needed),
+`server-v1.4.0`, `identity-platform-v1.1.0`. None of these collide with the app deploy tags
+(`personal/v*`, `docs/v*`, `integration/v*`, bare `v*`) — different prefix shape entirely, so a
+`push: tags:` glob for one family never accidentally matches the other.
 
 **Decided: `develop` feeds release-please.** Keeps package/app release cadence independent of the
 app's own promotion cascade — a library fix doesn't need to wait for someone to decide to promote
@@ -213,9 +274,9 @@ One-time manual setup (added to "Manual, out-of-band setup" below): generate the
 certificate (`New-SelfSignedCertificate`), export it as a password-protected `.pfx`, and store the
 base64-encoded `.pfx` plus its password as two new repository secrets
 (`WINDOWS_SIGNING_CERT_BASE64`, `WINDOWS_SIGNING_CERT_PASSWORD`) — a repo secret rather than a
-GitHub Environment one, since `publish-client-maui.yml` isn't gated behind an Environment.
+GitHub Environment one, since `06-publish-client-maui.yml` isn't gated behind an Environment.
 
-New workflow, **`publish-client-maui.yml`**, triggered on `push: tags: ['client-maui-v*']`:
+New workflow, **`06-publish-client-maui.yml`**, triggered on `push: tags: ['client-maui-v*']`:
 
 1. Check out at that tag.
 2. Build `net10.0-windows10.0.19041.0` (`windows-latest` GitHub-hosted runner — this doesn't need
@@ -318,14 +379,14 @@ each environment's trigger/approval stays declarative:
   GitHub Environment), `aspire deploy --non-interactive` with `Parameters__deploy_target` and
   target-specific `Azure__*`/`Parameters__*` env vars from the caller. Input: which ref/tag to check
   out and deploy — defaults to `github.ref` (the tag that triggered the run), but overridable, which
-  is what rollback (below) uses. **Not used by `develop`** — see `test-develop.yml` below.
-- **`test-develop.yml`** — `push: branches: [develop]` (i.e. every merge); self-hosted `home-pc`
+  is what rollback (below) uses. **Not used by `develop`** — see `02-develop-quality-gate.yml` below.
+- **`02-develop-quality-gate.yml`** — `push: branches: [develop]` (i.e. every merge); self-hosted `dgnuc1`
   (Ubuntu) runner; `environment: develop` (no required reviewer — scopes secrets only, doesn't gate).
   Build → `aspire deploy` the Docker Compose stack (same mechanism as a real deploy, just an ephemeral
   target) → wait for health → run `dotnet test` on `DgDevelopment.Identity.IntegrationTests` against
   it → `aspire destroy` the stack unconditionally (success or failure) → report pass/fail. No tag,
   no promotion — that's a separate, manual action once this is green.
-- **`deploy-personal.yml`** — `push: tags: ['personal/v*']` + `workflow_dispatch` (manual rollback,
+- **`05-deploy-personal.yml`** — `push: tags: ['personal/v*']` + `workflow_dispatch` (manual rollback,
   see below); same self-hosted runner; `environment: personal` (no-gate scoping, but the tag itself
   only gets created after you've manually opened and merged the `develop→personal` promotion PR,
   which is the real approval point).
@@ -334,7 +395,7 @@ each environment's trigger/approval stays declarative:
 - **`deploy-integration.yml`** — `push: tags: ['integration/v*']` + `workflow_dispatch`;
   `environment: integration`.
 - **`deploy-production.yml`** — `push: tags: ['v*']` + `workflow_dispatch`; `environment: production`.
-- **`promote.yml`** — the merged-PR cascade (`personal→docs→integration→main`) described above,
+- **`04-promote.yml`** — the merged-PR cascade (`personal→docs→integration→main`) described above,
   including auto-creating and pushing each branch's deploy tag. Does **not** cover `develop→personal`
   — that first hop is manual end-to-end (you open the PR, you merge it), only the hops after it
   cascade automatically.
@@ -362,8 +423,8 @@ deploy.
 None of this can be done by editing the repo:
 
 1. **Self-hosted runner on the home PC** (Ubuntu, not Windows — corrected from an earlier
-   assumption) — register from repo Settings → Actions → Runners, choosing Linux/x64, labeled e.g.
-   `home-pc`. Needs Docker + Compose installed, and the runner's user in the `docker` group
+   assumption) — register from repo Settings → Actions → Runners, choosing Linux/x64, labeled
+   `dgnuc1` (the NUC's hostname). Needs Docker + Compose installed, and the runner's user in the `docker` group
    (`sudo usermod -aG docker $USER`, then re-login) so it can run `docker compose` without `sudo`.
    Install as a systemd service via the runner package's `sudo ./svc.sh install && sudo ./svc.sh start`
    rather than leaving it running in a foreground terminal.
@@ -392,7 +453,28 @@ None of this can be done by editing the repo:
    (`New-SelfSignedCertificate`), export as a password-protected `.pfx`, store the base64-encoded
    `.pfx` and its password as repository secrets `WINDOWS_SIGNING_CERT_BASE64`/
    `WINDOWS_SIGNING_CERT_PASSWORD` — see "`Client.Maui` distribution" above. Repo-level, not an
-   Environment secret, since `publish-client-maui.yml` runs unconditionally on its tag, ungated.
+   Environment secret, since `06-publish-client-maui.yml` runs unconditionally on its tag, ungated.
+7. **`PROMOTE_PAT` repository secret** — discovered while implementing `04-promote.yml`: a tag pushed
+   (or PR opened) using the default `GITHUB_TOKEN` does **not** trigger other workflows — GitHub's
+   own anti-recursion safeguard. Since `04-promote.yml`'s whole job is to push a deploy tag and expect
+   that to fire the matching `deploy-*.yml`, it needs a real PAT instead. Generate a fine-grained
+   Personal Access Token scoped to just this repo with **Contents: write** and **Pull requests:
+   write** permissions, store it as the `PROMOTE_PAT` repository secret.
+8. **GitHub CLI (`gh`) on `dgnuc1`** — decided to run everything Linux-compatible on the self-hosted
+   runner rather than `ubuntu-latest` (`snyk`, `04-promote.yml`, `03-release-please.yml`,
+   `06-publish-client-maui.yml`'s `build-android`/`release` jobs). GitHub-hosted runners come with
+   `gh` preinstalled; self-hosted ones don't. `04-promote.yml` and the `release` job in
+   `06-publish-client-maui.yml` both call `gh` directly, so install it on the NUC (the official apt
+   repo — `gh`'s own install docs cover Ubuntu) before those jobs will succeed there. Everything else
+   moved to `dgnuc1` needs nothing beyond what's already there (.NET for Snyk's CLI to shell out to
+   when resolving NuGet dependencies, Node for `release-please-action` — bundled with the runner
+   agent itself, not a separate install).
+9. **A Windows self-hosted runner — not set up yet, tracked here for later.** `06-publish-client-maui.yml`'s
+   `build-windows` job is the one holdout still on `windows-latest`: building/signing the MSIX
+   genuinely needs the Windows/WinUI toolchain, which `dgnuc1` (Ubuntu) can't provide. Once a Windows
+   machine is available, register it as a second self-hosted runner (Settings → Actions → Runners →
+   New self-hosted runner → Windows/x64, its own label e.g. `dgwin1`) and repoint that one job's
+   `runs-on` at it — everything else in the pipeline is already off GitHub-hosted runners.
 
 ## Azure infrastructure for `develop`/`personal`
 
@@ -439,7 +521,7 @@ and both can be provisioned whenever, independent of getting the pipeline itself
 
 ### Getting secrets into the Compose deploy
 
-No Key Vault, no Azure authentication step — `test-develop.yml`/`deploy-personal.yml` read their
+No Key Vault, no Azure authentication step — `02-develop-quality-gate.yml`/`05-deploy-personal.yml` read their
 secrets directly from that branch's GitHub Environment (`secrets.IDENTITY_DB`,
 `secrets.NOTIFICATION_HUB_CONNECTION_STRING`, etc., once those exist) and export them as the env
 vars `aspire deploy`'s Docker Compose target (or a plain `docker compose up`) expects. Simpler than
@@ -499,7 +581,7 @@ Recommendation: start with the zero-code option given the "low activity" framing
 `docker compose logs` turns out to be too inconvenient in practice.
 
 **`develop`** (ephemeral): no persistent folder needed — the stack doesn't outlive a single test run.
-On failure, `test-develop.yml` should dump `docker compose logs` straight into the GitHub Actions job
+On failure, `02-develop-quality-gate.yml` should dump `docker compose logs` straight into the GitHub Actions job
 log before tearing the stack down (`aspire destroy`/`docker compose down`), so the failure is
 diagnosable from the workflow run itself without needing anything to persist on disk between runs.
 
@@ -507,6 +589,13 @@ diagnosable from the workflow run itself without needing anything to persist on 
 
 - **Fully greenfield for CI/CD**: `.github/workflows/` is empty, no Dockerfiles, no Helm/Bicep, no
   `appsettings.Production.json`, no versioning scheme anywhere in the repo.
+- **`Client.React` is further along than the other docs suggested**: `CONTEXT.md`/
+  `functional-specification.md` both list it as "Planned" (Milestone 3), but
+  `clients/DgDevelopment.Identity.Client.React/` already has a real npm package scaffold
+  (`package.json` as `@dgdevelopment/identity-client`, `tsconfig.json`, `src/`) — presumably still
+  embryonic, but real enough to include in `release-please`'s versioning from the start rather than
+  bolt on later. Added as the fifth component, using release-please's `node` release type instead
+  of the `.NET`-oriented one the other four use.
 - **`IdentityDb`** is today an `AddConnectionString` parameter in `AppHost.cs` — bring-your-own, not
   Aspire-provisioned. That model stays for `docs`/`integration`/`production` (Azure SQL, provisioned
   separately, connection string supplied as a secret). For `develop`/`personal` specifically, since
@@ -526,8 +615,9 @@ diagnosable from the workflow run itself without needing anything to persist on 
 
 ## Quality Gate tooling — decided (phase 1, revised)
 
-**Decided**: four checks on every PR into `develop`, all free — coverage threshold, CodeQL, Snyk,
-**and now self-hosted SonarQube** (moved up from "phase 2, deferred" — see below for why).
+**Decided**: three checks on every PR into `develop`, all free — coverage threshold, Snyk, and
+self-hosted SonarQube (moved up from "phase 2, deferred" — see below for why). **CodeQL was tried
+and removed** — see its own note below.
 
 - **Coverage threshold in CI** — the repo already produces coverage via ReportGenerator
   (`TestResults\html`, see `CONTEXT.md`'s test suite bullet). Add a CI step that runs the test
@@ -536,15 +626,14 @@ diagnosable from the workflow run itself without needing anything to persist on 
   number; tighten over time). Also tighten the existing Roslyn analyzer config
   (`Directory.Build.props` already sets `AnalysisMode`/`EnforceCodeStyleInBuild`) if it isn't
   already at its strictest useful setting.
-- **CodeQL** — free, GitHub-native security static analysis (`github/codeql-action`), scheduled
-  scan + PR-triggered scan, surfaces results as code-scanning alerts. Analyzes *our* code for
-  vulnerability patterns.
-- **Snyk** — free tier, scans **dependencies** (NuGet packages) for known CVEs, and — newly relevant
-  now that `develop`/`personal` are really containerized — can scan the built **Docker images**
-  themselves for vulnerable base-image/OS-package layers. Complements CodeQL rather than
-  overlapping it (dependency/image vulnerabilities vs. first-party code patterns). Runs early in
-  the pipeline (before the test suite) so a known-bad dependency fails fast and cheap, before
-  spending time on the full test run.
+- **Snyk** — free tier, scans **dependencies** (NuGet packages) for known CVEs. Runs early in the
+  pipeline (before the test suite) so a known-bad dependency fails fast and cheap, before spending
+  time on the full test run. Uses `snyk/actions/setup` (installs the CLI) + `snyk test
+  --all-projects` directly, not the dotnet-specific `snyk/actions/dotnet` action — that one is
+  deprecated (confirmed against `snyk/actions`' own repo, listed under "Deprecated Actions"), with
+  no dotnet-specific replacement; the generic setup-action-plus-CLI path is what Snyk recommends
+  instead. Also drops the Docker-container overhead the old action had (`docker run
+  snyk/snyk:dotnet`) in favor of shelling out to the .NET SDK already on the runner.
 - **SonarQube Community Edition, self-hosted** — moved from deferred to decided now: you want to run
   it on your own NUC (the same Ubuntu machine as the self-hosted runner) rather than pay for
   SonarCloud, which changes the cost/effort calculus that justified deferring it. Runs as a Docker
@@ -552,11 +641,48 @@ diagnosable from the workflow run itself without needing anything to persist on 
   CI step reaches it over `localhost`/the Docker network, no cross-machine networking or public
   exposure needed; the analysis never leaves your home network. CI wraps the build with
   `dotnet-sonarscanner` (`begin` → `dotnet build` → `dotnet test` → `end`), pointed at your local
-  SonarQube URL + a project token. Covers code smells, duplication, and maintainability — the
-  things coverage/CodeQL/Snyk don't.
+  SonarQube URL + a project token. Covers code smells, duplication, and maintainability, plus
+  Security Hotspots — security-sensitive code flagged for manual review (not the deeper
+  dataflow/taint-tracking CodeQL does, but real coverage). The solution is mixed-language (.NET +
+  TS/JS in `Client.React`) — `dotnet-sonarscanner` wraps the general SonarScanner engine, which
+  analyzes every recognized language it finds under `sonar.sources` in the same pass, not just C#.
+  The CI job just needs a Node.js runtime available (for the bundled JS/TS sensor) and
+  `node_modules`/`bin`/`obj`/`dist` excluded from analysis — no separate scanner run or second
+  SonarQube project needed for the React client.
+
+### CodeQL — tried, then removed (revisit on a paid GitHub tier)
+
+Added initially as a fourth, free, GitHub-native security scanner. Dropped after hitting three
+compounding problems, none fatal individually but adding up to more friction than it was worth for
+now:
+
+1. **No code-scanning upload on this plan.** GitHub code scanning (the Security-tab feature
+   `codeql-action/analyze` uploads SARIF to) isn't available for private repos below GitHub Team/
+   Enterprise — confirmed against GitHub's own docs after `analyze` failed with "Code scanning is
+   not enabled for this repository." Worked around with `upload: never` + attaching the SARIF as a
+   plain workflow artifact, which technically ran, but with no inline PR annotations or Security
+   tab, most of CodeQL's usual value was already gone.
+2. **`autobuild` couldn't handle this repo's shape.** It found `DgDevelopment.Identity.slnx` and
+   tried to build the *entire* solution, including `Client.Maui`'s `net10.0-android` target — which
+   needs the `maui-android` workload, not present by default, so the whole build failed. Fixed by
+   replacing `autobuild` with an explicit build of just the AppHost's dependency graph + test
+   projects (the same buildable-on-Linux subset `build-test-sonar` already builds), but that's more
+   hand-maintained surface area for something that was supposed to be a low-effort addition.
+3. **A third job competing for `dgnuc1`'s one execution slot.** Once moved to the self-hosted runner
+   (see "everything self-hosted" below), CodeQL needed an explicit `needs` chain (`snyk` →
+   `codeql` → `build-test-sonar`) to avoid racing the other two jobs for the runner's single
+   concurrent-job capacity — workable, but it's real overlap with SonarQube's Security Hotspots
+   (both flag security-sensitive code) for a check whose main differentiator (deeper
+   dataflow/taint-tracking) wasn't reaching anywhere visible anyway given point 1.
+
+**Decision: remove it for now, revisit if/when this repo moves to a paid GitHub tier** (Team or
+Enterprise) that actually unlocks code-scanning upload for private repos — at that point CodeQL's
+upload-based value proposition (inline PR annotations, Security tab, no artifact-digging) is real
+again and worth the reintroduction.
 
 Ordering in the PR pipeline: Snyk (dependency scan, fast) → build → SonarQube scan + coverage
-(wraps the test run) → CodeQL (runs on its own schedule/trigger independent of this sequence).
+(wraps the test run). Both jobs run on `dgnuc1` (see "Manual, out-of-band setup" item 8), chained
+with `needs` since the single self-hosted runner has one execution slot.
 
 ## Open items
 
@@ -572,10 +698,15 @@ Ordering in the PR pipeline: Snyk (dependency scan, fast) → build → SonarQub
   Vault as first proposed. Simpler, no Azure login needed for these two branches at all, at the cost
   of secrets sitting in GitHub rather than a dedicated secrets service. Also corrected: the actual
   home PC for `develop`/`personal` is **Ubuntu**, not Windows as first assumed — the self-hosted
-  runner setup and `test-develop.yml`/`deploy-personal.yml` target Linux accordingly.
-- ~~Tag creation process~~ → **automatic**, via `promote.yml` for app deploy tags (date+run-number
-  scheme), and via **release-please** for `Client.Core`/`Client.Blazor`/`Client.Maui`/`Client.Wpf`
-  (real semver from Conventional Commits).
+  runner setup and `02-develop-quality-gate.yml`/`05-deploy-personal.yml` target Linux accordingly.
+- ~~Tag creation process~~ → **automatic**, via `04-promote.yml` for app deploy tags (date+run-number
+  scheme), and via **release-please** for `Client.Core`/`Client.Blazor`/`Client.Maui`/`Client.Wpf`/
+  `Client.React`/`Server`/`IdentityPlatform` (real semver from Conventional Commits).
+- ~~Should `Server`/`IdentityPlatform` get real semver too, or just the deploy tags?~~ → **Yes,
+  added as two more release-please components** (`server`, `identity-platform`) — purely to track
+  IDP/client compatibility and give a real changelog, alongside (not instead of) the deploy tags. See
+  "Client and application versioning" above, including the open question about how commits to shared
+  library projects (`Application`/`Domain`/`Infrastructure`/etc.) factor into `Server`'s bump.
 - ~~Rollback~~ → **republish the previous tag**, via `workflow_dispatch` on the relevant deploy
   workflow — see "Rollback" above.
 - ~~`docs` environment naming~~ → clarified: it's genuinely public, hosting the IDP's API
@@ -599,9 +730,14 @@ Ordering in the PR pipeline: Snyk (dependency scan, fast) → build → SonarQub
   Community Edition on your own NUC (the same Ubuntu machine as the runner), decided now rather than
   phase 2, since self-hosting removes the cost/ops reason it was deferred for.
 
-**Still open:** none right now — every decision point raised so far has been resolved. This doc is
-ready to hand off to implementation; re-open a new "Open items" entry if something else surfaces
-while building it.
+**Still open:**
+
+- **How commits to `Server`'s shared library dependencies factor into its release-please bump** —
+  see the "Open question, not resolved yet" note under "Client and application versioning" above.
+  Not blocking (the component works today for commits that touch `src/Server` directly), just not
+  fully solved.
+
+Everything else raised so far has been resolved.
 
 ## Implementation plan
 
@@ -613,24 +749,31 @@ not now).
 
 **Repo-only (no external access needed):**
 
-1. Re-parent `personal` onto `develop` (git branch surgery, force-push to `origin/personal`).
-2. `AppHost.cs`: containerized `IdentityDb` for `personal`/`develop` (`AddSqlServer`+`AddDatabase`),
-   the `deploy-target` parameter, and the per-target `switch` (Redis removal already done, see
-   "Findings" above).
-3. `.github/workflows/_deploy.yml` (reusable, used by `docs`/`integration`/`production`/`personal`)
-   + `test-develop.yml` (the ephemeral stack: spin up → run `IntegrationTests` → dump logs on
-   failure → tear down, no tag/deploy) + `deploy-personal.yml`/`deploy-docs.yml`/
-   `deploy-integration.yml`/`deploy-production.yml` (each with `workflow_dispatch` for rollback) +
-   `promote.yml` (the `personal→docs→integration→main` cascade, including auto-tagging — does not
-   cover `develop→personal`, that hop is fully manual).
-4. Quality Gate workflow(s) on `develop` PRs: Snyk (dependency + image scan, early) → build →
-   SonarQube scan + coverage threshold (wraps the test run) → CodeQL (own schedule/trigger).
-5. `release-please.yml` (triggered on push to `develop`) + its manifest config for the four
-   `clients/*` components.
-6. `publish-client-maui.yml` (triggered on `client-maui-v*` tags) — build Windows unpackaged zip +
-   signed MSIX + Android APK, publish a GitHub Release with all three attached.
-7. `CONTEXT.md`: update the forward-merge description to the five-branch chain, and add the `docs`
-   environment clarification (genuinely public API docs, not just a stage name).
+1. ✅ Re-parent `personal` onto `develop` (git branch surgery, force-pushed to `origin/personal`).
+2. ✅ `AppHost.cs`: containerized `IdentityDb` for `personal`/`develop` (`AddSqlServer`+
+   `AddDatabase`), the `deploy-target` parameter, and the per-target `switch` (Redis removal already
+   done, see "Findings" above).
+3. ✅ `.github/workflows/02-develop-quality-gate.yml` (ephemeral stack: run `IntegrationTests` → `aspire
+   deploy` as a deployment smoke test → dump logs on failure → `aspire destroy`, always) +
+   `05-deploy-personal.yml` (`workflow_dispatch` included, for rollback) + `04-promote.yml` (the
+   `personal→docs→integration→main` cascade: auto-tags + opens the next hop's PR — does **not**
+   cover `develop→personal`, that hop is fully manual). A generic reusable `_deploy.yml` for
+   `docs`/`integration`/`production` is deferred until those environments are actually being
+   provisioned — `personal`/`develop`'s workflows are self-contained for now, not worth abstracting
+   with only one real caller each.
+4. ✅ `.github/workflows/01-pr-quality-gate.yml` on `develop` PRs: Snyk → build/test/coverage threshold
+   wrapped by the SonarQube scan (CodeQL tried and removed — see "Quality Gate tooling" above).
+   **Will fail until its secrets exist** (`SNYK_TOKEN`, `SONAR_HOST_URL`, `SONAR_TOKEN`, per items
+   10-11 below) — expected, not a bug.
+5. ✅ `.github/workflows/03-release-please.yml` (triggered on push to `develop`) + its manifest config
+   for all seven components: the five `clients/*` projects (`Client.React` included once discovered
+   mid-implementation — see above) plus `Server`/`IdentityPlatform` (added later — see "Client and
+   application versioning" above).
+6. ✅ `.github/workflows/06-publish-client-maui.yml` (triggered on `client-maui-v*` tags) — builds the
+   Windows zip + signed MSIX + Android APK, publishes a GitHub Release with all three attached and
+   a note about trusting the self-signed certificate.
+7. ✅ `CONTEXT.md`: forward-merge description updated to the five-branch chain (`personal` inserted
+   between `develop` and `docs`), `docs` environment clarification added.
 
 **Needs your Azure/GitHub/NUC access, can happen in parallel with the above:**
 
@@ -646,25 +789,32 @@ not now).
 12. Azure Notification Hub for `personal` (not urgent for `develop` — see "Shared or per-environment
     resources?" above) + Communication Services (shared, once its consuming code exists) — optional,
     not blocking the first deploys.
-13. GHCR package visibility confirmed for whatever images `develop`/`personal` pull.
+13. ~~GHCR package visibility~~ — **not needed for `personal`/`develop`**: the self-hosted runner
+    *is* the deploy target machine, so `docker compose`/`aspire deploy` build and run images
+    locally with no registry round-trip. GHCR only matters later, for `integration`/`main` on AKS.
 14. Self-signed Windows code-signing certificate generated, exported, and stored as the two
     `WINDOWS_SIGNING_CERT_*` repository secrets — see "`Client.Maui` distribution" above.
+15. **`PROMOTE_PAT` fine-grained PAT** (Contents: write, Pull requests: write, scoped to this repo)
+    stored as a repository secret — required for `04-promote.yml`'s tag-push step to actually trigger
+    downstream deploy workflows (the default `GITHUB_TOKEN` can't). See "Manual, out-of-band setup"
+    above.
 
 **Small code follow-up, not part of the pipeline itself:**
 
-15. An ACS-based `INotificationService` implementation, once the ACS resource exists (item 12) —
+16. An ACS-based `INotificationService` implementation, once the ACS resource exists (item 12) —
     today only `SmtpNotificationService` exists.
 
 **Explicitly deferred follow-up phase (after the above is working):**
 
-16. Migrate `DgDevelopment.Identity.IntegrationTests` from `WebApplicationFactory` (in-process) to
+17. Migrate `DgDevelopment.Identity.IntegrationTests` from `WebApplicationFactory` (in-process) to
     real HTTP against the ephemeral `develop` stack — new `HttpClient` construction pointed at a
-    configurable base URL, `test-develop.yml` orchestrating stack-up/tests/stack-down around it.
+    configurable base URL, `02-develop-quality-gate.yml` orchestrating stack-up/tests/stack-down around it.
     Touches nearly every existing test file; deliberately sequenced after the first working deploy,
     not bundled into it.
 
 **Explicitly not part of this pass:** anything for `docs`/`integration`/`production`'s own Azure
 infrastructure (App Service, the two AKS clusters, their OIDC app registrations/resource groups) —
-you're not provisioning those yet, so items 8-14 above are scoped to `develop`/`personal`/`Client.Maui`
-(item 14, the signing certificate, is `Client.Maui`-scoped rather than environment-scoped, but
-grouped here since it's the same "needs your access outside the repo" category).
+you're not provisioning those yet, so items 8-15 above are scoped to `develop`/`personal`/
+`Client.Maui`/the promotion mechanism itself (items 14-15, the signing certificate and the PAT, are
+scoped to `Client.Maui`/`04-promote.yml` respectively rather than to an environment, but grouped here
+since they're the same "needs your access outside the repo" category).

@@ -32,13 +32,13 @@ public sealed class ExpiredPasswordModel(
 
     public IActionResult OnGet([FromQuery] string? returnUrl = null)
     {
-        ReturnUrl = returnUrl;
+        ReturnUrl = SanitizeReturnUrl(returnUrl);
         return Page();
     }
 
     public async Task<IActionResult> OnPostAsync([FromQuery] string? returnUrl = null)
     {
-        ReturnUrl = returnUrl;
+        ReturnUrl = SanitizeReturnUrl(returnUrl);
 
         if (!string.Equals(Password, ConfirmPassword, StringComparison.Ordinal))
         {
@@ -110,4 +110,11 @@ public sealed class ExpiredPasswordModel(
 
         return userId;
     }
+
+    // CodeQL cs/web/xss on the form's asp-route-returnUrl in ExpiredPassword.cshtml: ASP.NET
+    // Core's asp-route-* tag helpers already URL-encode this value when building the form action,
+    // so it's very likely a false positive there - but rejecting anything that isn't a genuine
+    // local path here removes the query-string value from the picture entirely, regardless.
+    private string? SanitizeReturnUrl(string? returnUrl)
+        => !string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : null;
 }

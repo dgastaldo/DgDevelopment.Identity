@@ -20,8 +20,6 @@ public sealed class ClientConfiguration : IEntityTypeConfiguration<Client>
         builder.Property(x => x.RequirePkce);
         builder.Property(x => x.RequireConsent);
         builder.Property(x => x.IsActive);
-        builder.Property(x => x.CreatedAt).HasColumnType("datetime2");
-        builder.Property(x => x.UpdatedAt).HasColumnType("datetime2");
 
         builder.HasOne<Platform>().WithMany().HasForeignKey(x => x.PlatformId).OnDelete(DeleteBehavior.Restrict).IsRequired(false);
         builder.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);

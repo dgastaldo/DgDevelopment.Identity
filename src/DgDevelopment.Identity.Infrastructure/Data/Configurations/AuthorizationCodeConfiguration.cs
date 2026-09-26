@@ -19,8 +19,6 @@ public sealed class AuthorizationCodeConfiguration : IEntityTypeConfiguration<Au
         builder.Property(x => x.CodeChallengeHash).HasMaxLength(512);
         builder.Property(x => x.CodeChallengeMethod).HasMaxLength(10);
         builder.Property(x => x.IsUsed);
-        builder.Property(x => x.CreatedAt).HasColumnType("datetime2");
-        builder.Property(x => x.ExpiresAt).HasColumnType("datetime2");
 
         builder.HasOne<Client>().WithMany().HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);

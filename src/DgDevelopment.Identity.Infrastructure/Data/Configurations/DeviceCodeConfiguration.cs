@@ -19,9 +19,7 @@ public sealed class DeviceCodeConfiguration : IEntityTypeConfiguration<DeviceCod
         builder.Property(x => x.Scopes);
         builder.Property(x => x.IsAuthorized);
         builder.Property(x => x.IsUsed);
-        builder.Property(x => x.LastPolledAt).HasColumnType("datetime2").IsRequired(false);
-        builder.Property(x => x.CreatedAt).HasColumnType("datetime2");
-        builder.Property(x => x.ExpiresAt).HasColumnType("datetime2");
+        builder.Property(x => x.LastPolledAt).IsRequired(false);
 
         builder.HasOne<Client>().WithMany().HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict).IsRequired(false);

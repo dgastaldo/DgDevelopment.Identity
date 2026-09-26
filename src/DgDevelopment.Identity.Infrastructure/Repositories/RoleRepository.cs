@@ -35,7 +35,11 @@ public sealed class RoleRepository : IRoleRepository
         return await _context.Roles
             .AsNoTracking()
             .Include(r => r.Permissions)
-            .OrderBy(r => r.Name)
+            // Explicit case-insensitive sort: SQL Server's default collation is already
+            // case-insensitive, but SQLite's default is binary/case-sensitive - .ToLower()
+            // translates to LOWER() on both, making the ordering explicit instead of an
+            // accident of whichever provider's default collation happens to be running.
+            .OrderBy(r => r.Name.ToLower())
             .ToListAsync(ct).ConfigureAwait(false);
     }
 

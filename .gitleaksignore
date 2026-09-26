@@ -1,0 +1,2 @@
+# RFC 6238 Appendix B test vector (Base32 of "12345678901234567890"), not a real secret.
+026c62f7b5734731cc9526dd1779fb948b58f987:tests/DgDevelopment.Identity.Server.UnitTests/Domain/TotpGeneratorTests.cs:generic-api-key:8

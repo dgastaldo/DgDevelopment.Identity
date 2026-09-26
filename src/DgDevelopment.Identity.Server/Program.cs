@@ -1,3 +1,4 @@
+using DgDevelopment.Identity.Server.Commands;
 using DgDevelopment.Identity.Application.Audit;
 using DgDevelopment.Identity.Application.Clients;
 using DgDevelopment.Identity.Application.Common;
@@ -20,6 +21,9 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using System.Threading.RateLimiting;
+
+if (args.Length > 0 && args[0] == "rotate-admin-client-secret")
+    return await RotateAdminClientSecretCommand.RunAsync(args).ConfigureAwait(false);
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -212,5 +216,6 @@ app.MapHub<DgDevelopment.Identity.Server.Hubs.MfaHub>("/hubs/mfa");
 app.MapHub<DgDevelopment.Identity.Server.Hubs.SessionHub>("/hubs/session");
 
 await app.RunAsync();
+return 0;
 
 public partial class Program;
