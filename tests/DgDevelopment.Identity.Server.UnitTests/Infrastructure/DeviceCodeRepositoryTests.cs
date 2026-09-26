@@ -119,7 +119,11 @@ public sealed class DeviceCodeRepositoryTests : IClassFixture<DatabaseFixture<De
         var clientId = await _fixture.GetSeededClientIdAsync();
         await using var context = _fixture.CreateContext();
         var repo = new DeviceCodeRepository(context);
-        var expired = new DeviceCode(UniqueHash("expired"), UniqueHash("expired"), clientId, ["openid"], lifetimeSeconds: 0);
+        // A lifetime of exactly 0 sets ExpiresAt to "now" at construction time, which raced against
+        // DeleteExpiredAsync's own `ExpiresAt < DateTime.UtcNow` a few milliseconds later - close
+        // enough to the datetime2 column's rounding that the comparison was occasionally unreliable.
+        // A clearly-past lifetime removes the race instead of relying on timing.
+        var expired = new DeviceCode(UniqueHash("expired"), UniqueHash("expired"), clientId, ["openid"], lifetimeSeconds: -60);
         var valid = new DeviceCode(UniqueHash("valid"), UniqueHash("valid"), clientId, ["openid"]);
         await repo.AddAsync(expired);
         await repo.AddAsync(valid);

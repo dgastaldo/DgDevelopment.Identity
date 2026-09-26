@@ -3,14 +3,38 @@ namespace DgDevelopment.Identity.IntegrationTests;
 using DgDevelopment.Identity.Domain.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Testcontainers.MsSql;
 
 public sealed class IdentityWebApplicationFactory : WebApplicationFactory<Program>
 {
-    public const string ConnectionString =
-        "Server=(localdb)\\MSSQLLocalDB;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=true;Database=DgDevelopment.Identity.IntegrationTests";
+    // LocalDB (the previous approach) only exists on Windows, so this never ran on the Linux
+    // self-hosted CI runner. Shared across every IdentityWebApplicationFactory instance in the
+    // process, same reasoning as DatabaseFixture<T> in Server.UnitTests.
+    private static readonly Lazy<Task<MsSqlContainer>> SharedContainer = new(StartContainerAsync);
+
+    private static async Task<MsSqlContainer> StartContainerAsync()
+    {
+        // Without MSSQL_MEMORY_LIMIT_MB, SQL Server on Linux claims up to 80% of host physical RAM
+        // by default - on the self-hosted runner (7 GB total, shared with SonarQube/Postgres) that
+        // was starving everything else and triggering the kernel OOM killer. Note this is only an
+        // internal soft target SQL Server imposes on itself, not a Docker/cgroup hard limit - a 2
+        // GB cap still crashed sqlservr outright (SQLPAL fatal error, errno 11) even with test
+        // collections serialized, so this needs real headroom above what the rest of the box uses,
+        // not just "enough for this dataset's size." Kept in sync with Server.UnitTests'
+        // DatabaseFixture<T>, which hits the same crash for the same reason - see its comment for
+        // why this settled on 3 GB (not higher) on GitHub-hosted ubuntu-latest.
+        var container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2025-latest")
+            .WithEnvironment("MSSQL_MEMORY_LIMIT_MB", "3072")
+            .Build();
+        await container.StartAsync();
+        return container;
+    }
+
+    public string ConnectionString { get; private set; } = string.Empty;
 
     // OidcIssuerProvider stamps the `iss` claim from the request's own scheme+host, but JWT bearer
     // validation checks it against this fixed ValidIssuer - they only agree in real usage because
@@ -20,8 +44,16 @@ public sealed class IdentityWebApplicationFactory : WebApplicationFactory<Progra
 
     public CapturingNotificationService Notifications { get; } = new();
 
-    public IdentityWebApplicationFactory()
+    // Must be awaited (by IntegrationTestFixture.InitializeAsync) before anything else touches
+    // ConnectionString or triggers host startup via Factory.CreateClient()/.Server.
+    public async Task InitializeConnectionAsync()
     {
+        var container = await SharedContainer.Value;
+        ConnectionString = new SqlConnectionStringBuilder(container.GetConnectionString())
+        {
+            InitialCatalog = $"DgDevelopment.Identity.IntegrationTests.{Guid.NewGuid():N}",
+        }.ConnectionString;
+
         // Program.cs reads ConnectionStrings:IdentityDb into a local variable right after
         // WebApplication.CreateBuilder(args), before builder.Build() runs. ConfigureAppConfiguration
         // below only takes effect at Build() time, which is too late - the value is already captured.

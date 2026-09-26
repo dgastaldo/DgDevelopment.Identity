@@ -3,5 +3,7 @@
   "clients/DgDevelopment.Identity.Client.Blazor": "0.1.0",
   "clients/DgDevelopment.Identity.Client.Maui": "0.1.0",
   "clients/DgDevelopment.Identity.Client.Wpf": "0.1.0",
-  "clients/DgDevelopment.Identity.Client.React": "0.1.0"
+  "clients/DgDevelopment.Identity.Client.React": "0.1.0",
+  "src/DgDevelopment.Identity.Server": "0.1.0",
+  "src/DgDevelopment.Identity.IdentityPlatform": "0.1.0"
 }

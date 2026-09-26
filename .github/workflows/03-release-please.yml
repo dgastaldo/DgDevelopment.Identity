@@ -1,4 +1,4 @@
-name: release-please
+name: 03 - release-please
 
 # Versions the five clients/* SDKs/apps independently, from Conventional Commits on develop - see
 # docs/deployment.md's "Client package/app versioning" section. Deliberately separate from the
@@ -27,7 +27,7 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json

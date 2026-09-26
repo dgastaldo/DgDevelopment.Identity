@@ -1,0 +1,115 @@
+name: 02 - Develop Quality Gate (ephemeral stack)
+
+# develop is never a persistently-deployed environment - every merge spins up a throwaway Docker
+# Compose stack (Server + IdentityPlatform + a containerized SQL Server), proves the deployment
+# itself works, and tears it down regardless of outcome. See docs/deployment.md.
+#
+# DgDevelopment.Identity.IntegrationTests still runs in-process (WebApplicationFactory) for this
+# first pass - it doesn't hit the deployed stack yet. Migrating it to real HTTP against this
+# ephemeral stack is a deliberate, tracked follow-up phase (see docs/deployment.md's "Open items"),
+# not part of this workflow yet. Until then, the "aspire deploy"/"aspire destroy" steps below are a
+# smoke test of the deployment mechanism itself (does the Compose stack actually come up cleanly?),
+# separate from the application-level regression coverage the test step provides.
+
+on:
+  push:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+jobs:
+  # CodeQL lives here (push to develop, the default branch) rather than in 01-pr-quality-gate.yml's
+  # PR gate - GitHub only populates the Security tab's code scanning baseline from analysis of the
+  # default branch, so it needs to run on commits actually landing in develop, not on PRs. See
+  # 01-pr-quality-gate.yml's git history for the version that ran it as part of the PR gate instead.
+  codeql:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # only this job actually uploads to the Security tab
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: csharp
+            build-mode: manual
+          - language: javascript-typescript
+            build-mode: none
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        if: matrix.language == 'csharp'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      # Not the full .slnx: it also includes Client.Maui (needs mobile workloads) and Client.Wpf
+      # (net-windows TFM, can't build on Linux at all). AppHost + the two test projects reference
+      # everything else transitively (the same projects the test job below builds), so this covers
+      # all the Linux-buildable C# without those two.
+      - name: Build (C# only - manual build-mode, see comment above)
+        if: matrix.language == 'csharp'
+        run: |
+          dotnet build src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj -c Release
+          dotnet build tests/DgDevelopment.Identity.Server.UnitTests/DgDevelopment.Identity.Server.UnitTests.csproj -c Release
+          dotnet build tests/DgDevelopment.Identity.IntegrationTests/DgDevelopment.Identity.IntegrationTests.csproj -c Release
+
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  test:
+    runs-on: ubuntu-latest
+    environment: develop
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore and build
+        run: |
+          dotnet restore src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj
+          dotnet build src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj --no-restore
+
+      - name: Run integration tests (in-process, WebApplicationFactory)
+        run: >
+          dotnet test tests/DgDevelopment.Identity.IntegrationTests/DgDevelopment.Identity.IntegrationTests.csproj
+          --no-build --configuration Debug
+
+      # Fetch-then-execute (not curl | bash) and --proto/--tlsv1.2 pinned so a redirect can't
+      # silently downgrade to plain HTTP: reduces MITM/downgrade risk, though this still can't
+      # verify the script's contents against a checksum or signature - Aspire's install.sh doesn't
+      # publish one to check against.
+      - name: Install Aspire CLI
+        run: |
+          curl -fsSL --proto '=https' --tlsv1.2 -o install-aspire.sh https://aspire.dev/install.sh
+          bash install-aspire.sh
+          rm install-aspire.sh
+          echo "$HOME/.aspire/bin" >> "$GITHUB_PATH"
+
+      - name: Smoke-test the deployment (spin up the ephemeral Compose stack)
+        env:
+          Parameters__deploy_target: develop
+        run: aspire deploy --non-interactive
+
+      # TODO(implementation): confirm the exact way to reach the generated Compose project's logs -
+      # depends on where `aspire deploy` writes its Compose output for this AppHost/environment.
+      - name: Dump container logs on failure
+        if: failure()
+        run: docker compose logs || true
+
+      - name: Tear down the ephemeral stack
+        if: always()
+        env:
+          Parameters__deploy_target: develop
+        run: aspire destroy --yes --non-interactive

@@ -27,7 +27,11 @@ public sealed class GroupRepository : IGroupRepository
         return await _context.Groups
             .AsNoTracking()
             .Include(g => g.Roles)
-            .OrderBy(g => g.Name)
+            // Explicit case-insensitive sort: SQL Server's default collation is already
+            // case-insensitive, but SQLite's default is binary/case-sensitive - .ToLower()
+            // translates to LOWER() on both, making the ordering explicit instead of an
+            // accident of whichever provider's default collation happens to be running.
+            .OrderBy(g => g.Name.ToLower())
             .ToListAsync(ct).ConfigureAwait(false);
     }
 
@@ -37,7 +41,7 @@ public sealed class GroupRepository : IGroupRepository
             .AsNoTracking()
             .Include(g => g.Roles)
             .Where(g => g.ParentGroupId == parentGroupId)
-            .OrderBy(g => g.Name)
+            .OrderBy(g => g.Name.ToLower())
             .ToListAsync(ct).ConfigureAwait(false);
     }
 

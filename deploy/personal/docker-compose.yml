@@ -1,0 +1,75 @@
+## Applied once, by hand, on the NUC (see README.md in this folder). Not run by any GitHub Actions
+## workflow - the pipeline only builds and pushes images to GHCR; Watchtower on this machine is what
+## picks them up. Images referenced by the floating `:personal-latest` tag - Watchtower watches that
+## tag's digest and recreates the two app containers when it changes. Rollback: edit the tag below to
+## an immutable `:personal-YYYY.MM.DD.N` version and `docker compose up -d`.
+
+services:
+  sql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${SQL_SA_PASSWORD}
+    volumes:
+      - sql-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  identity-server:
+    image: ghcr.io/dgastaldo/dgdevelopment-identity-server:personal-latest
+    restart: unless-stopped
+    depends_on:
+      sql:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__IdentityDb: Server=sql,1433;Database=IdentityDb;User Id=sa;Password=${SQL_SA_PASSWORD};TrustServerCertificate=true
+      # Where the admin OAuth client id/secret get written on first seed and on every
+      # rotate-admin-client-secret run - identity-platform reads the same file below. Random
+      # per environment (never set from outside), matching every other environment's DbSeeder.
+      AdminClientConfigFile: /shared/admin-client-config.json
+    volumes:
+      - admin-client-config:/shared
+    ports:
+      - "8081:8080"
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+
+  identity-platform:
+    image: ghcr.io/dgastaldo/dgdevelopment-identity-platform:personal-latest
+    restart: unless-stopped
+    depends_on:
+      - identity-server
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      IdentityBaseUrl: http://identity-server:8080
+      AdminBaseUrl: ${IDENTITY_PLATFORM_PUBLIC_URL}
+      AdminClientConfigFile: /shared/admin-client-config.json
+    volumes:
+      - admin-client-config:/shared:ro
+    ports:
+      - "8082:8080"
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${GHCR_DOCKER_CONFIG_FILE}:/config.json:ro
+    environment:
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_POLL_INTERVAL: "300"
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_ROLLING_RESTART: "true"
+
+volumes:
+  sql-data:
+  admin-client-config:

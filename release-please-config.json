@@ -42,6 +42,34 @@
       "include-component-in-tag": true,
       "tag-separator": "-",
       "changelog-path": "CHANGELOG.md"
+    },
+    "src/DgDevelopment.Identity.Server": {
+      "release-type": "simple",
+      "component": "server",
+      "include-component-in-tag": true,
+      "tag-separator": "-",
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        {
+          "type": "xml",
+          "path": "DgDevelopment.Identity.Server.csproj",
+          "xpath": "//Version"
+        }
+      ]
+    },
+    "src/DgDevelopment.Identity.IdentityPlatform": {
+      "release-type": "simple",
+      "component": "identity-platform",
+      "include-component-in-tag": true,
+      "tag-separator": "-",
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        {
+          "type": "xml",
+          "path": "DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform.csproj",
+          "xpath": "//Version"
+        }
+      ]
     }
   }
 }

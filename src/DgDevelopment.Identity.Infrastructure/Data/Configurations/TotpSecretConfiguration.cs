@@ -15,7 +15,6 @@ public sealed class TotpSecretConfiguration : IEntityTypeConfiguration<TotpSecre
 
         builder.Property(x => x.SecretKey).HasMaxLength(256);
         builder.Property(x => x.IsEnabled);
-        builder.Property(x => x.EnabledAt).HasColumnType("datetime2");
 
         builder.HasOne<User>().WithOne().HasForeignKey<TotpSecret>(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
 

@@ -1,38 +1,48 @@
 namespace DgDevelopment.Identity.Server.UnitTests.Testing;
 
 using DgDevelopment.Identity.Infrastructure.Data;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
+// Was a shared Testcontainers SQL Server instance (LocalDB, the previous approach, only exists on
+// Windows so never ran on the Linux CI runner) - moved to a private SQLite in-memory database per
+// fixture instance instead. No Docker container, no shared-instance memory tuning to fight over
+// (see git history for the MSSQL_MEMORY_LIMIT_MB saga that motivated this move), and each of the
+// 40+ test classes using this fixture now gets a fully isolated database instead of a separate
+// database on one shared engine - xunit.runner.json's parallelizeTestCollections can go back to
+// true as a result.
+//
+// A SQLite in-memory database (`Data Source=:memory:`) lives only as long as its one connection
+// stays open, and a fresh SqliteConnection against that same connection string is a *different*,
+// empty database - not the same one. So this keeps one connection open for the fixture's lifetime
+// and hands it to every DbContext via UseSqlite(connection) (not a connection string), which is
+// the standard EF Core pattern for this: https://learn.microsoft.com/ef/core/testing/testing-sample
+//
+// EnsureCreated() (from the current model snapshot) instead of MigrateAsync(): the SQL Server
+// migrations under Infrastructure/Migrations contain provider-specific SQL (raw NEWID() etc.) that
+// doesn't apply to SQLite, and tests don't need migration history anyway, just the current schema.
 public class DatabaseFixture<TTestClass> : IAsyncLifetime
     where TTestClass : class
 {
-    private const string Server = "Server=(localdb)\\MSSQLLocalDB;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=true";
-
-    public DatabaseFixture()
-    {
-        ConnectionString = $"{Server};Database=DgDevelopment.Identity.Tests.{typeof(TTestClass).Name}";
-    }
-
-    protected string ConnectionString { get; }
+    private SqliteConnection _connection = null!;
 
     public virtual async Task InitializeAsync()
     {
+        _connection = new SqliteConnection("Data Source=:memory:");
+        await _connection.OpenAsync();
+
         await using var context = CreateContext();
-        await context.Database.EnsureDeletedAsync();
-        await context.Database.MigrateAsync();
+        await context.Database.EnsureCreatedAsync();
         await TestDbSeeder.SeedAsync(context);
     }
 
     public virtual async Task DisposeAsync()
-    {
-        await using var context = CreateContext();
-        await context.Database.EnsureDeletedAsync();
-    }
+        => await _connection.DisposeAsync();
 
     public IdentityDbContext CreateContext()
         => new(new DbContextOptionsBuilder<IdentityDbContext>()
-            .UseSqlServer(ConnectionString)
+            .UseSqlite(_connection)
             .Options);
 
     public async Task<Guid> GetSeededClientIdAsync(CancellationToken ct = default)

@@ -17,7 +17,5 @@ public sealed class RevokedTokenConfiguration : IEntityTypeConfiguration<Revoked
         builder.Property(x => x.TokenType).HasMaxLength(50);
         builder.Property(x => x.ClientId);
         builder.Property(x => x.UserId);
-        builder.Property(x => x.RevokedAt).HasColumnType("datetime2");
-        builder.Property(x => x.ExpiresAt).HasColumnType("datetime2");
     }
 }

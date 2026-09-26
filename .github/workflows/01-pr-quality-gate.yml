@@ -1,0 +1,163 @@
+name: 01 - PR Quality Gate
+
+# Runs on every PR into develop - this is the gate the ephemeral develop stack (test-develop.yml)
+# and everything downstream implicitly relies on being green before merge. See
+# docs/deployment.md's "Quality Gate tooling" section.
+#
+# Order: Snyk first (dependency scan, fast/cheap - fail before spending time on the rest) -> build
+# + unit tests + coverage threshold, wrapped by the SonarCloud scan. Both jobs run on GitHub-hosted
+# ubuntu-latest - moved off the self-hosted NUC runner deliberately: this workflow triggers on
+# every PR, including (once the repo is public) PRs from forks, and self-hosted runners must never
+# execute code reachable from an untrusted PR. Platform-specific clients (Client.Wpf today, a
+# Mac/iOS target later) get their own compile-only job per OS in parallel - see
+# build-windows/build-macos below. CodeQL runs separately, in 02-develop-quality-gate.yml on push
+# to develop - GitHub only populates the Security tab's baseline from the default branch, not PRs.
+#
+# Needs repository secrets: SNYK_TOKEN, and SONAR_TOKEN (SonarCloud - no SONAR_HOST_URL needed,
+# it defaults to sonarcloud.io), plus the SONAR_ORGANIZATION repository variable.
+
+on:
+  pull_request:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+jobs:
+  snyk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # snyk/actions/dotnet is deprecated (confirmed against snyk/actions' own repo, which lists it
+      # under "Deprecated Actions"), with no drop-in dotnet-specific replacement - the recommended
+      # path is the generic setup action + the CLI directly. Also drops the Docker-container
+      # overhead the old action had (it ran `docker run snyk/snyk:dotnet`); this shells out to the
+      # dotnet SDK already on the runner instead.
+      - name: Setup .NET (Snyk's CLI shells out to dotnet to resolve NuGet dependencies)
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install Snyk CLI
+        uses: snyk/actions/setup@9adf32b1121593767fc3c057af55b55db032dc04 # v1
+
+      # There's a DgDevelopment.Identity.slnx (the newer XML-free solution format), but Snyk
+      # doesn't recognize it and, without --all-projects, only looks at the repo root and finds
+      # nothing ("Could not detect supported target files") - confirmed against Snyk's own docs.
+      # --all-projects falls back to detecting each .csproj individually instead.
+      - name: Run Snyk to check for dependency and image vulnerabilities
+        run: snyk test --all-projects
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+  build-test-sonar:
+    runs-on: ubuntu-latest
+    needs: snyk
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # SonarQube wants full history for blame/new-code analysis
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Setup Java (required by the SonarScanner for .NET)
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '21'
+
+      # The bundled JS/TS sensor (for clients/DgDevelopment.Identity.Client.React) needs a Node
+      # runtime to execute even though nothing here runs the app itself.
+      - name: Setup Node.js (for the JS/TS analyzer)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+
+      # --ignore-scripts: this only needs the installed packages on disk for the analyzer to read,
+      # not to actually build/run anything - no reason to let install-time lifecycle scripts
+      # (postinstall etc.) execute arbitrary code from third-party packages.
+      - name: Install React client dependencies (improves type-aware JS/TS analysis)
+        working-directory: clients/DgDevelopment.Identity.Client.React
+        run: npm ci --ignore-scripts
+
+      - name: Install SonarScanner for .NET
+        run: dotnet tool install --global dotnet-sonarscanner
+
+      # dotnet-sonarscanner wraps the general SonarScanner engine, which analyzes every recognized
+      # language under sonar.sources (not just C#) in one pass - so the React client's TS/JS is
+      # picked up automatically as long as Node.js is available (setup-node step above). No
+      # separate scanner run needed for the JS/TS side.
+      # No sonar.host.url - defaults to sonarcloud.io. Project key is "{organization}_{repo}" -
+      # SonarCloud generates it in that shape when a project is imported via the GitHub App, shown
+      # on the project's own page.
+      #
+      # sonar.coverage.exclusions:
+      # - the two Program.cs are entry points - literal top-level statements that build the
+      #   host/DI container, not unit-testable without actually running the app as a subprocess.
+      #   Same reasoning as excluding EF Core's migrations from coverage in coverlet.runsettings:
+      #   wiring, not business logic.
+      # - ConnectController.cs / ExpiredPassword.cshtml.cs / MfaEnroll.cshtml.cs: MVC
+      #   controller actions and Razor Page handlers need a real HTTP pipeline to exercise
+      #   meaningfully (request binding, model state, HttpContext) - that's IntegrationTests'
+      #   job (WebApplicationFactory), which doesn't feed coverage into this job. Excluding them
+      #   here isn't "these don't need tests", it's "this specific job can't produce that data" -
+      #   revisit once/if IntegrationTests' coverage is wired into the PR gate too.
+      - name: Begin SonarCloud analysis
+        run: >
+          dotnet sonarscanner begin
+          /k:"dgastaldo_DgDevelopment.Identity"
+          /o:"${{ vars.SONAR_ORGANIZATION }}"
+          /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+          /d:sonar.cs.cobertura.reportsPaths="tests/**/TestResults/coverage/**/coverage.cobertura.xml"
+          /d:sonar.exclusions="**/node_modules/**,**/bin/**,**/obj/**,**/dist/**"
+          /d:sonar.coverage.exclusions="src/DgDevelopment.Identity.Server/Program.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/Program.cs,src/DgDevelopment.Identity.Server/Controllers/ConnectController.cs,src/DgDevelopment.Identity.Server/Pages/Account/ExpiredPassword.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/MfaEnroll.cshtml.cs"
+
+      # Debug config auto-generates coverage.cobertura.xml via GenerateCoverageAfterBuild in
+      # DgDevelopment.Identity.Server.UnitTests.csproj - no extra --collect flags needed here, and
+      # no reportgenerator/tool install needed either: that project's separate
+      # GenerateCoverageReport target (HTML report, needs reportgenerator) is a manual local-only
+      # convenience, never run here - CI only needs the raw cobertura.xml SonarCloud reads below.
+      - name: Build and generate coverage
+        run: |
+          dotnet restore src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj
+          dotnet build src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj --no-restore
+          dotnet build tests/DgDevelopment.Identity.Server.UnitTests/DgDevelopment.Identity.Server.UnitTests.csproj
+
+      # Real baseline established once EF Core's auto-generated migrations were excluded from
+      # coverage (coverlet.runsettings) - they were ~94% of Infrastructure's coverable lines, all
+      # at 0%, dragging the aggregate down to ~13% even though every real package sits at 83-100%.
+      # With migrations excluded, actual coverage is ~85% - 80% leaves a margin without being a
+      # rubber stamp.
+      - name: Enforce coverage threshold
+        run: |
+          COVERAGE_FILE=$(find tests/DgDevelopment.Identity.Server.UnitTests/TestResults/coverage -name coverage.cobertura.xml | head -1)
+          LINE_RATE=$(grep -oP '(?<=line-rate=")[^"]+' "$COVERAGE_FILE" | head -1)
+          THRESHOLD="0.80"
+          awk -v rate="$LINE_RATE" -v threshold="$THRESHOLD" 'BEGIN { exit (rate < threshold) }' \
+            || { echo "Line coverage $LINE_RATE is below the $THRESHOLD threshold"; exit 1; }
+
+      - name: End SonarQube analysis
+        run: dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+
+  # Platform-specific clients can't build on ubuntu-latest (a job is pinned to one runs-on, and
+  # there's no shared logic worth forcing into one matrix), so they'd get their own job per OS in
+  # parallel with the Linux-only chain above, compile-only (no Sonar/CodeQL), same shape as
+  # 06-publish-client-maui.yml's build-windows job:
+  #
+  # build-windows:
+  #   runs-on: windows-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-dotnet@v4
+  #       with:
+  #         dotnet-version: 10.0.x
+  #     - run: dotnet build clients/DgDevelopment.Identity.Client.Wpf/DgDevelopment.Identity.Client.Wpf.csproj -c Release
+  #
+  # Left commented out: Client.Wpf is still an empty scaffold (no .xaml/code, plain net10.0 TFM,
+  # no UseWPF) - compiling it today catches nothing and just burns CI time. Uncomment once it has
+  # real WPF code (net10.0-windows + UseWPF). build-macos: add the same way once there's a real
+  # Mac/iOS target (e.g. Client.Maui gains a net10.0-maccatalyst/net10.0-ios TFM), runs-on: macos-latest.

@@ -32,6 +32,10 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
+        // Starts (or reuses) the shared SQL Server container and sets ConnectionString - must
+        // happen before CreateContext() below or any Factory.CreateClient() call.
+        await Factory.InitializeConnectionAsync().ConfigureAwait(false);
+
         await using (var context = CreateContext())
         {
             await context.Database.EnsureDeletedAsync().ConfigureAwait(false);
@@ -85,7 +89,7 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
 
     public IdentityDbContext CreateContext()
         => new(new DbContextOptionsBuilder<IdentityDbContext>()
-            .UseSqlServer(IdentityWebApplicationFactory.ConnectionString)
+            .UseSqlServer(Factory.ConnectionString)
             .Options);
 
     public HttpClient CreateAuthenticatedClient()

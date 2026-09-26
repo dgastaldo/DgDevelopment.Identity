@@ -20,7 +20,6 @@ public sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
         builder.Property(x => x.Outcome).HasConversion<string>().HasMaxLength(50);
         builder.Property(x => x.IpAddress).HasMaxLength(45);
         builder.Property(x => x.UserAgent).HasMaxLength(500);
-        builder.Property(x => x.Timestamp).HasColumnType("datetime2");
 
         builder.HasOne<Tenant>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(x => x.TenantId);

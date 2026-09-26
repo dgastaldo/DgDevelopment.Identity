@@ -6,6 +6,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
     <NoWarn>$(NoWarn);CA1515</NoWarn>
+    <!-- Bumped automatically by release-please (component "identity-platform") - see
+         docs/deployment.md's "Client and application versioning" section. Not tied to the
+         personal/docs/integration/main deploy tags, which mark deployment events rather than
+         meaningful version history. -->
+    <Version>0.1.0</Version>
   </PropertyGroup>
 
   <Target Name="BuildTailwindCss" BeforeTargets="PrepareForBuild" Condition="Exists('node_modules') And '$(DesignTimeBuild)' != 'true'">
