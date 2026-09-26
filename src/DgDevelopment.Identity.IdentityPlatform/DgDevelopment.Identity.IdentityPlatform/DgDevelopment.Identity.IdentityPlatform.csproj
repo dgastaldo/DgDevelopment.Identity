@@ -10,21 +10,21 @@
          docs/deployment.md's "Client and application versioning" section. Not tied to the
          personal/docs/integration/main deploy tags, which mark deployment events rather than
          meaningful version history. -->
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
   </PropertyGroup>
 
   <Target Name="BuildTailwindCss" BeforeTargets="PrepareForBuild" Condition="Exists('node_modules') And '$(DesignTimeBuild)' != 'true'">
-    <Exec Command="npm run build:css" />
+    <Exec Command="npm run build:css"/>
   </Target>
 
   <ItemGroup>
-    <ProjectReference Include="..\DgDevelopment.Identity.IdentityPlatform.Client\DgDevelopment.Identity.IdentityPlatform.Client.csproj" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.11" />
+    <ProjectReference Include="..\DgDevelopment.Identity.IdentityPlatform.Client\DgDevelopment.Identity.IdentityPlatform.Client.csproj"/>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.11"/>
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\clients\DgDevelopment.Identity.Client.Blazor\DgDevelopment.Identity.Client.Blazor.csproj" />
-    <ProjectReference Include="..\..\DgDevelopment.Identity.ServiceDefaults\DgDevelopment.Identity.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\..\clients\DgDevelopment.Identity.Client.Blazor\DgDevelopment.Identity.Client.Blazor.csproj"/>
+    <ProjectReference Include="..\..\DgDevelopment.Identity.ServiceDefaults\DgDevelopment.Identity.ServiceDefaults.csproj"/>
   </ItemGroup>
 
 </Project>
