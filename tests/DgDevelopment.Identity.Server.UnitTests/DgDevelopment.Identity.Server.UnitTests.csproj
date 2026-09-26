@@ -62,6 +62,7 @@
     <ProjectReference Include="..\..\src\DgDevelopment.Identity.OAuth\DgDevelopment.Identity.OAuth.csproj" />
     <ProjectReference Include="..\..\src\DgDevelopment.Identity.Saml\DgDevelopment.Identity.Saml.csproj" />
     <ProjectReference Include="..\..\src\DgDevelopment.Identity.Infrastructure\DgDevelopment.Identity.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\DgDevelopment.Identity.Server\DgDevelopment.Identity.Server.csproj" />
   </ItemGroup>
 
 </Project>

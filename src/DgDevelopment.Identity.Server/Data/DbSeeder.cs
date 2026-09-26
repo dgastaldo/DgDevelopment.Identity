@@ -60,7 +60,7 @@ public sealed class DbSeeder(IServiceProvider serviceProvider, IConfiguration co
     // identity-platform picks up fresh credentials automatically on its next start, no manual copy
     // step. A no-op when AdminClientConfigFile isn't set (e.g. local dev), same as
     // SyncClientSecretToAppHostAsync above for that case.
-    private static void WriteAdminClientConfigForPlatform(IConfiguration configuration, Guid clientId, string clientSecret)
+    internal static void WriteAdminClientConfigForPlatform(IConfiguration configuration, Guid clientId, string clientSecret)
     {
         var path = configuration["AdminClientConfigFile"];
         if (string.IsNullOrWhiteSpace(path)) return;
