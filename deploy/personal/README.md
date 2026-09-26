@@ -48,16 +48,17 @@ Generates a fresh secret, updates it in the database, and rewrites the same shar
 `identity-platform` picks it up on that restart. `ClientId` itself never changes (it's the OAuth
 client's business key); only the secret rotates.
 
-From here on, pushing a `personal/v*` tag (or running `05-deploy-personal.yml` via
-`workflow_dispatch`) builds new images; Watchtower picks them up on its own within one poll interval,
-no further action needed on the NUC.
+From here on, merging a promotion PR into `personal` (or running `05-deploy-personal.yml` via
+`workflow_dispatch`) builds new images tagged with each app's current release-please version (from
+`.release-please-manifest.json`) and re-points `personal-latest` at them; Watchtower picks up the new
+`personal-latest` digest on its own within one poll interval, no further action needed on the NUC.
 
 ## Rollback
 
 Edit the two `image:` tags in `docker-compose.yml` from `:personal-latest` to a specific
-`:personal-YYYY.MM.DD.N` version (visible in the GHCR package's tag list), then
-`docker compose up -d`. Watchtower will leave a pinned version tag alone since it only watches
-`personal-latest`'s digest.
+`:personal-X.Y.Z` version (visible in the GHCR package's tag list - matches the app's release-please
+version at the time it was deployed), then `docker compose up -d`. Watchtower will leave a pinned
+version tag alone since it only watches `personal-latest`'s digest.
 
 ## What this doesn't cover yet
 
