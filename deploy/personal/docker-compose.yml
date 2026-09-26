@@ -1,11 +1,11 @@
 ## Applied once, by hand, on the NUC (see README.md in this folder). Not run by any GitHub Actions
-## workflow - the pipeline only builds and pushes images to GHCR; Watchtower on this machine is what
-## picks them up. Images referenced by the floating `:personal-latest` tag - Watchtower watches that
-## tag's digest and recreates the two app containers when it changes. Rollback: edit the tag below to
-## an immutable `:personal-YYYY.MM.DD.N` version and `docker compose up -d`.
+## workflow - the pipeline only builds and pushes images to GHCR; identity-watchtower on this machine
+## is what picks them up. Images referenced by the floating `:personal-latest` tag - identity-watchtower
+## watches that tag's digest and recreates the two app containers when it changes. Rollback: edit the
+## tag below to an immutable `:personal-YYYY.MM.DD.N` version and `docker compose up -d`.
 
 services:
-  sql:
+  identity-sql:
     image: mcr.microsoft.com/mssql/server:2022-latest
     restart: unless-stopped
     environment:
@@ -23,12 +23,12 @@ services:
     image: ghcr.io/dgastaldo/dgdevelopment-identity-server:personal-latest
     restart: unless-stopped
     depends_on:
-      sql:
+      identity-sql:
         condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__IdentityDb: Server=sql,1433;Database=IdentityDb;User Id=sa;Password=${SQL_SA_PASSWORD};TrustServerCertificate=true
+      ConnectionStrings__IdentityDb: Server=identity-sql,1433;Database=IdentityDb;User Id=sa;Password=${SQL_SA_PASSWORD};TrustServerCertificate=true
       # Where the admin OAuth client id/secret get written on first seed and on every
       # rotate-admin-client-secret run - identity-platform reads the same file below. Random
       # per environment (never set from outside), matching every other environment's DbSeeder.
@@ -58,7 +58,7 @@ services:
     labels:
       com.centurylinklabs.watchtower.enable: "true"
 
-  watchtower:
+  identity-watchtower:
     image: containrrr/watchtower:latest
     restart: unless-stopped
     volumes:
