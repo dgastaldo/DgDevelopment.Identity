@@ -14,9 +14,15 @@
   </PropertyGroup>
 
   <Target Name="GenerateCoverageAfterBuild" AfterTargets="Build" Condition="'$(GenerateCoverageOnBuild)' == 'true'">
-    <RemoveDir Directories="$(MSBuildProjectDirectory)\TestResults" />
-    <Exec Command="dotnet test &quot;$(MSBuildProjectFullPath)&quot; --no-build --collect:&quot;XPlat Code Coverage&quot; --results-directory &quot;$(MSBuildProjectDirectory)\TestResults\coverage&quot; --logger &quot;console;verbosity=minimal&quot;" />
-    <Exec Command="dotnet tool run reportgenerator -- -reports:&quot;$(MSBuildProjectDirectory)\TestResults\coverage\**\coverage.cobertura.xml&quot; -targetdir:&quot;$(MSBuildProjectDirectory)\TestResults\html&quot; -reporttypes:Html" />
+    <!-- Forward slashes throughout, not $(MSBuildProjectDirectory)'s native backslash on Windows -
+         these paths are passed as literal string arguments to dotnet test/reportgenerator (not
+         resolved by an MSBuild file-system task), so on Linux a backslash is just another filename
+         character rather than a path separator: it silently created a literal "TestResults\coverage"
+         directory and broke reportgenerator's glob match against it - never caught locally on
+         Windows, only surfaced once this actually ran on GitHub-hosted ubuntu-latest. -->
+    <RemoveDir Directories="$(MSBuildProjectDirectory)/TestResults" />
+    <Exec Command="dotnet test &quot;$(MSBuildProjectFullPath)&quot; --no-build --collect:&quot;XPlat Code Coverage&quot; --results-directory &quot;$(MSBuildProjectDirectory)/TestResults/coverage&quot; --logger &quot;console;verbosity=minimal&quot;" />
+    <Exec Command="dotnet tool run reportgenerator -- -reports:&quot;$(MSBuildProjectDirectory)/TestResults/coverage/**/coverage.cobertura.xml&quot; -targetdir:&quot;$(MSBuildProjectDirectory)/TestResults/html&quot; -reporttypes:Html" />
   </Target>
 
   <ItemGroup>
