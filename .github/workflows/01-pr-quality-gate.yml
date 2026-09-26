@@ -95,10 +95,17 @@ jobs:
       # SonarCloud generates it in that shape when a project is imported via the GitHub App, shown
       # on the project's own page.
       #
-      # sonar.coverage.exclusions: these two Program.cs are entry points - literal top-level
-      # statements that build the host/DI container, not unit-testable without actually running
-      # the app as a subprocess. Same reasoning as excluding EF Core's migrations from coverage in
-      # coverlet.runsettings: wiring, not business logic.
+      # sonar.coverage.exclusions:
+      # - the two Program.cs are entry points - literal top-level statements that build the
+      #   host/DI container, not unit-testable without actually running the app as a subprocess.
+      #   Same reasoning as excluding EF Core's migrations from coverage in coverlet.runsettings:
+      #   wiring, not business logic.
+      # - ConnectController.cs / ExpiredPassword.cshtml.cs / MfaEnroll.cshtml.cs: MVC
+      #   controller actions and Razor Page handlers need a real HTTP pipeline to exercise
+      #   meaningfully (request binding, model state, HttpContext) - that's IntegrationTests'
+      #   job (WebApplicationFactory), which doesn't feed coverage into this job. Excluding them
+      #   here isn't "these don't need tests", it's "this specific job can't produce that data" -
+      #   revisit once/if IntegrationTests' coverage is wired into the PR gate too.
       - name: Begin SonarCloud analysis
         run: >
           dotnet sonarscanner begin
@@ -107,7 +114,7 @@ jobs:
           /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
           /d:sonar.cs.cobertura.reportsPaths="tests/**/TestResults/coverage/**/coverage.cobertura.xml"
           /d:sonar.exclusions="**/node_modules/**,**/bin/**,**/obj/**,**/dist/**"
-          /d:sonar.coverage.exclusions="src/DgDevelopment.Identity.Server/Program.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/Program.cs"
+          /d:sonar.coverage.exclusions="src/DgDevelopment.Identity.Server/Program.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/Program.cs,src/DgDevelopment.Identity.Server/Controllers/ConnectController.cs,src/DgDevelopment.Identity.Server/Pages/Account/ExpiredPassword.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/MfaEnroll.cshtml.cs"
 
       # Debug config auto-generates coverage.cobertura.xml via GenerateCoverageAfterBuild in
       # DgDevelopment.Identity.Server.UnitTests.csproj - no extra --collect flags needed here, and

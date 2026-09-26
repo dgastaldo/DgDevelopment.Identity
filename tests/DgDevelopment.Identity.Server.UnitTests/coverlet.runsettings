@@ -5,18 +5,18 @@
      exclusion the aggregate line-rate reads ~13% even though every real package (Application,
      Domain, OAuth, Saml, and Infrastructure once migrations are excluded) sits at 83-100%.
 
-     Include: this project references DgDevelopment.Identity.Server only for the two small
-     server-side helpers it actually tests (RotateAdminClientSecretCommand, DbSeeder) - without
-     restricting to just those, coverlet would instrument the *entire* Server assembly (Controllers,
-     Pages, Program.cs, etc.), none of which this project exercises (that's IntegrationTests' job,
-     a separate coverage run), dragging the aggregate down to ~49%. -->
+     Include: this project references DgDevelopment.Identity.Server only for the handful of
+     server-side types it actually tests (RotateAdminClientSecretCommand, DbSeeder,
+     CorsOriginCache) - without restricting to just those, coverlet would instrument the *entire*
+     Server assembly (Controllers, Pages, Program.cs, etc.), none of which this project exercises
+     (that's IntegrationTests' job, a separate coverage run), dragging the aggregate down to ~49%. -->
 <RunSettings>
   <DataCollectionRunSettings>
     <DataCollectors>
       <DataCollector friendlyName="XPlat code coverage">
         <Configuration>
           <ExcludeByFile>**/Migrations/**/*.cs</ExcludeByFile>
-          <Include>[DgDevelopment.Identity.Application]*,[DgDevelopment.Identity.Domain]*,[DgDevelopment.Identity.Infrastructure]*,[DgDevelopment.Identity.OAuth]*,[DgDevelopment.Identity.Saml]*,[DgDevelopment.Identity.Server]DgDevelopment.Identity.Server.Commands.*,[DgDevelopment.Identity.Server]DgDevelopment.Identity.Server.Data.DbSeeder</Include>
+          <Include>[DgDevelopment.Identity.Application]*,[DgDevelopment.Identity.Domain]*,[DgDevelopment.Identity.Infrastructure]*,[DgDevelopment.Identity.OAuth]*,[DgDevelopment.Identity.Saml]*,[DgDevelopment.Identity.Server]DgDevelopment.Identity.Server.Commands.*,[DgDevelopment.Identity.Server]DgDevelopment.Identity.Server.Data.DbSeeder,[DgDevelopment.Identity.Server]DgDevelopment.Identity.Server.Services.CorsOriginCache</Include>
         </Configuration>
       </DataCollector>
     </DataCollectors>
