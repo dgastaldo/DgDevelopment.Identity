@@ -24,9 +24,12 @@ public class DatabaseFixture<TTestClass> : IAsyncLifetime
         // internal soft target SQL Server imposes on itself, not a Docker/cgroup hard limit - a 2
         // GB cap still crashed sqlservr outright (SQLPAL fatal error, errno 11) even with test
         // collections serialized, so this needs real headroom above what the rest of the box uses,
-        // not just "enough for this dataset's size."
+        // not just "enough for this dataset's size." Bumped to 6 GB after moving CI to GitHub-hosted
+        // ubuntu-latest (16 GB total): 4 GB was tuned for the 7 GB self-hosted box and started
+        // hitting "insufficient system memory in resource pool 'default'" here, sharing the runner
+        // with the Sonar/Java scanner and Node/npm running concurrently in the same job.
         var container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2025-latest")
-            .WithEnvironment("MSSQL_MEMORY_LIMIT_MB", "4096")
+            .WithEnvironment("MSSQL_MEMORY_LIMIT_MB", "6144")
             .Build();
         await container.StartAsync();
         return container;

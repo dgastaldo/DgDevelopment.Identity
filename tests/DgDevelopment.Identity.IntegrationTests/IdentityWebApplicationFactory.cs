@@ -25,9 +25,10 @@ public sealed class IdentityWebApplicationFactory : WebApplicationFactory<Progra
         // GB cap still crashed sqlservr outright (SQLPAL fatal error, errno 11) even with test
         // collections serialized, so this needs real headroom above what the rest of the box uses,
         // not just "enough for this dataset's size." Kept in sync with Server.UnitTests'
-        // DatabaseFixture<T>, which hits the same crash for the same reason.
+        // DatabaseFixture<T>, which hits the same crash for the same reason - see its comment for
+        // why this was bumped to 6 GB after moving CI to GitHub-hosted ubuntu-latest.
         var container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2025-latest")
-            .WithEnvironment("MSSQL_MEMORY_LIMIT_MB", "4096")
+            .WithEnvironment("MSSQL_MEMORY_LIMIT_MB", "6144")
             .Build();
         await container.StartAsync();
         return container;
