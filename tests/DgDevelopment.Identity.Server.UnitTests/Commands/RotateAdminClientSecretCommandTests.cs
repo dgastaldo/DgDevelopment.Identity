@@ -23,14 +23,14 @@ public sealed class RotateAdminClientSecretCommandTests : IClassFixture<Database
         var originalClientId = await _fixture.GetSeededClientIdAsync();
         await using var context = _fixture.CreateContext();
         var originalHash = (await context.Clients.SingleAsync(c => c.Id == originalClientId)).ClientSecretHash;
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
 
         var exitCode = await RotateAdminClientSecretCommand.RotateAsync(context, adminClientConfigFile: null, stdout, stderr);
 
         Assert.Equal(0, exitCode);
         Assert.Empty(stderr.ToString());
-        Assert.Contains("Admin client secret rotated", stdout.ToString());
+        Assert.Contains("Admin client secret rotated", stdout.ToString(), StringComparison.Ordinal);
         await using var verifyContext = _fixture.CreateContext();
         var updated = await verifyContext.Clients.SingleAsync(c => c.Id == originalClientId);
         Assert.NotEqual(originalHash, updated.ClientSecretHash);
@@ -40,8 +40,8 @@ public sealed class RotateAdminClientSecretCommandTests : IClassFixture<Database
     public async Task RotateAsyncWritesAdminClientConfigFileWhenPathProvided()
     {
         await using var context = _fixture.CreateContext();
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
         var path = Path.Combine(Path.GetTempPath(), $"admin-client-config-{Guid.NewGuid():N}.json");
 
         try
@@ -70,12 +70,12 @@ public sealed class RotateAdminClientSecretCommandTests : IClassFixture<Database
             .UseSqlite(connection)
             .Options);
         await context.Database.EnsureCreatedAsync();
-        var stdout = new StringWriter();
-        var stderr = new StringWriter();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
 
         var exitCode = await RotateAdminClientSecretCommand.RotateAsync(context, adminClientConfigFile: null, stdout, stderr);
 
         Assert.Equal(1, exitCode);
-        Assert.Contains("has the database been seeded", stderr.ToString());
+        Assert.Contains("has the database been seeded", stderr.ToString(), StringComparison.Ordinal);
     }
 }

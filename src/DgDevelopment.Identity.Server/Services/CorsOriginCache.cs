@@ -11,6 +11,7 @@ public sealed partial class CorsOriginCache : ICorsOriginCache, IDisposable
     private readonly ILogger<CorsOriginCache> _logger;
     private readonly PeriodicTimer _refreshTimer = new(TimeSpan.FromMinutes(5));
     private HashSet<string> _origins = [];
+    private HashSet<string> _redirectUris = [];
     private readonly ReaderWriterLockSlim _lock = new();
 
     public CorsOriginCache(IServiceScopeFactory scopeFactory, ILogger<CorsOriginCache> logger)
@@ -38,6 +39,19 @@ public sealed partial class CorsOriginCache : ICorsOriginCache, IDisposable
         }
     }
 
+    public bool IsAllowedRedirectUri(string uri)
+    {
+        _lock.EnterReadLock();
+        try
+        {
+            return _redirectUris.Contains(uri);
+        }
+        finally
+        {
+            _lock.ExitReadLock();
+        }
+    }
+
     private async Task RefreshLoopAsync(CancellationToken ct = default)
     {
         while (await _refreshTimer.WaitForNextTickAsync(ct).ConfigureAwait(false))
@@ -56,11 +70,15 @@ public sealed partial class CorsOriginCache : ICorsOriginCache, IDisposable
             var origins = redirectUris
                 .Select(uri => uri.GetLeftPart(UriPartial.Authority))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var exactUris = redirectUris
+                .Select(uri => uri.ToString())
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             _lock.EnterWriteLock();
             try
             {
                 _origins = origins;
+                _redirectUris = exactUris;
             }
             finally
             {

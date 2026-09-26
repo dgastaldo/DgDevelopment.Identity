@@ -37,6 +37,10 @@ public static class RotateAdminClientSecretCommand
     public static async Task<int> RotateAsync(
         IdentityDbContext db, string? adminClientConfigFile, TextWriter stdout, TextWriter stderr)
     {
+        ArgumentNullException.ThrowIfNull(db);
+        ArgumentNullException.ThrowIfNull(stdout);
+        ArgumentNullException.ThrowIfNull(stderr);
+
         var client = await db.Clients.FirstOrDefaultAsync(c => c.Name == "identity-platform").ConfigureAwait(false);
         if (client is null)
         {

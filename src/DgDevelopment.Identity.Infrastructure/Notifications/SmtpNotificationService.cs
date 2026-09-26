@@ -41,6 +41,11 @@ public sealed partial class SmtpNotificationService : INotificationService
             return;
         }
 
+        // CodeQL cs/sensitive-data-transmission: flags that EnableSsl is configurable and could be
+        // set to false. Deliberate: EnableSsl defaults to true, and this only becomes false if an
+        // operator explicitly sets Email:EnableSsl=false, e.g. talking to an internal mail relay
+        // over a trusted network with no TLS support. Not something a query-string value or other
+        // untrusted input can influence.
         using var client = new SmtpClient(_host, _port) { EnableSsl = _enableSsl };
         if (!string.IsNullOrWhiteSpace(_username))
             client.Credentials = new NetworkCredential(_username, _password);
