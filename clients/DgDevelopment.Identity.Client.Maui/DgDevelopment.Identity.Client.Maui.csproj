@@ -20,7 +20,7 @@
 		<ApplicationTitle>DgDevelopment Identity</ApplicationTitle>
 		<ApplicationId>com.dgdevelopment.identity</ApplicationId>
 		<ApplicationVersion>1</ApplicationVersion>
-		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+		<ApplicationDisplayVersion>0.2.0</ApplicationDisplayVersion>
 
 		<!-- Runs as a plain unpackaged exe (no MSIX) so `dotnet build`/`dotnet run` work without
 		     a signing certificate - the custom URI scheme for WebAuthenticator is still declared
@@ -52,13 +52,13 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.Maui.Controls" Version="10.0.90" />
-		<PackageReference Include="Microsoft.Extensions.Http" Version="10.0.11" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.11" />
+		<PackageReference Include="Microsoft.Maui.Controls" Version="10.0.90"/>
+		<PackageReference Include="Microsoft.Extensions.Http" Version="10.0.11"/>
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.11"/>
 	</ItemGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\DgDevelopment.Identity.Client.Core\DgDevelopment.Identity.Client.Core.csproj" />
+	  <ProjectReference Include="..\DgDevelopment.Identity.Client.Core\DgDevelopment.Identity.Client.Core.csproj"/>
 	</ItemGroup>
 
 </Project>
