@@ -98,9 +98,14 @@ jobs:
       # sonar.exclusions also drops:
       # - Client.React: that package's tsconfig.json declares "include": ["src/**/*"], but there's
       #   no src/ directory yet (same "empty scaffold" state as Client.Wpf, just not commented out
-      #   of a build job since nothing here builds it) - the TypeScript analyzer logs "No inputs
-      #   were found in config file" as an ERROR on every run otherwise. Drop this line once
-      #   Client.React has real source under src/.
+      #   of a build job since nothing here builds it) - the TypeScript sensor logs "No inputs were
+      #   found in config file" as an ERROR on every run regardless (its tsconfig.json *discovery*
+      #   step globs the whole checkout independently of this exclusion, which only filters which
+      #   files get analyzed) - harmless, doesn't fail the job, just log noise. Tried silencing it
+      #   with sonar.typescript.tsconfigPaths="" but dotnet-sonarscanner rejects an empty value for
+      #   that property outright ("format ... is invalid"); not worth another guess without being
+      #   able to check the scanner's docs from here. Drop the exclusion once Client.React has real
+      #   source under src/ - the ERROR goes away on its own at that point too.
       # - Migrations/: EF Core-generated, never hand-edited - findings there (e.g. "use Guid.Empty"
       #   on a scaffolded `new Guid("000...")` default value) aren't actionable without touching
       #   generated code.
