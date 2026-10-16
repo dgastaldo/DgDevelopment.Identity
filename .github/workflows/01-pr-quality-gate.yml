@@ -95,6 +95,12 @@ jobs:
       # SonarCloud generates it in that shape when a project is imported via the GitHub App, shown
       # on the project's own page.
       #
+      # sonar.exclusions also drops Client.React: that package's tsconfig.json declares
+      # "include": ["src/**/*"], but there's no src/ directory yet (same "empty scaffold" state as
+      # Client.Wpf, just not commented out of a build job since nothing here builds it) - the
+      # TypeScript analyzer logs "No inputs were found in config file" as an ERROR on every run
+      # otherwise. Drop this line once Client.React has real source under src/.
+      #
       # sonar.coverage.exclusions:
       # - the two Program.cs are entry points - literal top-level statements that build the
       #   host/DI container, not unit-testable without actually running the app as a subprocess.
@@ -113,7 +119,7 @@ jobs:
           /o:"${{ vars.SONAR_ORGANIZATION }}"
           /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
           /d:sonar.cs.cobertura.reportsPaths="tests/**/TestResults/coverage/**/coverage.cobertura.xml"
-          /d:sonar.exclusions="**/node_modules/**,**/bin/**,**/obj/**,**/dist/**"
+          /d:sonar.exclusions="**/node_modules/**,**/bin/**,**/obj/**,**/dist/**,clients/DgDevelopment.Identity.Client.React/**"
           /d:sonar.coverage.exclusions="src/DgDevelopment.Identity.Server/Program.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/Program.cs,src/DgDevelopment.Identity.Server/Controllers/ConnectController.cs,src/DgDevelopment.Identity.Server/Pages/Account/ExpiredPassword.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/MfaEnroll.cshtml.cs"
 
       # Debug config auto-generates coverage.cobertura.xml via GenerateCoverageAfterBuild in
