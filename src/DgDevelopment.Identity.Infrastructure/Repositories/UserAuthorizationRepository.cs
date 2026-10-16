@@ -86,7 +86,7 @@ public sealed class UserAuthorizationRepository(IdentityDbContext context) : IUs
         return visitedGroups;
     }
 
-    private static List<RawGrant> BuildDirectGrants(IEnumerable<UserPermission> userPermissions, IReadOnlyDictionary<Guid, Permission> directPermissions)
+    private static List<RawGrant> BuildDirectGrants(IEnumerable<UserPermission> userPermissions, Dictionary<Guid, Permission> directPermissions)
     {
         var grants = new List<RawGrant>();
         foreach (var assignment in userPermissions)
@@ -99,10 +99,10 @@ public sealed class UserAuthorizationRepository(IdentityDbContext context) : IUs
 
     private static List<RawGrant> BuildRoleGrants(
         IEnumerable<RolePermission> rolePermissions,
-        IReadOnlyDictionary<Guid, Permission> permissions,
-        IReadOnlyDictionary<Guid, (Guid TenantId, string? ScopeType, string? ScopeValue)> userRoleAssignments,
+        Dictionary<Guid, Permission> permissions,
+        Dictionary<Guid, (Guid TenantId, string? ScopeType, string? ScopeValue)> userRoleAssignments,
         IReadOnlyCollection<GroupRole> groupRoleAssignments,
-        IReadOnlyDictionary<Guid, Guid> groupTenants,
+        Dictionary<Guid, Guid> groupTenants,
         Guid tenantId)
     {
         var grants = new List<RawGrant>();

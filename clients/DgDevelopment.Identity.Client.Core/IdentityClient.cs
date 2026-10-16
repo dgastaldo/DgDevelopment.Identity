@@ -310,6 +310,8 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
     public async Task<(ClientResponse Client, string ClientSecret)?> CreateClientAsync(
         CreateClientParameters parameters, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(parameters);
+
         using var response = await http.PostAsJsonAsync($"{options.Authority}/api/v1/clients", new
         {
             parameters.Name,
@@ -330,7 +332,10 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
 
     public Task<HttpResponseMessage> UpdateClientAsync(
         Guid id, UpdateClientParameters parameters, bool allTenants = false, CancellationToken ct = default)
-        => http.PutAsJsonAsync(new Uri($"{options.Authority}/api/v1/clients/{id}?allTenants={allTenants}"), new
+    {
+        ArgumentNullException.ThrowIfNull(parameters);
+
+        return http.PutAsJsonAsync(new Uri($"{options.Authority}/api/v1/clients/{id}?allTenants={allTenants}"), new
         {
             parameters.Name,
             parameters.RequireConsent,
@@ -341,6 +346,7 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
             parameters.PostLogoutRedirectUris,
             parameters.AdminConsentScopes
         }, ct);
+    }
 
     public async Task<string?> RegenerateClientSecretAsync(Guid id, bool allTenants = false, CancellationToken ct = default)
     {
