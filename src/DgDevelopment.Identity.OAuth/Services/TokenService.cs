@@ -64,7 +64,7 @@ public sealed class TokenService(
         var accessToken = await jwtService.CreateAccessTokenAsync(new(
             client.Client!.TenantId,
             new User("system", "", DgDevelopment.Identity.Domain.ValueObjects.EmailAddress.FromString("system@idp.local")),
-            client.Client!,
+            client.Client,
             scopes,
             null,
             3600), ct).ConfigureAwait(false);

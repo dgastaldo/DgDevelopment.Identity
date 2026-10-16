@@ -208,7 +208,6 @@ public sealed class UserTests
         var firstStart = user.MfaGracePeriodStartedAt;
         Assert.NotNull(firstStart);
 
-        Thread.Sleep(10);
         user.StartMfaGracePeriodIfNotStarted();
 
         Assert.Equal(firstStart, user.MfaGracePeriodStartedAt);
