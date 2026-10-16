@@ -28,6 +28,7 @@ builder.Services.AddHealthChecks();
 
 string identityBaseUriString = builder.Configuration.GetValue<string>("IdentityBaseUrl") ?? "https://localhost:7157";
 string adminBaseUriString = builder.Configuration.GetValue<string>("AdminBaseUrl") ?? "https://localhost:7018";
+var adminBaseUri = new Uri(adminBaseUriString.TrimEnd('/') + "/");
 string adminClientId = builder.Configuration.GetValue<string>("Identity:AdminClientId") ?? "";
 string adminClientSecret = builder.Configuration.GetValue<string>("Identity:AdminClientSecret") ?? "";
 
@@ -36,8 +37,8 @@ builder.Services.AddIdentityAuthentication(new OidcOptions
     Authority = identityBaseUriString,
     ClientId = adminClientId,
     ClientSecret = adminClientSecret,
-    RedirectUri = new Uri(adminBaseUriString + "/callback"),
-    PostLogoutRedirectUri = new Uri(adminBaseUriString + "/"),
+    RedirectUri = new Uri(adminBaseUri, "callback"),
+    PostLogoutRedirectUri = adminBaseUri,
     Scopes = ["openid", "profile", "email"]
 });
 
@@ -79,4 +80,4 @@ app.MapGet("/config/identity.json", () => Results.Json(new
     AdminClientId = adminClientId
 }));
 
-app.Run();
+await app.RunAsync().ConfigureAwait(false);

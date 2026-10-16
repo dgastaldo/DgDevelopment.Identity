@@ -58,7 +58,7 @@ else if (UserPage is not null)
                     {
                         <tr class="transition hover:bg-slate-50">
                             <td class="px-5 py-4"><a href="/users/@user.Id" class="font-semibold text-slate-900 hover:text-violet-700">@user.Username</a><div class="text-xs text-slate-400">@user.Email</div></td>
-                            <td class="px-5 py-4"><span class="rounded-full px-2.5 py-1 text-xs font-semibold @(user.IsLocked ? "bg-amber-50 text-amber-700" : user.IsActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500")">@(user.IsLocked ? "Locked" : user.IsActive ? "Active" : "Inactive")</span></td>
+                            <td class="px-5 py-4"><span class="rounded-full px-2.5 py-1 text-xs font-semibold @StatusBadgeClass(user)">@StatusLabel(user)</span></td>
                             <td class="px-5 py-4 text-slate-500">@(user.RequireMfa ? "Required" : "Optional")</td>
                             <td class="px-5 py-4 text-slate-500">@user.CreatedAt.ToLocalTime().ToString("d")</td>
                             <td class="px-5 py-4 text-right"><a href="/users/@user.Id" class="font-semibold text-violet-700 hover:text-violet-900">Open</a></td>
@@ -73,6 +73,18 @@ else if (UserPage is not null)
 </RequirePermission>
 
 @code {
+    private static string StatusBadgeClass(UserResponse user)
+    {
+        if (user.IsLocked) return "bg-amber-50 text-amber-700";
+        return user.IsActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500";
+    }
+
+    private static string StatusLabel(UserResponse user)
+    {
+        if (user.IsLocked) return "Locked";
+        return user.IsActive ? "Active" : "Inactive";
+    }
+
     private PagedUsersResponse? UserPage;
     private string Search = string.Empty;
     private int Page = 1;

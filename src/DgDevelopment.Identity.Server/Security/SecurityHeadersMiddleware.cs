@@ -20,8 +20,7 @@ public static class SecurityHeadersMiddleware
             context.Response.OnStarting(() =>
             {
                 var headers = context.Response.Headers;
-                headers["Content-Security-Policy"] = string.Join("; ",
-                [
+                headers.ContentSecurityPolicy = string.Join("; ",
                     "default-src 'self'",
                     $"script-src 'self' 'nonce-{nonce}'",
                     "style-src 'self'",
@@ -31,10 +30,9 @@ public static class SecurityHeadersMiddleware
                     "form-action 'self'",
                     "frame-ancestors 'none'",
                     "base-uri 'self'",
-                    "object-src 'none'",
-                ]);
-                headers["X-Content-Type-Options"] = "nosniff";
-                headers["X-Frame-Options"] = "DENY";
+                    "object-src 'none'");
+                headers.XContentTypeOptions = "nosniff";
+                headers.XFrameOptions = "DENY";
                 headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
                 return Task.CompletedTask;
             });
