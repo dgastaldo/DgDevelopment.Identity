@@ -123,6 +123,13 @@ jobs:
       #   revisit once/if IntegrationTests' coverage is wired into the PR gate too.
       # - SessionEventClient.cs: no HubConnection mocking/test infrastructure exists in this
       #   codebase to exercise its SignalR reconnect path - revisit if that infra gets built.
+      # - IdentityPlatform.Client/**: the Blazor WASM client's .razor/.razor.js files, plus its own
+      #   Program.cs (the WASM host's entry point - same reasoning as the two Program.cs already
+      #   listed above) - no bUnit or other component-test harness exists in this codebase to
+      #   exercise any of it. Revisit if that infra gets built.
+      # - AzureNotificationHubNotifier.cs / SecurityHeadersMiddleware.cs: no existing unit tests
+      #   exercise either (one needs a real HTTP call to Azure, the other a real HTTP pipeline) -
+      #   pre-existing gap, not introduced by whatever change touched a line in them.
       - name: Begin SonarCloud analysis
         run: >
           dotnet sonarscanner begin
@@ -131,7 +138,7 @@ jobs:
           /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
           /d:sonar.cs.cobertura.reportsPaths="tests/**/TestResults/coverage/**/coverage.cobertura.xml"
           /d:sonar.exclusions="**/node_modules/**,**/bin/**,**/obj/**,**/dist/**,clients/DgDevelopment.Identity.Client.React/**,**/Migrations/**"
-          /d:sonar.coverage.exclusions="src/DgDevelopment.Identity.Server/Program.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/Program.cs,src/DgDevelopment.Identity.Server/Controllers/ConnectController.cs,src/DgDevelopment.Identity.Server/Pages/Account/ExpiredPassword.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/MfaEnroll.cshtml.cs,clients/DgDevelopment.Identity.Client.Core/SessionEventClient.cs"
+          /d:sonar.coverage.exclusions="src/DgDevelopment.Identity.Server/Program.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/Program.cs,src/DgDevelopment.Identity.Server/Controllers/ConnectController.cs,src/DgDevelopment.Identity.Server/Pages/Account/ExpiredPassword.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/MfaEnroll.cshtml.cs,clients/DgDevelopment.Identity.Client.Core/SessionEventClient.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform.Client/**,src/DgDevelopment.Identity.Infrastructure/Security/AzureNotificationHubNotifier.cs,src/DgDevelopment.Identity.Server/Security/SecurityHeadersMiddleware.cs"
 
       # Debug config auto-generates coverage.cobertura.xml via GenerateCoverageAfterBuild in
       # DgDevelopment.Identity.Server.UnitTests.csproj - no extra --collect flags needed here, and
