@@ -195,9 +195,12 @@ public sealed class DbSeeder(IServiceProvider serviceProvider, IConfiguration co
                          ("Identity:AdminClientSecret", clientSecret)
                      })
             {
+                // Environment.ProcessPath is the dotnet muxer that launched this process (dev-only
+                // seeding always runs under `dotnet run`/AppHost) - an absolute path, so this can't
+                // pick up some other "dotnet" earlier on PATH.
                 var startInfo = new ProcessStartInfo
                 {
-                    FileName = "dotnet",
+                    FileName = Environment.ProcessPath ?? "dotnet",
                     Arguments = $"user-secrets set \"{key}\" \"{value}\" --project \"{appHostDir}\"",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,

@@ -4,6 +4,11 @@ namespace DgDevelopment.Identity.Domain.ValueObjects;
 
 public sealed record EmailAddress
 {
+    // The pattern itself has no backtracking blowup (no nested quantifiers over the same class),
+    // but a timeout is cheap insurance against a future edit introducing one - and silences
+    // S6444 either way.
+    private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(250);
+
     public string Value { get; }
 
     public EmailAddress(string value)
@@ -19,7 +24,14 @@ public sealed record EmailAddress
     public static bool IsValid(string email)
     {
         if (string.IsNullOrWhiteSpace(email)) return false;
-        return Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.IgnoreCase);
+        try
+        {
+            return Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.IgnoreCase, RegexTimeout);
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            return false;
+        }
     }
 
     public override string ToString() => Value;
