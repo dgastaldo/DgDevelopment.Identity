@@ -107,7 +107,7 @@ public sealed partial class AzureNotificationHubNotifier : IPushNotifier
     private static Uri BuildMessagesUri(string endpoint, string hubName)
     {
         var host = new Uri(endpoint.TrimEnd('/') + "/").Host;
-        return new Uri($"https://{host}/{Uri.EscapeDataString(hubName)}/messages");
+        return new Uri(new Uri($"https://{host}/"), $"{Uri.EscapeDataString(hubName)}/messages");
     }
 
     private static bool TryBuildPayload(PushPlatform platform, PushNotification notification, out string format, out string contentType, out string body)

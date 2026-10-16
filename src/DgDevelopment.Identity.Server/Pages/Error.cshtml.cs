@@ -12,6 +12,8 @@ public sealed class ErrorModel : PageModel
 
     public string ErrorMessage => ErrorDescription ?? ErrorCode ?? "An unknown error occurred.";
 
-    // No server-side logic needed - the page just renders ErrorMessage from the bound query string.
-    public static void OnGet() { }
+    public static void OnGet()
+    {
+        // No server-side logic needed - the page just renders ErrorMessage from the bound query string.
+    }
 }

@@ -14,7 +14,7 @@ var identityConfig = await configClient.GetFromJsonAsync<JsonObject>("config/ide
 
 string identityBaseUriString = identityConfig["IdentityBaseUrl"]?.GetValue<string>()
     ?? throw new InvalidOperationException("IdentityPlatform authority is unavailable.");
-string adminBaseUriString = builder.HostEnvironment.BaseAddress.TrimEnd('/');
+var adminBaseUri = new Uri(builder.HostEnvironment.BaseAddress);
 string adminClientId = identityConfig["AdminClientId"]?.GetValue<string>()
     ?? throw new InvalidOperationException("IdentityPlatform client ID is unavailable.");
 string adminClientSecret = builder.Configuration.GetValue<string>("Identity:AdminClientSecret") ?? "";
@@ -24,8 +24,8 @@ builder.Services.AddIdentityAuthentication(new OidcOptions
     Authority = identityBaseUriString,
     ClientId = adminClientId,
     ClientSecret = adminClientSecret,
-    RedirectUri = new Uri(adminBaseUriString + "/callback"),
-    PostLogoutRedirectUri = new Uri(adminBaseUriString + "/"),
+    RedirectUri = new Uri(adminBaseUri, "callback"),
+    PostLogoutRedirectUri = adminBaseUri,
     Scopes = ["openid", "profile", "email"]
 });
 
