@@ -48,9 +48,7 @@ public sealed class SessionEventClient : IAsyncDisposable
                 await handler.Invoke().ConfigureAwait(false);
         });
 
-        // CancellationToken.None: SignalR's Reconnected event carries no token of its own to
-        // forward - the re-subscribe either completes or the connection drops again regardless.
-        connection.Reconnected += _ => connection.InvokeAsync("SubscribeToUser", userId, CancellationToken.None);
+        connection.Reconnected += _ => connection.InvokeAsync("SubscribeToUser", userId);
 
         _connection = connection;
         await connection.StartAsync(ct).ConfigureAwait(false);
