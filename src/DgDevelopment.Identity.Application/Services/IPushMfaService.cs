@@ -61,11 +61,8 @@ public sealed class PushMfaService : IPushMfaService
             throw new ArgumentException($"Unknown push platform '{platform}'.", nameof(platform));
 
         var secret = await _totpRepository.GetByUserIdAsync(userId, ct).ConfigureAwait(false);
-        if (secret is { IsEnabled: true })
-        {
-            if (string.IsNullOrWhiteSpace(totpCode) || !TotpGenerator.VerifyCode(_secretProtector.Unprotect(secret.SecretKey), totpCode))
-                throw new InvalidOperationException("A valid TOTP code is required to register a device.");
-        }
+        if (secret is { IsEnabled: true } && (string.IsNullOrWhiteSpace(totpCode) || !TotpGenerator.VerifyCode(_secretProtector.Unprotect(secret.SecretKey), totpCode)))
+            throw new InvalidOperationException("A valid TOTP code is required to register a device.");
 
         var existing = (await _deviceRepository.GetActiveByUserIdAsync(userId, ct).ConfigureAwait(false))
             .FirstOrDefault(d => d.PushToken == pushToken);
