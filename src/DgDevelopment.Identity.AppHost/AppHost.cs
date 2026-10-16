@@ -1,3 +1,5 @@
+const string HttpsEndpoint = "https";
+
 var builder = DistributedApplication.CreateBuilder(args);
 
 var deployTarget = builder.Configuration["Parameters:deploy-target"];
@@ -11,8 +13,8 @@ IResourceBuilder<IResourceWithConnectionString> sqlServer = deployTarget is "per
     : builder.AddConnectionString("IdentityDb");
 
 var server = builder
-    .AddProject<Projects.DgDevelopment_Identity_Server>("identity-server", launchProfileName: "https")
-    .WithEndpoint("https", endpoint => endpoint.IsProxied = false)
+    .AddProject<Projects.DgDevelopment_Identity_Server>("identity-server", launchProfileName: HttpsEndpoint)
+    .WithEndpoint(HttpsEndpoint, endpoint => endpoint.IsProxied = false)
     .WithEndpoint("http", endpoint => endpoint.IsProxied = false)
     .WithReference(sqlServer);
 
@@ -20,15 +22,15 @@ var adminClientId = builder.Configuration["Identity:AdminClientId"] ?? "";
 var adminClientSecret = builder.Configuration["Identity:AdminClientSecret"] ?? "";
 
 var identityPlatform = builder
-    .AddProject<Projects.DgDevelopment_Identity_IdentityPlatform>("identity-platform", launchProfileName: "https")
-    .WithEndpoint("https", endpoint => endpoint.IsProxied = false)
+    .AddProject<Projects.DgDevelopment_Identity_IdentityPlatform>("identity-platform", launchProfileName: HttpsEndpoint)
+    .WithEndpoint(HttpsEndpoint, endpoint => endpoint.IsProxied = false)
     .WithEndpoint("http", endpoint => endpoint.IsProxied = false)
     .WithReference(server)
-    .WithEnvironment("IdentityBaseUrl", server.GetEndpoint("https"))
+    .WithEnvironment("IdentityBaseUrl", server.GetEndpoint(HttpsEndpoint))
     .WithEnvironment("Identity__AdminClientId", adminClientId)
     .WithEnvironment("Identity__AdminClientSecret", adminClientSecret);
 
-identityPlatform.WithEnvironment("AdminBaseUrl", identityPlatform.GetEndpoint("https"));
+identityPlatform.WithEnvironment("AdminBaseUrl", identityPlatform.GetEndpoint(HttpsEndpoint));
 
 // deploy-target selects the one compute-environment resource relevant to this run - see
 // docs/deployment.md's "Aspire-native deployment model". Only personal/develop are wired up so far

@@ -8,12 +8,13 @@ using DgDevelopment.Identity.Domain.ValueObjects;
 
 public sealed class AuthorizationService(IClientRepository clientRepository, IAuthorizationCodeRepository codeRepository) : IAuthorizationService
 {
+    private const string InvalidRequestError = "invalid_request";
 
     public async Task<AuthorizationResult> ValidateAsync(AuthorizationRequest request, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (string.IsNullOrWhiteSpace(request.ClientId))
-            return new(false, null, "invalid_request", "Missing client_id.", null);
+            return new(false, null, InvalidRequestError, "Missing client_id.", null);
 
         var client = await clientRepository.GetByClientIdAsync(request.ClientId, ct).ConfigureAwait(false);
         if (client == null || !client.IsActive)
@@ -29,13 +30,13 @@ public sealed class AuthorizationService(IClientRepository clientRepository, IAu
 
         var redirectUri = new Uri(request.RedirectUri);
         if (!client.RedirectUris.Any(r => r.RedirectUri == redirectUri))
-            return new(false, null, "invalid_request", "Invalid redirect_uri.", null);
+            return new(false, null, InvalidRequestError, "Invalid redirect_uri.", null);
 
         if (client.RequirePkce && string.IsNullOrWhiteSpace(request.CodeChallenge))
-            return new(false, null, "invalid_request", "PKCE code_challenge is required.", null);
+            return new(false, null, InvalidRequestError, "PKCE code_challenge is required.", null);
 
         if (!string.IsNullOrWhiteSpace(request.CodeChallengeMethod) && request.CodeChallengeMethod != "S256")
-            return new(false, null, "invalid_request", "Only S256 code_challenge_method is supported.", null);
+            return new(false, null, InvalidRequestError, "Only S256 code_challenge_method is supported.", null);
 
         return new(true, client, null, null, request.RedirectUri);
     }

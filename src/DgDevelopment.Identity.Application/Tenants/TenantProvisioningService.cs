@@ -10,6 +10,17 @@ public sealed class TenantProvisioningService(
     IRoleRepository roleRepository,
     IGroupRepository groupRepository) : ITenantProvisioningService
 {
+    private const string UserCategory = "User";
+    private const string RoleCategory = "Role";
+    private const string PermissionCategory = "Permission";
+    private const string GroupCategory = "Group";
+    private const string PlatformCategory = "Platform";
+    private const string ClientCategory = "Client";
+    private const string AuditCategory = "Audit";
+    private const string TenantCategory = "Tenant";
+    private const string IdentityCategory = "Identity";
+    private const string DashboardCategory = "Dashboard";
+
     public async Task<TenantProvisioningResult> ProvisionAsync(string name, string slug, bool isPlatformTenant = false, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -100,38 +111,38 @@ public sealed class TenantProvisioningService(
     /// </summary>
     private static IReadOnlyCollection<Permission> StandardPermissionCatalog(Guid tenantId, Guid platformId) =>
     [
-        new(tenantId, platformId, "identity-platform.user.read", "Read users", "User"),
-        new(tenantId, platformId, "identity-platform.user.create", "Create users", "User"),
-        new(tenantId, platformId, "identity-platform.user.update", "Update users", "User"),
-        new(tenantId, platformId, "identity-platform.user.delete", "Delete users", "User"),
-        new(tenantId, platformId, "identity-platform.user.read.all-tenants", "Read users across all tenants", "User", isGlobal: true),
-        new(tenantId, platformId, "identity-platform.role.read", "Read roles", "Role"),
-        new(tenantId, platformId, "identity-platform.role.create", "Create roles", "Role"),
-        new(tenantId, platformId, "identity-platform.role.update", "Update roles", "Role"),
-        new(tenantId, platformId, "identity-platform.role.delete", "Delete roles", "Role"),
-        new(tenantId, platformId, "identity-platform.permission.read", "Read permissions", "Permission"),
-        new(tenantId, platformId, "identity-platform.permission.create", "Create permissions", "Permission"),
-        new(tenantId, platformId, "identity-platform.permission.update", "Update permissions", "Permission"),
-        new(tenantId, platformId, "identity-platform.permission.delete", "Delete permissions", "Permission"),
-        new(tenantId, platformId, "identity-platform.group.read", "Read groups", "Group"),
-        new(tenantId, platformId, "identity-platform.group.create", "Create groups", "Group"),
-        new(tenantId, platformId, "identity-platform.group.update", "Update groups", "Group"),
-        new(tenantId, platformId, "identity-platform.group.delete", "Delete groups", "Group"),
-        new(tenantId, platformId, "identity-platform.platform.read", "Read platforms", "Platform"),
-        new(tenantId, platformId, "identity-platform.platform.create", "Create platforms", "Platform"),
-        new(tenantId, platformId, "identity-platform.platform.update", "Update platforms", "Platform"),
-        new(tenantId, platformId, "identity-platform.platform.delete", "Delete platforms", "Platform"),
-        new(tenantId, platformId, "identity-platform.client.read", "Read clients", "Client"),
-        new(tenantId, platformId, "identity-platform.client.create", "Create clients", "Client"),
-        new(tenantId, platformId, "identity-platform.client.update", "Update clients", "Client"),
-        new(tenantId, platformId, "identity-platform.client.delete", "Delete clients", "Client"),
-        new(tenantId, platformId, "identity-platform.audit.read", "Read audit logs", "Audit"),
-        new(tenantId, platformId, "identity-platform.audit.read.all-tenants", "Read audit logs across all tenants", "Audit", isGlobal: true),
-        new(tenantId, platformId, "identity-platform.tenant.read", "Read tenants", "Tenant", isGlobal: true),
-        new(tenantId, platformId, "identity-platform.tenant.create", "Create tenants", "Tenant", isGlobal: true),
-        new(tenantId, platformId, "identity-platform.tenant.update", "Update tenants", "Tenant", isGlobal: true),
-        new(tenantId, platformId, "identity-platform.identity.manage", "Manage identity system settings", "Identity", isGlobal: true),
-        new(tenantId, platformId, "identity-platform.identity.superadmin", "Super administrator access", "Identity", isGlobal: true),
-        new(tenantId, platformId, "identity-platform.dashboard.read", "View identity platform dashboard", "Dashboard"),
+        new(tenantId, platformId, "identity-platform.user.read", "Read users", UserCategory),
+        new(tenantId, platformId, "identity-platform.user.create", "Create users", UserCategory),
+        new(tenantId, platformId, "identity-platform.user.update", "Update users", UserCategory),
+        new(tenantId, platformId, "identity-platform.user.delete", "Delete users", UserCategory),
+        new(tenantId, platformId, "identity-platform.user.read.all-tenants", "Read users across all tenants", UserCategory, isGlobal: true),
+        new(tenantId, platformId, "identity-platform.role.read", "Read roles", RoleCategory),
+        new(tenantId, platformId, "identity-platform.role.create", "Create roles", RoleCategory),
+        new(tenantId, platformId, "identity-platform.role.update", "Update roles", RoleCategory),
+        new(tenantId, platformId, "identity-platform.role.delete", "Delete roles", RoleCategory),
+        new(tenantId, platformId, "identity-platform.permission.read", "Read permissions", PermissionCategory),
+        new(tenantId, platformId, "identity-platform.permission.create", "Create permissions", PermissionCategory),
+        new(tenantId, platformId, "identity-platform.permission.update", "Update permissions", PermissionCategory),
+        new(tenantId, platformId, "identity-platform.permission.delete", "Delete permissions", PermissionCategory),
+        new(tenantId, platformId, "identity-platform.group.read", "Read groups", GroupCategory),
+        new(tenantId, platformId, "identity-platform.group.create", "Create groups", GroupCategory),
+        new(tenantId, platformId, "identity-platform.group.update", "Update groups", GroupCategory),
+        new(tenantId, platformId, "identity-platform.group.delete", "Delete groups", GroupCategory),
+        new(tenantId, platformId, "identity-platform.platform.read", "Read platforms", PlatformCategory),
+        new(tenantId, platformId, "identity-platform.platform.create", "Create platforms", PlatformCategory),
+        new(tenantId, platformId, "identity-platform.platform.update", "Update platforms", PlatformCategory),
+        new(tenantId, platformId, "identity-platform.platform.delete", "Delete platforms", PlatformCategory),
+        new(tenantId, platformId, "identity-platform.client.read", "Read clients", ClientCategory),
+        new(tenantId, platformId, "identity-platform.client.create", "Create clients", ClientCategory),
+        new(tenantId, platformId, "identity-platform.client.update", "Update clients", ClientCategory),
+        new(tenantId, platformId, "identity-platform.client.delete", "Delete clients", ClientCategory),
+        new(tenantId, platformId, "identity-platform.audit.read", "Read audit logs", AuditCategory),
+        new(tenantId, platformId, "identity-platform.audit.read.all-tenants", "Read audit logs across all tenants", AuditCategory, isGlobal: true),
+        new(tenantId, platformId, "identity-platform.tenant.read", "Read tenants", TenantCategory, isGlobal: true),
+        new(tenantId, platformId, "identity-platform.tenant.create", "Create tenants", TenantCategory, isGlobal: true),
+        new(tenantId, platformId, "identity-platform.tenant.update", "Update tenants", TenantCategory, isGlobal: true),
+        new(tenantId, platformId, "identity-platform.identity.manage", "Manage identity system settings", IdentityCategory, isGlobal: true),
+        new(tenantId, platformId, "identity-platform.identity.superadmin", "Super administrator access", IdentityCategory, isGlobal: true),
+        new(tenantId, platformId, "identity-platform.dashboard.read", "View identity platform dashboard", DashboardCategory),
     ];
 }

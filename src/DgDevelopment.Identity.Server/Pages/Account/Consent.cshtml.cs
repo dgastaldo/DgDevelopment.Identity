@@ -11,6 +11,8 @@ using Microsoft.Extensions.Options;
 
 public sealed class ConsentModel : PageModel
 {
+    private const string ErrorPage = "/Error";
+    private const string InvalidRequestError = "invalid_request";
     private static readonly Dictionary<string, string> ScopeDescriptions = new(StringComparer.Ordinal)
     {
         ["openid"] = "Sign you in using your DgDevelopment identity.",
@@ -51,11 +53,11 @@ public sealed class ConsentModel : PageModel
 
         var parsed = ParseReturnUrl(returnUrl);
         if (parsed.ClientId is null)
-            return RedirectToPage("/Error", new { errorCode = "invalid_request", errorDescription = "Invalid consent request." });
+            return RedirectToPage(ErrorPage, new { errorCode = InvalidRequestError, errorDescription = "Invalid consent request." });
 
         var client = await _clientRepository.GetByClientIdAsync(parsed.ClientId).ConfigureAwait(false);
         if (client is null || !client.IsActive)
-            return RedirectToPage("/Error", new { errorCode = "invalid_client", errorDescription = "Invalid client." });
+            return RedirectToPage(ErrorPage, new { errorCode = "invalid_client", errorDescription = "Invalid client." });
 
         ClientName = client.Name;
 
@@ -76,15 +78,15 @@ public sealed class ConsentModel : PageModel
 
         var userIdValue = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!Guid.TryParse(userIdValue, out var userId) || string.IsNullOrWhiteSpace(returnUrl))
-            return RedirectToPage("/Error", new { errorCode = "invalid_request", errorDescription = "Invalid consent request." });
+            return RedirectToPage(ErrorPage, new { errorCode = InvalidRequestError, errorDescription = "Invalid consent request." });
 
         var parsed = ParseReturnUrl(returnUrl);
         if (parsed.ClientId is null || parsed.RedirectUri is null)
-            return RedirectToPage("/Error", new { errorCode = "invalid_request", errorDescription = "Invalid consent request." });
+            return RedirectToPage(ErrorPage, new { errorCode = InvalidRequestError, errorDescription = "Invalid consent request." });
 
         var client = await _clientRepository.GetByClientIdAsync(parsed.ClientId).ConfigureAwait(false);
         if (client is null || !client.IsActive)
-            return RedirectToPage("/Error", new { errorCode = "invalid_client", errorDescription = "Invalid client." });
+            return RedirectToPage(ErrorPage, new { errorCode = "invalid_client", errorDescription = "Invalid client." });
 
         if (string.Equals(action, "approve", StringComparison.OrdinalIgnoreCase))
         {
@@ -96,7 +98,7 @@ public sealed class ConsentModel : PageModel
         }
 
         if (!client.RedirectUris.Any(r => r.RedirectUri.ToString() == parsed.RedirectUri))
-            return RedirectToPage("/Error", new { errorCode = "invalid_request", errorDescription = "Invalid redirect_uri." });
+            return RedirectToPage(ErrorPage, new { errorCode = InvalidRequestError, errorDescription = "Invalid redirect_uri." });
 
         var separator = parsed.RedirectUri.Contains('?', StringComparison.Ordinal) ? '&' : '?';
         var denyUrl = $"{parsed.RedirectUri}{separator}error=access_denied";
