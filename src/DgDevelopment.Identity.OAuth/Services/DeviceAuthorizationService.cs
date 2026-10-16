@@ -26,7 +26,7 @@ public sealed class DeviceAuthorizationService(
             throw new DeviceAuthorizationException("invalid_client", validation.ErrorDescription ?? "Invalid client.");
 
         var client = validation.Client;
-        var disallowedScope = scopes.Where(scope => !client.Scopes.Any(s => s.Scope == scope)).FirstOrDefault();
+        var disallowedScope = scopes.FirstOrDefault(scope => !client.Scopes.Any(s => s.Scope == scope));
         if (disallowedScope is not null)
             throw new DeviceAuthorizationException("invalid_scope", $"Scope '{disallowedScope}' not allowed for this client.");
 

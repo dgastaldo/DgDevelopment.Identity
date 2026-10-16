@@ -23,7 +23,7 @@ public sealed class AuthorizationService(IClientRepository clientRepository, IAu
             return new(false, null, "unsupported_response_type", "Only 'code' response type is supported.", null);
 
         var requestedScopes = request.Scope.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var disallowedScope = requestedScopes.Where(scope => !client.Scopes.Any(s => s.Scope == scope)).FirstOrDefault();
+        var disallowedScope = requestedScopes.FirstOrDefault(scope => !client.Scopes.Any(s => s.Scope == scope));
         if (disallowedScope is not null)
             return new(false, null, "invalid_scope", $"Scope '{disallowedScope}' not allowed.", null);
 
