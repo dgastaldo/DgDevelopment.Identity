@@ -128,8 +128,8 @@ jobs:
           /o:"${{ vars.SONAR_ORGANIZATION }}"
           /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
           /d:sonar.cs.cobertura.reportsPaths="tests/**/TestResults/coverage/**/coverage.cobertura.xml"
-          /d:sonar.exclusions="**/node_modules/**,**/bin/**,**/obj/**,**/dist/**,clients/DgDevelopment.Identity.Client.React/**"
-          /d:sonar.coverage.exclusions="src/DgDevelopment.Identity.Server/Program.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/Program.cs,src/DgDevelopment.Identity.Server/Controllers/ConnectController.cs,src/DgDevelopment.Identity.Server/Pages/Account/ExpiredPassword.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/MfaEnroll.cshtml.cs"
+          /d:sonar.exclusions="**/node_modules/**,**/bin/**,**/obj/**,**/dist/**,clients/DgDevelopment.Identity.Client.React/**,**/Migrations/**"
+          /d:sonar.coverage.exclusions="src/DgDevelopment.Identity.Server/Program.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/Program.cs,src/DgDevelopment.Identity.Server/Controllers/ConnectController.cs,src/DgDevelopment.Identity.Server/Pages/Account/ExpiredPassword.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/MfaEnroll.cshtml.cs,clients/DgDevelopment.Identity.Client.Core/SessionEventClient.cs"
 
       - name: Build and generate coverage
         run: |

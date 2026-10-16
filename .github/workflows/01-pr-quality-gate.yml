@@ -95,11 +95,15 @@ jobs:
       # SonarCloud generates it in that shape when a project is imported via the GitHub App, shown
       # on the project's own page.
       #
-      # sonar.exclusions also drops Client.React: that package's tsconfig.json declares
-      # "include": ["src/**/*"], but there's no src/ directory yet (same "empty scaffold" state as
-      # Client.Wpf, just not commented out of a build job since nothing here builds it) - the
-      # TypeScript analyzer logs "No inputs were found in config file" as an ERROR on every run
-      # otherwise. Drop this line once Client.React has real source under src/.
+      # sonar.exclusions also drops:
+      # - Client.React: that package's tsconfig.json declares "include": ["src/**/*"], but there's
+      #   no src/ directory yet (same "empty scaffold" state as Client.Wpf, just not commented out
+      #   of a build job since nothing here builds it) - the TypeScript analyzer logs "No inputs
+      #   were found in config file" as an ERROR on every run otherwise. Drop this line once
+      #   Client.React has real source under src/.
+      # - Migrations/: EF Core-generated, never hand-edited - findings there (e.g. "use Guid.Empty"
+      #   on a scaffolded `new Guid("000...")` default value) aren't actionable without touching
+      #   generated code.
       #
       # sonar.coverage.exclusions:
       # - the two Program.cs are entry points - literal top-level statements that build the
@@ -112,6 +116,8 @@ jobs:
       #   job (WebApplicationFactory), which doesn't feed coverage into this job. Excluding them
       #   here isn't "these don't need tests", it's "this specific job can't produce that data" -
       #   revisit once/if IntegrationTests' coverage is wired into the PR gate too.
+      # - SessionEventClient.cs: no HubConnection mocking/test infrastructure exists in this
+      #   codebase to exercise its SignalR reconnect path - revisit if that infra gets built.
       - name: Begin SonarCloud analysis
         run: >
           dotnet sonarscanner begin
@@ -119,8 +125,8 @@ jobs:
           /o:"${{ vars.SONAR_ORGANIZATION }}"
           /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
           /d:sonar.cs.cobertura.reportsPaths="tests/**/TestResults/coverage/**/coverage.cobertura.xml"
-          /d:sonar.exclusions="**/node_modules/**,**/bin/**,**/obj/**,**/dist/**,clients/DgDevelopment.Identity.Client.React/**"
-          /d:sonar.coverage.exclusions="src/DgDevelopment.Identity.Server/Program.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/Program.cs,src/DgDevelopment.Identity.Server/Controllers/ConnectController.cs,src/DgDevelopment.Identity.Server/Pages/Account/ExpiredPassword.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/MfaEnroll.cshtml.cs"
+          /d:sonar.exclusions="**/node_modules/**,**/bin/**,**/obj/**,**/dist/**,clients/DgDevelopment.Identity.Client.React/**,**/Migrations/**"
+          /d:sonar.coverage.exclusions="src/DgDevelopment.Identity.Server/Program.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/Program.cs,src/DgDevelopment.Identity.Server/Controllers/ConnectController.cs,src/DgDevelopment.Identity.Server/Pages/Account/ExpiredPassword.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/MfaEnroll.cshtml.cs,clients/DgDevelopment.Identity.Client.Core/SessionEventClient.cs"
 
       # Debug config auto-generates coverage.cobertura.xml via GenerateCoverageAfterBuild in
       # DgDevelopment.Identity.Server.UnitTests.csproj - no extra --collect flags needed here, and

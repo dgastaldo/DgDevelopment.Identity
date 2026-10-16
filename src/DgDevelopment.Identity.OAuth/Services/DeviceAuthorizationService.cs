@@ -26,11 +26,9 @@ public sealed class DeviceAuthorizationService(
             throw new DeviceAuthorizationException("invalid_client", validation.ErrorDescription ?? "Invalid client.");
 
         var client = validation.Client;
-        foreach (var scope in scopes)
-        {
-            if (!client.Scopes.Any(s => s.Scope == scope))
-                throw new DeviceAuthorizationException("invalid_scope", $"Scope '{scope}' not allowed for this client.");
-        }
+        var disallowedScope = scopes.Where(scope => !client.Scopes.Any(s => s.Scope == scope)).FirstOrDefault();
+        if (disallowedScope is not null)
+            throw new DeviceAuthorizationException("invalid_scope", $"Scope '{disallowedScope}' not allowed for this client.");
 
         var deviceCode = Secret.Generate(32);
         var userCode = GenerateUserCode();

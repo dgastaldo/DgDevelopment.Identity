@@ -38,9 +38,11 @@ public sealed class DbSeederTests
     {
         var configuration = new ConfigurationBuilder().Build();
 
-        DbSeeder.WriteAdminClientConfigForPlatform(configuration, Guid.NewGuid(), "unused-secret");
+        // No AdminClientConfigFile set - nothing to assert on disk, just that it doesn't throw
+        // (e.g. trying to create a directory for a null/empty path).
+        var exception = Record.Exception(() =>
+            DbSeeder.WriteAdminClientConfigForPlatform(configuration, Guid.NewGuid(), "unused-secret"));
 
-        // No AdminClientConfigFile set - nothing to assert on disk, this just confirms it doesn't
-        // throw (e.g. trying to create a directory for a null/empty path).
+        Assert.Null(exception);
     }
 }

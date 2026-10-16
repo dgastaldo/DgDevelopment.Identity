@@ -214,7 +214,7 @@ public sealed partial class ConnectController : Controller
         var issuer = _issuerProvider.GetIssuer().GetLeftPart(UriPartial.Authority);
         return Ok(new
         {
-            issuer = issuer,
+            issuer,
             authorization_endpoint = $"{issuer}/connect/authorize",
             token_endpoint = $"{issuer}/connect/token",
             userinfo_endpoint = $"{issuer}/connect/userinfo",
@@ -249,15 +249,7 @@ public sealed partial class ConnectController : Controller
             ValidateAudience = true,
             ValidateLifetime = true,
             IssuerSigningKeys = keys.Keys,
-            AudienceValidator = (audiences, _, _) =>
-            {
-                foreach (var aud in audiences)
-                {
-                    if (_clientIdCache.IsValidClientId(aud))
-                        return true;
-                }
-                return false;
-            }
+            AudienceValidator = (audiences, _, _) => audiences.Any(_clientIdCache.IsValidClientId)
         };
 
         var principal = await _jwtService.ValidateTokenAsync(token, parameters).ConfigureAwait(false);

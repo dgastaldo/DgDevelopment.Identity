@@ -9,5 +9,6 @@ public sealed class CheckEmailModel : PageModel
 
     public void OnGet()
     {
+        // No server-side logic needed - the page just renders Purpose-dependent copy.
     }
 }
