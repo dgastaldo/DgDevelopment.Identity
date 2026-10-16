@@ -1,10 +1,11 @@
+using System.Text.Json.Serialization;
 using DgDevelopment.Identity.Domain.Entities;
 
 namespace DgDevelopment.Identity.Server.Models;
 
-public sealed record CreatePlatformRequest(string Name, string Description, PermissionMode PermissionMode);
+public sealed record CreatePlatformRequest(string Name, string Description, [property: JsonRequired] PermissionMode PermissionMode);
 
-public sealed record UpdatePlatformRequest(string Name, string Description, PermissionMode PermissionMode);
+public sealed record UpdatePlatformRequest(string Name, string Description, [property: JsonRequired] PermissionMode PermissionMode);
 
 public sealed record PlatformResponse(Guid Id, Guid TenantId, string Name, string Description, PermissionMode PermissionMode)
 {
