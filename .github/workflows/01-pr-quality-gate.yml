@@ -98,18 +98,17 @@ jobs:
       # sonar.exclusions also drops:
       # - Client.React: that package's tsconfig.json declares "include": ["src/**/*"], but there's
       #   no src/ directory yet (same "empty scaffold" state as Client.Wpf, just not commented out
-      #   of a build job since nothing here builds it). Drop this line once Client.React has real
-      #   source under src/.
+      #   of a build job since nothing here builds it) - the TypeScript sensor logs "No inputs were
+      #   found in config file" as an ERROR on every run regardless (its tsconfig.json *discovery*
+      #   step globs the whole checkout independently of this exclusion, which only filters which
+      #   files get analyzed) - harmless, doesn't fail the job, just log noise. Tried silencing it
+      #   with sonar.typescript.tsconfigPaths="" but dotnet-sonarscanner rejects an empty value for
+      #   that property outright ("format ... is invalid"); not worth another guess without being
+      #   able to check the scanner's docs from here. Drop the exclusion once Client.React has real
+      #   source under src/ - the ERROR goes away on its own at that point too.
       # - Migrations/: EF Core-generated, never hand-edited - findings there (e.g. "use Guid.Empty"
       #   on a scaffolded `new Guid("000...")` default value) aren't actionable without touching
       #   generated code.
-      #
-      # sonar.typescript.tsconfigPaths="" : sonar.exclusions above only filters which files get
-      # analyzed, not the TS sensor's own tsconfig.json *discovery* step, which globs the whole
-      # checkout independently and logs "Failed to parse tsconfig ... No inputs were found" as an
-      # ERROR every run regardless - it still found Client.React's tsconfig and tried to load it.
-      # Pointing this at nothing skips that discovery outright; there's no other TS project in the
-      # repo for it to find anyway. Revisit alongside the exclusion above once Client.React is real.
       #
       # sonar.coverage.exclusions:
       # - the two Program.cs are entry points - literal top-level statements that build the
@@ -132,7 +131,6 @@ jobs:
           /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
           /d:sonar.cs.cobertura.reportsPaths="tests/**/TestResults/coverage/**/coverage.cobertura.xml"
           /d:sonar.exclusions="**/node_modules/**,**/bin/**,**/obj/**,**/dist/**,clients/DgDevelopment.Identity.Client.React/**,**/Migrations/**"
-          /d:sonar.typescript.tsconfigPaths=""
           /d:sonar.coverage.exclusions="src/DgDevelopment.Identity.Server/Program.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/Program.cs,src/DgDevelopment.Identity.Server/Controllers/ConnectController.cs,src/DgDevelopment.Identity.Server/Pages/Account/ExpiredPassword.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/MfaEnroll.cshtml.cs,clients/DgDevelopment.Identity.Client.Core/SessionEventClient.cs"
 
       # Debug config auto-generates coverage.cobertura.xml via GenerateCoverageAfterBuild in
