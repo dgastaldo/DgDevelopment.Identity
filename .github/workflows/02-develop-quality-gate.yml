@@ -10,6 +10,17 @@ name: 02 - Develop Quality Gate (ephemeral stack)
 # not part of this workflow yet. Until then, the "aspire deploy"/"aspire destroy" steps below are a
 # smoke test of the deployment mechanism itself (does the Compose stack actually come up cleanly?),
 # separate from the application-level regression coverage the test step provides.
+#
+# The `sonar` job below re-runs the same SonarCloud scan as 01-pr-quality-gate.yml, but on a plain
+# push to develop instead of a pull_request - that's what makes SonarScanner submit it as a real
+# branch analysis instead of PR decoration. Without this, SonarCloud never receives an analysis for
+# develop itself (only for PR branches), which is what its "branch not analyzed" warning is about.
+# Snyk isn't repeated here - the PR gate already blocks a merge on a dependency vulnerability, no
+# need to pay for that scan again on every push.
+#
+# Needs repository secrets: SONAR_TOKEN (SonarCloud - no SONAR_HOST_URL needed, it defaults to
+# sonarcloud.io), plus the SONAR_ORGANIZATION repository variable - same ones 01-pr-quality-gate.yml
+# uses.
 
 on:
   push:
@@ -72,3 +83,59 @@ jobs:
         env:
           Parameters__deploy_target: develop
         run: aspire destroy --yes --non-interactive
+
+  sonar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # SonarQube wants full history for blame/new-code analysis
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Setup Java (required by the SonarScanner for .NET)
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '21'
+
+      # The bundled JS/TS sensor (for clients/DgDevelopment.Identity.Client.React) needs a Node
+      # runtime to execute even though nothing here runs the app itself.
+      - name: Setup Node.js (for the JS/TS analyzer)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+
+      # --ignore-scripts: this only needs the installed packages on disk for the analyzer to read,
+      # not to actually build/run anything - no reason to let install-time lifecycle scripts
+      # (postinstall etc.) execute arbitrary code from third-party packages.
+      - name: Install React client dependencies (improves type-aware JS/TS analysis)
+        working-directory: clients/DgDevelopment.Identity.Client.React
+        run: npm ci --ignore-scripts
+
+      - name: Install SonarScanner for .NET
+        run: dotnet tool install --global dotnet-sonarscanner
+
+      # Same sonar.* parameters as 01-pr-quality-gate.yml's build-test-sonar job - no sonar.pullrequest.*
+      # args here, so the scanner submits this as a branch analysis (develop) instead of PR decoration.
+      - name: Begin SonarCloud analysis
+        run: >
+          dotnet sonarscanner begin
+          /k:"dgastaldo_DgDevelopment.Identity"
+          /o:"${{ vars.SONAR_ORGANIZATION }}"
+          /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+          /d:sonar.cs.cobertura.reportsPaths="tests/**/TestResults/coverage/**/coverage.cobertura.xml"
+          /d:sonar.exclusions="**/node_modules/**,**/bin/**,**/obj/**,**/dist/**"
+          /d:sonar.coverage.exclusions="src/DgDevelopment.Identity.Server/Program.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/Program.cs,src/DgDevelopment.Identity.Server/Controllers/ConnectController.cs,src/DgDevelopment.Identity.Server/Pages/Account/ExpiredPassword.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/MfaEnroll.cshtml.cs"
+
+      - name: Build and generate coverage
+        run: |
+          dotnet restore src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj
+          dotnet build src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj --no-restore
+          dotnet build tests/DgDevelopment.Identity.Server.UnitTests/DgDevelopment.Identity.Server.UnitTests.csproj
+
+      - name: End SonarQube analysis
+        run: dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"

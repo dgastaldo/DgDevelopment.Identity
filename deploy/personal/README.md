@@ -3,8 +3,9 @@
 No GitHub Actions runner lives on the NUC. The pipeline (`05-deploy-personal.yml`, GitHub-hosted
 `ubuntu-latest`) only builds `identity-server`/`identity-platform` container images and pushes them
 to GHCR as `ghcr.io/dgastaldo/dgdevelopment-identity-server:personal-latest` and
-`ghcr.io/dgastaldo/dgdevelopment-identity-platform:personal-latest`. Watchtower, running on the NUC,
-polls GHCR every 5 minutes and recreates the containers when a new `personal-latest` digest appears.
+`ghcr.io/dgastaldo/dgdevelopment-identity-platform:personal-latest`. `identity-watchtower`, running
+on the NUC, polls GHCR every 5 minutes and recreates the containers when a new `personal-latest`
+digest appears.
 
 ## One-time NUC setup
 
@@ -14,8 +15,8 @@ polls GHCR every 5 minutes and recreates the containers when a new `personal-lat
    ```bash
    docker login ghcr.io -u dgastaldo -p <PAT>
    ```
-   This writes credentials to `~/.docker/config.json` - both `docker compose pull` and Watchtower
-   (mounted read-only) reuse this same file. The PAT needs no expiry-renewal automation: it's only
+   This writes credentials to `~/.docker/config.json` - both `docker compose pull` and
+   `identity-watchtower` (mounted read-only) reuse this same file. The PAT needs no expiry-renewal automation: it's only
    read once by `docker login`, not re-checked afterwards, but rotate it periodically like any
    long-lived credential.
 3. Copy `docker-compose.yml` and `.env.example` (renamed to `.env`) from this folder onto the NUC.
@@ -50,15 +51,16 @@ client's business key); only the secret rotates.
 
 From here on, merging a promotion PR into `personal` (or running `05-deploy-personal.yml` via
 `workflow_dispatch`) builds new images tagged with each app's current release-please version (from
-`.release-please-manifest.json`) and re-points `personal-latest` at them; Watchtower picks up the new
-`personal-latest` digest on its own within one poll interval, no further action needed on the NUC.
+`.release-please-manifest.json`) and re-points `personal-latest` at them; `identity-watchtower` picks
+up the new `personal-latest` digest on its own within one poll interval, no further action needed on
+the NUC.
 
 ## Rollback
 
 Edit the two `image:` tags in `docker-compose.yml` from `:personal-latest` to a specific
 `:personal-X.Y.Z` version (visible in the GHCR package's tag list - matches the app's release-please
-version at the time it was deployed), then `docker compose up -d`. Watchtower will leave a pinned
-version tag alone since it only watches `personal-latest`'s digest.
+version at the time it was deployed), then `docker compose up -d`. `identity-watchtower` will leave a
+pinned version tag alone since it only watches `personal-latest`'s digest.
 
 ## What this doesn't cover yet
 
