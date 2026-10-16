@@ -16,6 +16,7 @@ public sealed class UserAuthorizationRepository(IdentityDbContext context) : IUs
             .Include(u => u.Roles)
             .Include(u => u.Permissions)
             .Include(u => u.Groups)
+            .AsSplitQuery()
             .SingleOrDefaultAsync(u => u.Id == userId, ct)
             .ConfigureAwait(false);
 
@@ -125,6 +126,7 @@ public sealed class UserAuthorizationRepository(IdentityDbContext context) : IUs
             .AsNoTracking()
             .Include(u => u.Roles)
             .Include(u => u.Groups)
+            .AsSplitQuery()
             .SingleOrDefaultAsync(u => u.Id == userId, ct)
             .ConfigureAwait(false);
 

@@ -19,7 +19,9 @@ public sealed record EmailAddress
     public static bool IsValid(string email)
     {
         if (string.IsNullOrWhiteSpace(email)) return false;
-        return Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.IgnoreCase);
+        // No backtracking blowup possible (no nested quantifiers over the same class), but S6444
+        // wants an explicit timeout regardless of whether one could ever actually trigger.
+        return Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(250));
     }
 
     public override string ToString() => Value;
