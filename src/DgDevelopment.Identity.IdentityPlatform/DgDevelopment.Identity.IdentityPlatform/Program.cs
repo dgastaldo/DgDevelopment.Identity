@@ -80,4 +80,4 @@ app.MapGet("/config/identity.json", () => Results.Json(new
     AdminClientId = adminClientId
 }));
 
-await app.RunAsync();
+await app.RunAsync().ConfigureAwait(false);

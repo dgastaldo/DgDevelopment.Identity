@@ -73,13 +73,17 @@ else if (UserPage is not null)
 </RequirePermission>
 
 @code {
-    private static string StatusBadgeClass(UserResponse user) => user.IsLocked
-        ? "bg-amber-50 text-amber-700"
-        : user.IsActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500";
+    private static string StatusBadgeClass(UserResponse user)
+    {
+        if (user.IsLocked) return "bg-amber-50 text-amber-700";
+        return user.IsActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500";
+    }
 
-    private static string StatusLabel(UserResponse user) => user.IsLocked
-        ? "Locked"
-        : user.IsActive ? "Active" : "Inactive";
+    private static string StatusLabel(UserResponse user)
+    {
+        if (user.IsLocked) return "Locked";
+        return user.IsActive ? "Active" : "Inactive";
+    }
 
     private PagedUsersResponse? UserPage;
     private string Search = string.Empty;
