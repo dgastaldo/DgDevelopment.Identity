@@ -308,22 +308,21 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
         => http.GetFromJsonAsync<ClientResponse>($"{options.Authority}/api/v1/clients/{id}?allTenants={allTenants}", ct);
 
     public async Task<(ClientResponse Client, string ClientSecret)?> CreateClientAsync(
-        string name, ClientType clientType, Guid? platformId, bool requireConsent,
-        IReadOnlyCollection<string> grantTypes, IReadOnlyCollection<string> scopes,
-        IReadOnlyCollection<Uri> redirectUris, IReadOnlyCollection<Uri> postLogoutRedirectUris,
-        IReadOnlyCollection<string> adminConsentScopes, CancellationToken ct = default)
+        CreateClientParameters parameters, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(parameters);
+
         using var response = await http.PostAsJsonAsync($"{options.Authority}/api/v1/clients", new
         {
-            name,
-            clientType,
-            platformId,
-            requireConsent,
-            grantTypes,
-            scopes,
-            redirectUris,
-            postLogoutRedirectUris,
-            adminConsentScopes
+            parameters.Name,
+            parameters.ClientType,
+            parameters.PlatformId,
+            parameters.RequireConsent,
+            parameters.GrantTypes,
+            parameters.Scopes,
+            parameters.RedirectUris,
+            parameters.PostLogoutRedirectUris,
+            parameters.AdminConsentScopes
         }, ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<CreateClientResponse>(ct).ConfigureAwait(false) is { } result
@@ -332,21 +331,22 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
     }
 
     public Task<HttpResponseMessage> UpdateClientAsync(
-        Guid id, string name, bool requireConsent, Guid? platformId,
-        IReadOnlyCollection<string> grantTypes, IReadOnlyCollection<string> scopes,
-        IReadOnlyCollection<Uri> redirectUris, IReadOnlyCollection<Uri> postLogoutRedirectUris,
-        IReadOnlyCollection<string> adminConsentScopes, bool allTenants = false, CancellationToken ct = default)
-        => http.PutAsJsonAsync(new Uri($"{options.Authority}/api/v1/clients/{id}?allTenants={allTenants}"), new
+        Guid id, UpdateClientParameters parameters, bool allTenants = false, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(parameters);
+
+        return http.PutAsJsonAsync(new Uri($"{options.Authority}/api/v1/clients/{id}?allTenants={allTenants}"), new
         {
-            name,
-            requireConsent,
-            platformId,
-            grantTypes,
-            scopes,
-            redirectUris,
-            postLogoutRedirectUris,
-            adminConsentScopes
+            parameters.Name,
+            parameters.RequireConsent,
+            parameters.PlatformId,
+            parameters.GrantTypes,
+            parameters.Scopes,
+            parameters.RedirectUris,
+            parameters.PostLogoutRedirectUris,
+            parameters.AdminConsentScopes
         }, ct);
+    }
 
     public async Task<string?> RegenerateClientSecretAsync(Guid id, bool allTenants = false, CancellationToken ct = default)
     {
@@ -375,25 +375,24 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
         return await response.Content.ReadFromJsonAsync<TenantAdminResponse>(ct).ConfigureAwait(false);
     }
 
-    public Task<PagedAuditLogResponse?> GetAuditLogsAsync(
-        string? actorType = null, Guid? actorId = null, string? action = null, string? targetId = null,
-        DateTime? from = null, DateTime? to = null, int page = 1, int pageSize = 50, bool allTenants = false, CancellationToken ct = default)
+    public Task<PagedAuditLogResponse?> GetAuditLogsAsync(AuditLogQuery? query = null, CancellationToken ct = default)
     {
-        var query = $"?page={page}&pageSize={pageSize}&allTenants={allTenants}";
-        if (!string.IsNullOrWhiteSpace(actorType))
-            query += $"&actorType={Uri.EscapeDataString(actorType)}";
-        if (actorId.HasValue)
-            query += $"&actorId={actorId}";
-        if (!string.IsNullOrWhiteSpace(action))
-            query += $"&action={Uri.EscapeDataString(action)}";
-        if (!string.IsNullOrWhiteSpace(targetId))
-            query += $"&targetId={Uri.EscapeDataString(targetId)}";
-        if (from.HasValue)
-            query += $"&from={from.Value:O}";
-        if (to.HasValue)
-            query += $"&to={to.Value:O}";
+        query ??= new();
+        var queryString = $"?page={query.Page}&pageSize={query.PageSize}&allTenants={query.AllTenants}";
+        if (!string.IsNullOrWhiteSpace(query.ActorType))
+            queryString += $"&actorType={Uri.EscapeDataString(query.ActorType)}";
+        if (query.ActorId.HasValue)
+            queryString += $"&actorId={query.ActorId}";
+        if (!string.IsNullOrWhiteSpace(query.Action))
+            queryString += $"&action={Uri.EscapeDataString(query.Action)}";
+        if (!string.IsNullOrWhiteSpace(query.TargetId))
+            queryString += $"&targetId={Uri.EscapeDataString(query.TargetId)}";
+        if (query.From.HasValue)
+            queryString += $"&from={query.From.Value:O}";
+        if (query.To.HasValue)
+            queryString += $"&to={query.To.Value:O}";
 
-        return http.GetFromJsonAsync<PagedAuditLogResponse>($"{options.Authority}/api/v1/audit{query}", ct);
+        return http.GetFromJsonAsync<PagedAuditLogResponse>($"{options.Authority}/api/v1/audit{queryString}", ct);
     }
 
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken ct)
@@ -608,6 +607,22 @@ public sealed record ClientResponse(
 public sealed record CreateClientResponse(
     [property: JsonPropertyName("client")] ClientResponse Client,
     [property: JsonPropertyName("clientSecret")] string ClientSecret);
+
+public sealed record CreateClientParameters(
+    string Name, ClientType ClientType, Guid? PlatformId, bool RequireConsent,
+    IReadOnlyCollection<string> GrantTypes, IReadOnlyCollection<string> Scopes,
+    IReadOnlyCollection<Uri> RedirectUris, IReadOnlyCollection<Uri> PostLogoutRedirectUris,
+    IReadOnlyCollection<string> AdminConsentScopes);
+
+public sealed record UpdateClientParameters(
+    string Name, bool RequireConsent, Guid? PlatformId,
+    IReadOnlyCollection<string> GrantTypes, IReadOnlyCollection<string> Scopes,
+    IReadOnlyCollection<Uri> RedirectUris, IReadOnlyCollection<Uri> PostLogoutRedirectUris,
+    IReadOnlyCollection<string> AdminConsentScopes);
+
+public sealed record AuditLogQuery(
+    string? ActorType = null, Guid? ActorId = null, string? Action = null, string? TargetId = null,
+    DateTime? From = null, DateTime? To = null, int Page = 1, int PageSize = 50, bool AllTenants = false);
 
 public sealed record ClientSecretResponse(
     [property: JsonPropertyName("clientSecret")] string ClientSecret);

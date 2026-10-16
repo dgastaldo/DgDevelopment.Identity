@@ -82,14 +82,14 @@
         Error = null;
         try
         {
-            LogPage = await Api.GetAuditLogsAsync(
-                action: string.IsNullOrWhiteSpace(ActionFilter) ? null : ActionFilter,
-                targetId: string.IsNullOrWhiteSpace(TargetIdFilter) ? null : TargetIdFilter,
-                from: FromFilter,
-                to: ToFilter,
-                page: Page,
-                pageSize: 20,
-                allTenants: TenantState.AllTenants).ConfigureAwait(false);
+            LogPage = await Api.GetAuditLogsAsync(new AuditLogQuery(
+                Action: string.IsNullOrWhiteSpace(ActionFilter) ? null : ActionFilter,
+                TargetId: string.IsNullOrWhiteSpace(TargetIdFilter) ? null : TargetIdFilter,
+                From: FromFilter,
+                To: ToFilter,
+                Page: Page,
+                PageSize: 20,
+                AllTenants: TenantState.AllTenants)).ConfigureAwait(false);
             if (LogPage is null) Error = "The audit log returned no data.";
         }
         catch (HttpRequestException)

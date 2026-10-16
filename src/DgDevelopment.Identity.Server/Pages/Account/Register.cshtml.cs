@@ -60,31 +60,9 @@ public sealed class RegisterModel(
             TenantName = joiningTenant.Name;
         }
 
-        if (string.IsNullOrWhiteSpace(Username) || string.IsNullOrWhiteSpace(Email) || string.IsNullOrWhiteSpace(Password))
+        if (ValidateRegistrationInput() is { } validationError)
         {
-            ModelState.AddModelError(string.Empty, "Fill in all required fields.");
-            return Page();
-        }
-
-        if (!string.Equals(Password, ConfirmPassword, StringComparison.Ordinal))
-        {
-            ModelState.AddModelError(string.Empty, "Passwords do not match.");
-            return Page();
-        }
-
-        try
-        {
-            PasswordPolicy.Validate(Password);
-        }
-        catch (ArgumentException ex)
-        {
-            ModelState.AddModelError(string.Empty, ex.Message);
-            return Page();
-        }
-
-        if (!EmailAddress.IsValid(Email))
-        {
-            ModelState.AddModelError(string.Empty, "Enter a valid email address.");
+            ModelState.AddModelError(string.Empty, validationError);
             return Page();
         }
 
@@ -104,40 +82,76 @@ public sealed class RegisterModel(
 
         if (joiningTenant is not null)
         {
-            // Joining an existing tenant never grants an elevated role by itself - an existing
-            // tenant admin grants roles afterward, matching how every other member is onboarded.
-            await userRepository.AddAsync(user).ConfigureAwait(false);
-            await tenantRepository.AddMembershipAsync(new TenantMembership(joiningTenant.Id, user.Id)).ConfigureAwait(false);
+            await JoinExistingTenantAsync(user, joiningTenant).ConfigureAwait(false);
         }
         else
         {
-            if (string.IsNullOrWhiteSpace(OrganizationName) || string.IsNullOrWhiteSpace(OrganizationSlug))
-            {
-                ModelState.AddModelError(string.Empty, "Enter an organization name and slug.");
-                return Page();
-            }
-
-            TenantProvisioningResult provisioned;
-            try
-            {
-                provisioned = await provisioningService.ProvisionAsync(OrganizationName, OrganizationSlug).ConfigureAwait(false);
-            }
-            catch (InvalidOperationException ex)
-            {
-                ModelState.AddModelError(string.Empty, ex.Message);
-                return Page();
-            }
-
-            // The user who creates a new tenant becomes its owner and its GlobalAdmin - mirrors
-            // TenantProvisioningService's own bootstrap-tenant pattern (see DbSeeder).
-            user.AddToGroup(provisioned.GlobalAdminsGroup);
-            await userRepository.AddAsync(user).ConfigureAwait(false);
-            await tenantRepository.AddMembershipAsync(new TenantMembership(provisioned.Tenant.Id, user.Id, isOwner: true)).ConfigureAwait(false);
+            var provisioningFailure = await CreateNewTenantAndUserAsync(user).ConfigureAwait(false);
+            if (provisioningFailure is not null)
+                return provisioningFailure;
         }
 
         await SendVerificationEmailAsync(user).ConfigureAwait(false);
 
         return RedirectToPage("/Account/CheckEmail", new { purpose = "register" });
+    }
+
+    private string? ValidateRegistrationInput()
+    {
+        if (string.IsNullOrWhiteSpace(Username) || string.IsNullOrWhiteSpace(Email) || string.IsNullOrWhiteSpace(Password))
+            return "Fill in all required fields.";
+
+        if (!string.Equals(Password, ConfirmPassword, StringComparison.Ordinal))
+            return "Passwords do not match.";
+
+        try
+        {
+            PasswordPolicy.Validate(Password);
+        }
+        catch (ArgumentException ex)
+        {
+            return ex.Message;
+        }
+
+        if (!EmailAddress.IsValid(Email))
+            return "Enter a valid email address.";
+
+        return null;
+    }
+
+    // Joining an existing tenant never grants an elevated role by itself - an existing tenant
+    // admin grants roles afterward, matching how every other member is onboarded.
+    private async Task JoinExistingTenantAsync(User user, Tenant joiningTenant)
+    {
+        await userRepository.AddAsync(user).ConfigureAwait(false);
+        await tenantRepository.AddMembershipAsync(new TenantMembership(joiningTenant.Id, user.Id)).ConfigureAwait(false);
+    }
+
+    private async Task<IActionResult?> CreateNewTenantAndUserAsync(User user)
+    {
+        if (string.IsNullOrWhiteSpace(OrganizationName) || string.IsNullOrWhiteSpace(OrganizationSlug))
+        {
+            ModelState.AddModelError(string.Empty, "Enter an organization name and slug.");
+            return Page();
+        }
+
+        TenantProvisioningResult provisioned;
+        try
+        {
+            provisioned = await provisioningService.ProvisionAsync(OrganizationName, OrganizationSlug).ConfigureAwait(false);
+        }
+        catch (InvalidOperationException ex)
+        {
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return Page();
+        }
+
+        // The user who creates a new tenant becomes its owner and its GlobalAdmin - mirrors
+        // TenantProvisioningService's own bootstrap-tenant pattern (see DbSeeder).
+        user.AddToGroup(provisioned.GlobalAdminsGroup);
+        await userRepository.AddAsync(user).ConfigureAwait(false);
+        await tenantRepository.AddMembershipAsync(new TenantMembership(provisioned.Tenant.Id, user.Id, isOwner: true)).ConfigureAwait(false);
+        return null;
     }
 
     private async Task SendVerificationEmailAsync(User user)

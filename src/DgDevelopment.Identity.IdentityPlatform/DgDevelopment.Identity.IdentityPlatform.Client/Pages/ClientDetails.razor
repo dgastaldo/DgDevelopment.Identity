@@ -136,10 +136,13 @@
         {
             var platformId = Guid.TryParse(EditModel.PlatformId, out var parsed) ? parsed : (Guid?)null;
             using var response = await Api.UpdateClientAsync(
-                Id, EditModel.Name, EditModel.RequireConsent, platformId,
-                Split(EditModel.GrantTypes), Split(EditModel.Scopes),
-                SplitUris(EditModel.RedirectUris), SplitUris(EditModel.PostLogoutRedirectUris),
-                Split(EditModel.AdminConsentScopes), TenantState.AllTenants).ConfigureAwait(false);
+                Id,
+                new UpdateClientParameters(
+                    EditModel.Name, EditModel.RequireConsent, platformId,
+                    Split(EditModel.GrantTypes), Split(EditModel.Scopes),
+                    SplitUris(EditModel.RedirectUris), SplitUris(EditModel.PostLogoutRedirectUris),
+                    Split(EditModel.AdminConsentScopes)),
+                TenantState.AllTenants).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             await LoadAsync();
         }

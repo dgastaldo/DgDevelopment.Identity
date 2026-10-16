@@ -1,8 +1,9 @@
+using System.Text.Json.Serialization;
 using DgDevelopment.Identity.Domain.Entities;
 
 namespace DgDevelopment.Identity.Server.Models;
 
-public sealed record CreateRoleRequest(string Name, string Description, Guid PlatformId);
+public sealed record CreateRoleRequest(string Name, string Description, [property: JsonRequired] Guid PlatformId);
 
 public sealed record UpdateRoleRequest(string Name, string Description);
 
