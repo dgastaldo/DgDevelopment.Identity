@@ -1,5 +1,6 @@
 using DgDevelopment.Identity.Application.Audit;
 using DgDevelopment.Identity.Application.Authorization;
+using DgDevelopment.Identity.Domain.Repositories;
 using DgDevelopment.Identity.Server.Authorization;
 using DgDevelopment.Identity.Server.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -15,15 +16,13 @@ public sealed class AuditController(IAuditLogService auditLogService, ITenantCon
 {
     [HttpGet]
     [RequirePermission("identity-platform.audit.read")]
-    public async Task<IActionResult> GetAuditLogs(
-        [FromQuery] string? actorType, [FromQuery] Guid? actorId, [FromQuery] string? action, [FromQuery] string? targetId,
-        [FromQuery] DateTime? from, [FromQuery] DateTime? to,
-        [FromQuery] int page = 1, [FromQuery] int pageSize = 50, [FromQuery] bool allTenants = false,
-        CancellationToken ct = default)
+    public async Task<IActionResult> GetAuditLogs([FromQuery] AuditLogQueryParameters query, CancellationToken ct = default)
     {
-        var canSeeAllTenants = allTenants && await tenantContext.IsGlobalAdministratorAsync(ct).ConfigureAwait(false);
-        var result = await auditLogService.GetPagedAsync(
-            tenantContext.TenantId, canSeeAllTenants, actorType, actorId, action, targetId, from, to, page, pageSize, ct).ConfigureAwait(false);
+        ArgumentNullException.ThrowIfNull(query);
+        var canSeeAllTenants = query.AllTenants && await tenantContext.IsGlobalAdministratorAsync(ct).ConfigureAwait(false);
+        var filter = new AuditLogFilter(
+            tenantContext.TenantId, canSeeAllTenants, query.ActorType, query.ActorId, query.Action, query.TargetId, query.From, query.To);
+        var result = await auditLogService.GetPagedAsync(filter, query.Page, query.PageSize, ct).ConfigureAwait(false);
 
         return Ok(new
         {

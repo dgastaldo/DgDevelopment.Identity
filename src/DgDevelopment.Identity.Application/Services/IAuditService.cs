@@ -2,8 +2,11 @@ using DgDevelopment.Identity.Domain.Entities;
 
 namespace DgDevelopment.Identity.Application.Services;
 
+public sealed record AuditEvent(
+    string Action, AuditOutcome Outcome, Guid TenantId, Guid? ActorId = null, string? ActorType = null,
+    string? TargetId = null, string? TargetType = null, string? Details = null);
+
 public interface IAuditService
 {
-    Task RecordAsync(string action, AuditOutcome outcome, Guid tenantId, Guid? actorId = null, string? actorType = null,
-        string? targetId = null, string? targetType = null, string? details = null, CancellationToken ct = default);
+    Task RecordAsync(AuditEvent auditEvent, CancellationToken ct = default);
 }

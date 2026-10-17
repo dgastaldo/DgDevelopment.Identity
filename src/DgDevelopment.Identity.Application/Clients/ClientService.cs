@@ -33,62 +33,56 @@ public sealed class ClientService(IClientRepository clientRepository, IPlatformR
         return !allTenants && client.TenantId != tenantId ? null : client;
     }
 
-    public async Task<(Client Client, string ClientSecret)> CreateAsync(
-        string name, ClientType clientType, Guid? platformId, bool requireConsent,
-        IReadOnlyCollection<string> grantTypes, IReadOnlyCollection<string> scopes,
-        IReadOnlyCollection<Uri> redirectUris, IReadOnlyCollection<Uri> postLogoutRedirectUris,
-        IReadOnlyCollection<string> adminConsentScopes, Guid tenantId, CancellationToken ct = default)
+    public async Task<(Client Client, string ClientSecret)> CreateAsync(CreateClientCommand command, Guid tenantId, CancellationToken ct = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentNullException.ThrowIfNull(grantTypes);
-        ArgumentNullException.ThrowIfNull(scopes);
-        ArgumentNullException.ThrowIfNull(redirectUris);
-        ArgumentNullException.ThrowIfNull(postLogoutRedirectUris);
-        ArgumentNullException.ThrowIfNull(adminConsentScopes);
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentException.ThrowIfNullOrWhiteSpace(command.Name);
+        ArgumentNullException.ThrowIfNull(command.GrantTypes);
+        ArgumentNullException.ThrowIfNull(command.Scopes);
+        ArgumentNullException.ThrowIfNull(command.RedirectUris);
+        ArgumentNullException.ThrowIfNull(command.PostLogoutRedirectUris);
+        ArgumentNullException.ThrowIfNull(command.AdminConsentScopes);
 
-        if (platformId is { } requestedPlatformId)
+        if (command.PlatformId is { } requestedPlatformId)
             await EnsurePlatformInTenantAsync(requestedPlatformId, tenantId, ct).ConfigureAwait(false);
 
         var clientSecret = Secret.Generate(32);
-        var client = new Client(tenantId, Guid.NewGuid(), Hash(clientSecret), name, clientType, platformId, requireConsent);
+        var client = new Client(tenantId, Guid.NewGuid(), Hash(clientSecret), command.Name, command.ClientType, command.PlatformId, command.RequireConsent);
 
-        foreach (var grantType in grantTypes)
+        foreach (var grantType in command.GrantTypes)
             client.AddGrantType(grantType);
-        foreach (var scope in scopes)
+        foreach (var scope in command.Scopes)
             client.AddScope(scope);
-        foreach (var redirectUri in redirectUris)
+        foreach (var redirectUri in command.RedirectUris)
             client.AddRedirectUri(redirectUri);
-        foreach (var postLogoutRedirectUri in postLogoutRedirectUris)
+        foreach (var postLogoutRedirectUri in command.PostLogoutRedirectUris)
             client.AddPostLogoutRedirectUri(postLogoutRedirectUri);
-        foreach (var adminConsentScope in adminConsentScopes)
+        foreach (var adminConsentScope in command.AdminConsentScopes)
             client.AddAdminConsentScope(adminConsentScope);
 
         await clientRepository.AddAsync(client, ct).ConfigureAwait(false);
         return (client, clientSecret);
     }
 
-    public async Task UpdateAsync(
-        Guid id, string name, bool requireConsent, Guid? platformId,
-        IReadOnlyCollection<string> grantTypes, IReadOnlyCollection<string> scopes,
-        IReadOnlyCollection<Uri> redirectUris, IReadOnlyCollection<Uri> postLogoutRedirectUris,
-        IReadOnlyCollection<string> adminConsentScopes, Guid tenantId, bool allTenants, CancellationToken ct = default)
+    public async Task UpdateAsync(Guid id, UpdateClientCommand command, Guid tenantId, bool allTenants, CancellationToken ct = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentException.ThrowIfNullOrWhiteSpace(command.Name);
 
         var client = await GetRequiredAsync(id, tenantId, allTenants, ct).ConfigureAwait(false);
 
-        if (platformId is { } requestedPlatformId)
+        if (command.PlatformId is { } requestedPlatformId)
             await EnsurePlatformInTenantAsync(requestedPlatformId, client.TenantId, ct).ConfigureAwait(false);
 
-        client.Rename(name);
-        client.SetRequireConsent(requireConsent);
-        client.SetPlatform(platformId);
+        client.Rename(command.Name);
+        client.SetRequireConsent(command.RequireConsent);
+        client.SetPlatform(command.PlatformId);
 
-        Reconcile(client.GrantTypes.Select(g => g.GrantType), grantTypes, client.AddGrantType, client.RemoveGrantType);
-        Reconcile(client.Scopes.Select(s => s.Scope), scopes, client.AddScope, client.RemoveScope);
-        Reconcile(client.RedirectUris.Select(r => r.RedirectUri), redirectUris, client.AddRedirectUri, client.RemoveRedirectUri);
-        Reconcile(client.PostLogoutRedirectUris.Select(r => r.RedirectUri), postLogoutRedirectUris, client.AddPostLogoutRedirectUri, client.RemovePostLogoutRedirectUri);
-        Reconcile(client.AdminConsentScopes.Select(s => s.Scope), adminConsentScopes, client.AddAdminConsentScope, client.RemoveAdminConsentScope);
+        Reconcile(client.GrantTypes.Select(g => g.GrantType), command.GrantTypes, client.AddGrantType, client.RemoveGrantType);
+        Reconcile(client.Scopes.Select(s => s.Scope), command.Scopes, client.AddScope, client.RemoveScope);
+        Reconcile(client.RedirectUris.Select(r => r.RedirectUri), command.RedirectUris, client.AddRedirectUri, client.RemoveRedirectUri);
+        Reconcile(client.PostLogoutRedirectUris.Select(r => r.RedirectUri), command.PostLogoutRedirectUris, client.AddPostLogoutRedirectUri, client.RemovePostLogoutRedirectUri);
+        Reconcile(client.AdminConsentScopes.Select(s => s.Scope), command.AdminConsentScopes, client.AddAdminConsentScope, client.RemoveAdminConsentScope);
 
         await clientRepository.UpdateAsync(client, ct).ConfigureAwait(false);
     }

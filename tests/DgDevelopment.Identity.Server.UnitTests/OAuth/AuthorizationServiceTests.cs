@@ -185,7 +185,7 @@ public sealed class AuthorizationServiceTests : IClassFixture<DatabaseFixture<Au
         var codeRepo = new AuthorizationCodeRepository(context);
         var service = new AuthorizationService(clientRepo, codeRepo);
 
-        var code = await service.CreateAuthorizationCodeAsync(tenantId, client!, user!, ["openid", "profile"], TestConstants.AdminClientRedirectUri, "challenge-123", "S256");
+        var code = await service.CreateAuthorizationCodeAsync(new AuthorizationCodeRequest(tenantId, client!, user!, ["openid", "profile"], TestConstants.AdminClientRedirectUri, "challenge-123", "S256"));
 
         Assert.False(string.IsNullOrWhiteSpace(code));
         var codeHash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(code)));

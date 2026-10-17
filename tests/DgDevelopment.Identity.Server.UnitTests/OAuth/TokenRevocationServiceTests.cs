@@ -104,7 +104,7 @@ public sealed class TokenRevocationServiceTests : IClassFixture<DatabaseFixture<
         var refreshRepo = new RefreshTokenRepository(context);
         var first = new RefreshToken(tenantId, Hash(firstValue), clientId, userId, session.Id, ["openid"]);
         await refreshRepo.AddAsync(first);
-        var second = new RefreshToken(tenantId, Hash(secondValue), clientId, userId, session.Id, ["openid"], first.Id);
+        var second = new RefreshToken(tenantId, Hash(secondValue), clientId, userId, session.Id, ["openid"], new RefreshTokenOptions(first.Id));
         await refreshRepo.AddAsync(second);
 
         var clientRepo = new ClientRepository(context);

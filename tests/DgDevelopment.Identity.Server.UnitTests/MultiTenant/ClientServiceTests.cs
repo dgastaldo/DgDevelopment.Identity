@@ -50,10 +50,12 @@ public sealed class ClientServiceTests : IClassFixture<DatabaseFixture<ClientSer
         var service = CreateService(context);
 
         var (client, clientSecret) = await service.CreateAsync(
-            "My Client", ClientType.Confidential, null, requireConsent: true,
-            ["authorization_code", "refresh_token"], ["openid", "profile"],
-            [new Uri("https://example.com/callback")], [new Uri("https://example.com/")],
-            [], tenant.Id);
+            new CreateClientCommand(
+                "My Client", ClientType.Confidential, null, RequireConsent: true,
+                ["authorization_code", "refresh_token"], ["openid", "profile"],
+                [new Uri("https://example.com/callback")], [new Uri("https://example.com/")],
+                []),
+            tenant.Id);
 
         var stored = await new ClientRepository(context).GetByIdAsync(client.Id);
         Assert.NotNull(stored);
@@ -73,7 +75,7 @@ public sealed class ClientServiceTests : IClassFixture<DatabaseFixture<ClientSer
         var service = CreateService(context);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            service.CreateAsync("Client", ClientType.Confidential, otherTenantPlatform.Id, true, [], [], [], [], [], tenantA.Id));
+            service.CreateAsync(new CreateClientCommand("Client", ClientType.Confidential, otherTenantPlatform.Id, true, [], [], [], [], []), tenantA.Id));
     }
 
     [Fact]
@@ -86,10 +88,12 @@ public sealed class ClientServiceTests : IClassFixture<DatabaseFixture<ClientSer
             var tenant = await CreateTenantAsync(setupContext, "ClientUpdateReconcile");
             var service = CreateService(setupContext);
             var (client, _) = await service.CreateAsync(
-                "Client", ClientType.Confidential, null, true,
-                ["authorization_code"], ["openid"],
-                [new Uri("https://old.example.com/callback")], [],
-                [], tenant.Id);
+                new CreateClientCommand(
+                    "Client", ClientType.Confidential, null, true,
+                    ["authorization_code"], ["openid"],
+                    [new Uri("https://old.example.com/callback")], [],
+                    []),
+                tenant.Id);
             tenantId = tenant.Id;
             clientId = client.Id;
         }
@@ -98,12 +102,14 @@ public sealed class ClientServiceTests : IClassFixture<DatabaseFixture<ClientSer
         var updateService = CreateService(context);
 
         await updateService.UpdateAsync(
-            clientId, "Client renamed", requireConsent: false, platformId: null,
-            grantTypes: ["authorization_code", "refresh_token"],
-            scopes: ["profile"],
-            redirectUris: [new Uri("https://new.example.com/callback")],
-            postLogoutRedirectUris: [],
-            adminConsentScopes: [],
+            clientId,
+            new UpdateClientCommand(
+                "Client renamed", RequireConsent: false, PlatformId: null,
+                GrantTypes: ["authorization_code", "refresh_token"],
+                Scopes: ["profile"],
+                RedirectUris: [new Uri("https://new.example.com/callback")],
+                PostLogoutRedirectUris: [],
+                AdminConsentScopes: []),
             tenantId, allTenants: false);
 
         var stored = await new ClientRepository(context).GetByIdAsync(clientId);
@@ -124,10 +130,10 @@ public sealed class ClientServiceTests : IClassFixture<DatabaseFixture<ClientSer
         var tenantA = await CreateTenantAsync(context, "ClientUpdateTenantA");
         var tenantB = await CreateTenantAsync(context, "ClientUpdateTenantB");
         var service = CreateService(context);
-        var (client, _) = await service.CreateAsync("Client", ClientType.Confidential, null, true, [], [], [], [], [], tenantB.Id);
+        var (client, _) = await service.CreateAsync(new CreateClientCommand("Client", ClientType.Confidential, null, true, [], [], [], [], []), tenantB.Id);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            service.UpdateAsync(client.Id, "New name", true, null, [], [], [], [], [], tenantA.Id, allTenants: false));
+            service.UpdateAsync(client.Id, new UpdateClientCommand("New name", true, null, [], [], [], [], []), tenantA.Id, allTenants: false));
 
         Assert.Equal("The client does not belong to the active tenant.", exception.Message);
     }
@@ -138,7 +144,7 @@ public sealed class ClientServiceTests : IClassFixture<DatabaseFixture<ClientSer
         await using var context = _fixture.CreateContext();
         var tenant = await CreateTenantAsync(context, "ClientRegenerate");
         var service = CreateService(context);
-        var (client, originalSecret) = await service.CreateAsync("Client", ClientType.Confidential, null, true, [], [], [], [], [], tenant.Id);
+        var (client, originalSecret) = await service.CreateAsync(new CreateClientCommand("Client", ClientType.Confidential, null, true, [], [], [], [], []), tenant.Id);
 
         var newSecret = await service.RegenerateSecretAsync(client.Id, tenant.Id, allTenants: false);
 
@@ -155,7 +161,7 @@ public sealed class ClientServiceTests : IClassFixture<DatabaseFixture<ClientSer
         await using var context = _fixture.CreateContext();
         var tenant = await CreateTenantAsync(context, "ClientDeactivate");
         var service = CreateService(context);
-        var (client, _) = await service.CreateAsync("Client", ClientType.Confidential, null, true, [], [], [], [], [], tenant.Id);
+        var (client, _) = await service.CreateAsync(new CreateClientCommand("Client", ClientType.Confidential, null, true, [], [], [], [], []), tenant.Id);
 
         await service.SetActiveAsync(client.Id, isActive: false, tenant.Id, allTenants: false);
 
@@ -171,7 +177,7 @@ public sealed class ClientServiceTests : IClassFixture<DatabaseFixture<ClientSer
         var homeTenant = await CreateTenantAsync(context, "ClientGetHome");
         var otherTenant = await CreateTenantAsync(context, "ClientGetOther");
         var service = CreateService(context);
-        var (client, _) = await service.CreateAsync("Client", ClientType.Confidential, null, true, [], [], [], [], [], homeTenant.Id);
+        var (client, _) = await service.CreateAsync(new CreateClientCommand("Client", ClientType.Confidential, null, true, [], [], [], [], []), homeTenant.Id);
 
         var result = await service.GetAsync(client.Id, otherTenant.Id, allTenants: false);
 
@@ -185,8 +191,8 @@ public sealed class ClientServiceTests : IClassFixture<DatabaseFixture<ClientSer
         var tenantA = await CreateTenantAsync(context, "ClientPagedA");
         var tenantB = await CreateTenantAsync(context, "ClientPagedB");
         var service = CreateService(context);
-        var (clientA, _) = await service.CreateAsync("Client A", ClientType.Confidential, null, true, [], [], [], [], [], tenantA.Id);
-        var (clientB, _) = await service.CreateAsync("Client B", ClientType.Confidential, null, true, [], [], [], [], [], tenantB.Id);
+        var (clientA, _) = await service.CreateAsync(new CreateClientCommand("Client A", ClientType.Confidential, null, true, [], [], [], [], []), tenantA.Id);
+        var (clientB, _) = await service.CreateAsync(new CreateClientCommand("Client B", ClientType.Confidential, null, true, [], [], [], [], []), tenantB.Id);
 
         var scopedResult = await service.GetPagedAsync(null, 1, 100, tenantA.Id, allTenants: false);
         var globalResult = await service.GetPagedAsync(null, 1, 1000, tenantA.Id, allTenants: true);
