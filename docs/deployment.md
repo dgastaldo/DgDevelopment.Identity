@@ -68,8 +68,8 @@ included — through an ordinary forward merge.
 
 | Branch | Environment | Host | Trigger | Approval |
 |---|---|---|---|---|
-| `develop` | develop/e2e (ephemeral — spun up per test run, then torn down) | home PC (Ubuntu, self-hosted runner), Docker Compose | every merge into `develop` | none — auto (the test *results* are the gate on promoting onward) |
-| `personal` | personal (always-on) | same home PC, separate Compose stack | `personal/v*` tag | manual — you promote only after the `develop` test run is green |
+| `develop` | develop/e2e (ephemeral — spun up per test run, then torn down) | GitHub-hosted `ubuntu-latest`, throwaway Docker Compose stack built via `aspire deploy` | every merge into `develop` | none — auto (the test *results* are the gate on promoting onward) |
+| `personal` | personal (always-on) | home PC (NUC), separate Compose stack managed by Portainer, images pulled from GHCR | `personal/v*` tag | manual — you promote only after the `develop` test run is green |
 | `docs` | docs | Azure App Service | `docs/v*` tag | manual (GitHub Environment) |
 | `integration` | integration | AKS — first publicly-reachable tier ("preview prod") | `integration/v*` tag | manual |
 | `main` | production | AKS — separate cluster/resource group from integration | `v*` (bare) tag | manual |
@@ -363,10 +363,46 @@ skill's reference docs and `aspire docs get`:
   cluster" step needed. integration and main get separate resource groups/subscription scoping
   (`Azure__ResourceGroup`/`Azure__SubscriptionId`, set per-branch in CI) — real isolation between
   the first public tier and true production, at the cost of two clusters.
-- Registry: **GHCR**. AKS auto-creates an ACR by default unless a registry is configured
-  explicitly — the override API needs confirming (`aspire docs api search` for container-registry
-  customization on `AddAzureKubernetesEnvironment`), plus a GHCR image-pull secret on the cluster
-  (PAT or `GITHUB_TOKEN`-based) so pods can pull private images.
+- Registry: **GHCR** — not just for `integration`/`main`'s AKS pull, but also `personal`'s own deploy
+  path (see "Revised: `personal` deploy model" below, which supersedes the "no registry round-trip"
+  assumption originally made for `personal`/`develop` in this section). AKS auto-creates an ACR by
+  default unless a registry is configured explicitly — the override API needs confirming (`aspire
+  docs api search` for container-registry customization on `AddAzureKubernetesEnvironment`), plus a
+  GHCR image-pull secret on the cluster (PAT or `GITHUB_TOKEN`-based) so pods can pull private
+  images.
+
+### Revised: `personal` deploy model — GHCR + Watchtower, not a self-hosted runner building locally
+
+**Superseded the original assumption above** (that `personal`/`develop` build and run containers
+directly on a self-hosted NUC runner, with no registry involved): `personal` now goes through GHCR,
+and no GitHub Actions runner lives on the NUC at all — only `develop`'s ephemeral smoke test still
+drives `aspire deploy` directly, on a GitHub-hosted runner, for a stack that's destroyed before the
+job even ends.
+
+- **Build**: `05-deploy-personal.yml`, on `ubuntu-latest`, builds `identity-server`/
+  `identity-platform` via `dotnet publish .../*.csproj -c Release --os linux --arch x64
+  /t:PublishContainer` (the .NET SDK's own container-publish target — daemon-less, no Dockerfile to
+  hand-maintain) and pushes each to `ghcr.io/dgastaldo/dgdevelopment-identity-{server,platform}`,
+  tagged `personal-<release-please version>`. A `docker buildx imagetools create` call then points
+  the floating `personal-latest` tag at that same manifest, purely via the registry API (no image
+  pull, no local Docker daemon involvement).
+- **Run**: the NUC runs `deploy/personal/docker-compose.yml` (versioned in this repo, copied onto the
+  NUC once per "One-time NUC setup" in `deploy/personal/README.md`) under **Portainer**, referencing
+  the two images by their `:personal-latest` tag.
+- **Update propagation**: a `identity-watchtower` container (`containrrr/watchtower`) runs alongside
+  the stack, polling GHCR every 5 minutes (`WATCHTOWER_POLL_INTERVAL`) for a changed `personal-latest`
+  digest and recreating just the two app containers when it finds one — no webhook, no GitOps polling
+  by Portainer itself, no inbound connection into the home network required at all.
+- **Rollback**: edit `docker-compose.yml`'s two `image:` tags from `:personal-latest` to a specific
+  `:personal-X.Y.Z` version and `docker compose up -d` — Watchtower leaves a pinned version tag alone
+  since it only watches `personal-latest`'s digest. See `deploy/personal/README.md` for the full
+  one-time setup and rollback walkthrough.
+
+This also means `personal` needs **no self-hosted runner, no inbound SSH/Actions-runner connection
+into the home network, and no Azure login** — `05-deploy-personal.yml` only needs GHCR push
+credentials (the default `GITHUB_TOKEN` already has `packages: write` once the workflow declares that
+permission) and runs entirely on GitHub-hosted infrastructure. The NUC's only outbound dependency is
+pulling from GHCR, same as any other Docker host.
 
 ## GitHub Actions layout (once implemented)
 
@@ -380,16 +416,18 @@ each environment's trigger/approval stays declarative:
   target-specific `Azure__*`/`Parameters__*` env vars from the caller. Input: which ref/tag to check
   out and deploy — defaults to `github.ref` (the tag that triggered the run), but overridable, which
   is what rollback (below) uses. **Not used by `develop`** — see `02-develop-quality-gate.yml` below.
-- **`02-develop-quality-gate.yml`** — `push: branches: [develop]` (i.e. every merge); self-hosted `dgnuc1`
-  (Ubuntu) runner; `environment: develop` (no required reviewer — scopes secrets only, doesn't gate).
+- **`02-develop-quality-gate.yml`** — `push: branches: [develop]` (i.e. every merge); GitHub-hosted
+  `ubuntu-latest`; `environment: develop` (no required reviewer — scopes secrets only, doesn't gate).
   Build → `aspire deploy` the Docker Compose stack (same mechanism as a real deploy, just an ephemeral
-  target) → wait for health → run `dotnet test` on `DgDevelopment.Identity.IntegrationTests` against
+  target, built and torn down entirely within the job — no registry round-trip, since nothing here
+  needs to persist) → run `dotnet test` on `DgDevelopment.Identity.IntegrationTests` against
   it → `aspire destroy` the stack unconditionally (success or failure) → report pass/fail. No tag,
   no promotion — that's a separate, manual action once this is green.
-- **`05-deploy-personal.yml`** — `push: tags: ['personal/v*']` + `workflow_dispatch` (manual rollback,
-  see below); same self-hosted runner; `environment: personal` (no-gate scoping, but the tag itself
-  only gets created after you've manually opened and merged the `develop→personal` promotion PR,
-  which is the real approval point).
+- **`05-deploy-personal.yml`** — `push: branches: [personal]` (the promotion merge itself) +
+  `workflow_dispatch` (manual rollback/re-run, see below); GitHub-hosted `ubuntu-latest`;
+  `environment: personal`. Builds and pushes the two app images to GHCR and re-points
+  `personal-latest` at them — does **not** touch the NUC directly. See "Revised: `personal` deploy
+  model" above for the full build→push→Watchtower-pull path.
 - **`deploy-docs.yml`** — `push: tags: ['docs/v*']` + `workflow_dispatch`; `environment: docs`;
   `ubuntu-latest`.
 - **`deploy-integration.yml`** — `push: tags: ['integration/v*']` + `workflow_dispatch`;
@@ -422,12 +460,11 @@ deploy.
 
 None of this can be done by editing the repo:
 
-1. **Self-hosted runner on the home PC** (Ubuntu, not Windows — corrected from an earlier
-   assumption) — register from repo Settings → Actions → Runners, choosing Linux/x64, labeled
-   `dgnuc1` (the NUC's hostname). Needs Docker + Compose installed, and the runner's user in the `docker` group
-   (`sudo usermod -aG docker $USER`, then re-login) so it can run `docker compose` without `sudo`.
-   Install as a systemd service via the runner package's `sudo ./svc.sh install && sudo ./svc.sh start`
-   rather than leaving it running in a foreground terminal.
+1. ~~Self-hosted runner on the home PC~~ — **superseded**: no GitHub Actions runner lives on the NUC
+   at all. `develop`'s ephemeral stack and `personal`'s image build both run on GitHub-hosted
+   `ubuntu-latest`; `personal`'s actual deploy is pull-based (GHCR + Watchtower, see "Revised:
+   `personal` deploy model" above), so the NUC only ever needs Docker + Compose + Portainer installed
+   (no runner, no inbound Actions connection) — see `deploy/personal/README.md`'s one-time setup.
 2. **GitHub Environments** — create all five: `docs`, `integration`, `production` each with a
    required reviewer (the actual approval gate); `personal` and `develop` too, but with **no**
    protection rules — an Environment without a required reviewer still deploys automatically, it
@@ -789,9 +826,12 @@ not now).
 12. Azure Notification Hub for `personal` (not urgent for `develop` — see "Shared or per-environment
     resources?" above) + Communication Services (shared, once its consuming code exists) — optional,
     not blocking the first deploys.
-13. ~~GHCR package visibility~~ — **not needed for `personal`/`develop`**: the self-hosted runner
-    *is* the deploy target machine, so `docker compose`/`aspire deploy` build and run images
-    locally with no registry round-trip. GHCR only matters later, for `integration`/`main` on AKS.
+13. **GHCR package visibility** — confirm `ghcr.io/dgastaldo/dgdevelopment-identity-server` and
+    `-identity-platform` are visible to the NUC's `docker login` credential (a fine-grained PAT with
+    `read:packages`, per `deploy/personal/README.md`'s one-time setup) — needed now for `personal`
+    too, not just later for `integration`/`main` on AKS, since the original "no registry round-trip"
+    assumption for `personal`/`develop` no longer holds (see "Revised: `personal` deploy model"
+    above).
 14. Self-signed Windows code-signing certificate generated, exported, and stored as the two
     `WINDOWS_SIGNING_CERT_*` repository secrets — see "`Client.Maui` distribution" above.
 15. **`PROMOTE_PAT` fine-grained PAT** (Contents: write, Pull requests: write, scoped to this repo)
