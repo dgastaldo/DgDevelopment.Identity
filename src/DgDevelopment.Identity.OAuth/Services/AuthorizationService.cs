@@ -49,7 +49,7 @@ public sealed class AuthorizationService(IClientRepository clientRepository, IAu
 
         var authCode = new AuthorizationCode(
             request.TenantId, codeHash, request.Client.Id, request.User.Id, new Uri(request.RedirectUri),
-            request.Scopes, request.CodeChallenge, request.CodeChallengeMethod);
+            [.. request.Scopes], request.CodeChallenge, request.CodeChallengeMethod);
         await codeRepository.AddAsync(authCode, ct).ConfigureAwait(false);
 
         return code;
