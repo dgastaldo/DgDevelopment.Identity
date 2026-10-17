@@ -159,7 +159,7 @@ public sealed class TokenService(
 
         var refreshTokenValue = DgDevelopment.Identity.Domain.ValueObjects.Secret.Generate(64);
         var refreshTokenHash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(refreshTokenValue)));
-        var refreshToken = new RefreshToken(tenantId, refreshTokenHash, client.Id, user.Id, session.Id, scopes, previousTokenId);
+        var refreshToken = new RefreshToken(tenantId, refreshTokenHash, client.Id, user.Id, session.Id, scopes, new RefreshTokenOptions(previousTokenId));
         await refreshTokenRepo.AddAsync(refreshToken, ct).ConfigureAwait(false);
 
         return new(accessToken, "Bearer", 3600, idToken, refreshTokenValue, string.Join(' ', scopes));

@@ -9,24 +9,22 @@ public sealed class AuditService(
     IAuditLogRepository repository,
     IHttpContextAccessor httpContextAccessor) : IAuditService
 {
-    public async Task RecordAsync(string action, AuditOutcome outcome, Guid tenantId, Guid? actorId = null, string? actorType = null,
-        string? targetId = null, string? targetType = null, string? details = null, CancellationToken ct = default)
+    public async Task RecordAsync(AuditEvent auditEvent, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(auditEvent);
+
         var context = httpContextAccessor.HttpContext;
-        actorId ??= Guid.TryParse(context?.User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? context?.User.FindFirstValue("sub"), out var parsedActorId) ? parsedActorId : null;
+        var actorId = auditEvent.ActorId ?? (Guid.TryParse(context?.User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? context?.User.FindFirstValue("sub"), out var parsedActorId) ? parsedActorId : null);
 
         var entry = new AuditLog(
-            tenantId,
-            action,
-            outcome,
-            actorId,
-            actorType ?? (actorId.HasValue ? "user" : "system"),
-            targetId,
-            targetType,
-            details,
-            context?.Connection.RemoteIpAddress?.ToString(),
-            context?.Request.Headers.UserAgent.ToString());
+            auditEvent.TenantId,
+            auditEvent.Action,
+            auditEvent.Outcome,
+            new AuditActorInfo(actorId, auditEvent.ActorType ?? (actorId.HasValue ? "user" : "system")),
+            new AuditTargetInfo(auditEvent.TargetId, auditEvent.TargetType),
+            auditEvent.Details,
+            new AuditRequestContext(context?.Connection.RemoteIpAddress?.ToString(), context?.Request.Headers.UserAgent.ToString()));
 
         await repository.AddAsync(entry, ct).ConfigureAwait(false);
     }

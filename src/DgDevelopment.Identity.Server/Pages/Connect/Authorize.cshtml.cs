@@ -148,7 +148,7 @@ public sealed class AuthorizeModel : PageModel
 
         var scopes = Scope.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var code = await _authorizationService.CreateAuthorizationCodeAsync(
-            tenantId, client, user, scopes, RedirectUri, CodeChallenge, CodeChallengeMethod).ConfigureAwait(false);
+            new AuthorizationCodeRequest(tenantId, client, user, scopes, RedirectUri, CodeChallenge, CodeChallengeMethod)).ConfigureAwait(false);
 
         var redirect = $"{RedirectUri}?code={Uri.EscapeDataString(code)}";
         if (State != null)

@@ -2,6 +2,7 @@ namespace DgDevelopment.Identity.Server.UnitTests.MultiTenant;
 
 using DgDevelopment.Identity.Application.Audit;
 using DgDevelopment.Identity.Domain.Entities;
+using DgDevelopment.Identity.Domain.Repositories;
 using DgDevelopment.Identity.Infrastructure.Data;
 using DgDevelopment.Identity.Infrastructure.Repositories;
 using DgDevelopment.Identity.Server.UnitTests.Testing;
@@ -31,7 +32,7 @@ public sealed class AuditLogServiceTests : IClassFixture<DatabaseFixture<AuditLo
 
     private static async Task AddLogAsync(IdentityDbContext context, Guid tenantId, string action, string? targetId = null, AuditOutcome outcome = AuditOutcome.Success)
     {
-        context.AuditLogs.Add(new AuditLog(tenantId, action, outcome, targetId: targetId));
+        context.AuditLogs.Add(new AuditLog(tenantId, action, outcome, target: new AuditTargetInfo(targetId)));
         await context.SaveChangesAsync();
     }
 
@@ -45,8 +46,8 @@ public sealed class AuditLogServiceTests : IClassFixture<DatabaseFixture<AuditLo
         await AddLogAsync(context, tenantB.Id, "tenant-b.action");
         var service = CreateService(context);
 
-        var scopedResult = await service.GetPagedAsync(tenantA.Id, allTenants: false, null, null, null, null, null, null, 1, 100);
-        var globalResult = await service.GetPagedAsync(tenantA.Id, allTenants: true, null, null, null, null, null, null, 1, 1000);
+        var scopedResult = await service.GetPagedAsync(new AuditLogFilter(tenantA.Id, AllTenants: false), 1, 100);
+        var globalResult = await service.GetPagedAsync(new AuditLogFilter(tenantA.Id, AllTenants: true), 1, 1000);
 
         Assert.Contains(scopedResult.Items, a => a.Action == "tenant-a.action");
         Assert.DoesNotContain(scopedResult.Items, a => a.Action == "tenant-b.action");
@@ -63,7 +64,7 @@ public sealed class AuditLogServiceTests : IClassFixture<DatabaseFixture<AuditLo
         await AddLogAsync(context, tenant.Id, "user.logout");
         var service = CreateService(context);
 
-        var result = await service.GetPagedAsync(tenant.Id, allTenants: false, null, null, "user.login", null, null, null, 1, 100);
+        var result = await service.GetPagedAsync(new AuditLogFilter(tenant.Id, AllTenants: false, Action: "user.login"), 1, 100);
 
         Assert.All(result.Items, a => Assert.Equal("user.login", a.Action));
         Assert.Single(result.Items);
@@ -79,7 +80,7 @@ public sealed class AuditLogServiceTests : IClassFixture<DatabaseFixture<AuditLo
         await AddLogAsync(context, tenant.Id, "role.create", targetId: Guid.NewGuid().ToString());
         var service = CreateService(context);
 
-        var result = await service.GetPagedAsync(tenant.Id, allTenants: false, null, null, "role.create", targetId, null, null, 1, 100);
+        var result = await service.GetPagedAsync(new AuditLogFilter(tenant.Id, AllTenants: false, Action: "role.create", TargetId: targetId), 1, 100);
 
         var entry = Assert.Single(result.Items);
         Assert.Equal(targetId, entry.TargetId);
@@ -94,7 +95,7 @@ public sealed class AuditLogServiceTests : IClassFixture<DatabaseFixture<AuditLo
             await AddLogAsync(context, tenant.Id, $"action-{i}");
         var service = CreateService(context);
 
-        var firstPage = await service.GetPagedAsync(tenant.Id, allTenants: false, null, null, null, null, null, null, 1, 2);
+        var firstPage = await service.GetPagedAsync(new AuditLogFilter(tenant.Id, AllTenants: false), 1, 2);
 
         Assert.Equal(2, firstPage.Items.Count);
         Assert.Equal(5, firstPage.TotalCount);

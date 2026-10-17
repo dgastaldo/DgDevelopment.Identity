@@ -47,7 +47,7 @@ public sealed class TenantsController(
         try
         {
             var result = await provisioningService.ProvisionAsync(request.Name, request.Slug, ct: ct).ConfigureAwait(false);
-            await auditService.RecordAsync("tenant.create", AuditOutcome.Success, result.Tenant.Id, targetId: result.Tenant.Id.ToString(), targetType: "tenant", ct: ct).ConfigureAwait(false);
+            await auditService.RecordAsync(new AuditEvent("tenant.create", AuditOutcome.Success, result.Tenant.Id, TargetId: result.Tenant.Id.ToString(), TargetType: "tenant"), ct).ConfigureAwait(false);
             return CreatedAtAction(nameof(GetTenants), null, TenantAdminResponse.From(result.Tenant));
         }
         catch (ArgumentException ex)
@@ -81,8 +81,9 @@ public sealed class TenantsController(
         if (request.IsActive) tenant.Activate(); else tenant.Deactivate();
         await tenantRepository.UpdateAsync(tenant, ct).ConfigureAwait(false);
 
-        await auditService.RecordAsync(request.IsActive ? "tenant.activate" : "tenant.deactivate", AuditOutcome.Success,
-            tenant.Id, targetId: tenant.Id.ToString(), targetType: "tenant", ct: ct).ConfigureAwait(false);
+        await auditService.RecordAsync(
+            new AuditEvent(request.IsActive ? "tenant.activate" : "tenant.deactivate", AuditOutcome.Success,
+                tenant.Id, TargetId: tenant.Id.ToString(), TargetType: "tenant"), ct).ConfigureAwait(false);
         return Ok(TenantAdminResponse.From(tenant));
     }
 }
