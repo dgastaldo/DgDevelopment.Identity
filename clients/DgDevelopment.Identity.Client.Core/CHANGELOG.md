@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.1](https://github.com/dgastaldo/DgDevelopment.Identity/compare/client-core-v0.2.0...client-core-v0.2.1) (2026-10-17)
+
+
+### Bug Fixes
+
+* get new-code coverage back above the Sonar gate's 80% threshold ([43a54ce](https://github.com/dgastaldo/DgDevelopment.Identity/commit/43a54ce3a105f2ef454acc99ee882bec237d1d0c))
+* resolve SessionEventClient bug and ~30 SonarCloud code smells ([6094735](https://github.com/dgastaldo/DgDevelopment.Identity/commit/609473574e3b23c95199a537f1d7ba8db5f82cb0))
+* resolve SonarCloud reliability bugs and minor vulnerabilities ([055a2c5](https://github.com/dgastaldo/DgDevelopment.Identity/commit/055a2c5cc77ae69f1f683025ad1ca8b5b705fe3b))
+
 ## [0.2.0](https://github.com/dgastaldo/DgDevelopment.Identity/compare/client-core-v0.1.0...client-core-v0.2.0) (2026-09-26)
 
 
