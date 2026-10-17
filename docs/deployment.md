@@ -6,12 +6,16 @@ Living design doc, mostly implemented as of 2026-09-12. Originally written 2026-
 reference/planning-only document; the design has since been built out: `AppHost.cs`'s per-target
 `deploy-target` switch, all six numbered workflows (`01-pr-quality-gate.yml` through
 `06-publish-client-maui.yml`), the release-please config for all seven components, and the manual
-out-of-band setup (self-hosted runner `dgnuc1`, `develop`/`personal` GitHub Environments,
-`PROMOTE_PAT`, Snyk, self-hosted SonarQube) are all in place — see "Implementation plan" at the
-bottom for the itemized checklist. Not yet exercised end-to-end (no PR has gone through
-`01-pr-quality-gate.yml` yet), and `docs`/`integration`/`main`'s own Azure infrastructure is still
-entirely unprovisioned — those branches' deploy workflows don't exist yet, only `develop`/`personal`
-do. See "Open items" for what's still genuinely undecided.
+out-of-band setup (`develop`/`personal` GitHub Environments, `PROMOTE_PAT`, Snyk, SonarCloud) are
+all in place — see "Implementation plan" at the bottom for the itemized checklist. **Revised since
+first written: every workflow job runs on GitHub-hosted runners (`ubuntu-latest`/`windows-latest`) —
+no self-hosted runner on the NUC** (deliberately moved off one, since `01-pr-quality-gate.yml`
+triggers on every PR including, once the repo is public, PRs from forks, and a self-hosted runner
+must never execute untrusted PR code); **and SonarCloud, not a self-hosted SonarQube instance** —
+see "Quality Gate tooling" and "Revised: `personal` deploy model" below for both corrections. Not
+yet exercised fully end-to-end for `docs`/`integration`/`main` — those branches' own Azure
+infrastructure is still entirely unprovisioned, so their deploy workflows don't exist yet, only
+`develop`/`personal` do. See "Open items" for what's still genuinely undecided.
 
 ## Goal
 
@@ -279,8 +283,8 @@ GitHub Environment one, since `06-publish-client-maui.yml` isn't gated behind an
 New workflow, **`06-publish-client-maui.yml`**, triggered on `push: tags: ['client-maui-v*']`:
 
 1. Check out at that tag.
-2. Build `net10.0-windows10.0.19041.0` (`windows-latest` GitHub-hosted runner — this doesn't need
-   the home-PC self-hosted runner, it's a stateless build) twice:
+2. Build `net10.0-windows10.0.19041.0` (`windows-latest` GitHub-hosted runner — a stateless build,
+   same GitHub-hosted model as every other job in this pipeline) twice:
    - Unpackaged (`WindowsPackageType=None`, today's default) → zip the output.
    - Packaged (`WindowsPackageType=MSIX`), signed with the certificate decoded from the two secrets
      above → produces the `.msix`. Exact MSBuild properties (`PackageCertificateKeyFile`/
@@ -497,28 +501,21 @@ None of this can be done by editing the repo:
    that to fire the matching `deploy-*.yml`, it needs a real PAT instead. Generate a fine-grained
    Personal Access Token scoped to just this repo with **Contents: write** and **Pull requests:
    write** permissions, store it as the `PROMOTE_PAT` repository secret.
-8. **GitHub CLI (`gh`) on `dgnuc1`** — decided to run everything Linux-compatible on the self-hosted
-   runner rather than `ubuntu-latest` (`snyk`, `04-promote.yml`, `03-release-please.yml`,
-   `06-publish-client-maui.yml`'s `build-android`/`release` jobs). GitHub-hosted runners come with
-   `gh` preinstalled; self-hosted ones don't. `04-promote.yml` and the `release` job in
-   `06-publish-client-maui.yml` both call `gh` directly, so install it on the NUC (the official apt
-   repo — `gh`'s own install docs cover Ubuntu) before those jobs will succeed there. Everything else
-   moved to `dgnuc1` needs nothing beyond what's already there (.NET for Snyk's CLI to shell out to
-   when resolving NuGet dependencies, Node for `release-please-action` — bundled with the runner
-   agent itself, not a separate install).
-9. **A Windows self-hosted runner — not set up yet, tracked here for later.** `06-publish-client-maui.yml`'s
-   `build-windows` job is the one holdout still on `windows-latest`: building/signing the MSIX
-   genuinely needs the Windows/WinUI toolchain, which `dgnuc1` (Ubuntu) can't provide. Once a Windows
-   machine is available, register it as a second self-hosted runner (Settings → Actions → Runners →
-   New self-hosted runner → Windows/x64, its own label e.g. `dgwin1`) and repoint that one job's
-   `runs-on` at it — everything else in the pipeline is already off GitHub-hosted runners.
+8. ~~GitHub CLI (`gh`) on `dgnuc1`~~ — **superseded, nothing to do**: every job (`snyk`,
+   `04-promote.yml`, `03-release-please.yml`, `06-publish-client-maui.yml`'s `build-android`/
+   `release` jobs included) runs on GitHub-hosted runners, which already ship `gh` preinstalled.
+9. ~~A Windows self-hosted runner~~ — **superseded, nothing to do**: `06-publish-client-maui.yml`'s
+   `build-windows` job runs on GitHub-hosted `windows-latest`, which already has the Windows/WinUI
+   toolchain needed to build and sign the MSIX. No self-hosted machine of any OS is needed anywhere
+   in this pipeline.
 
 ## Azure infrastructure for `develop`/`personal`
 
-`develop` and `personal` still run entirely on a home PC (Ubuntu, Docker Compose, self-hosted
-runner) — that hasn't changed, and neither needs an Azure *subscription* just to deploy the app
-itself. Two pieces are genuinely cloud-only services the code already calls or will call — nothing
-to do with hosting, and both entirely optional to provision right now:
+`personal` still runs entirely on a home PC (the NUC, Ubuntu, Docker Compose under Portainer, images
+pulled from GHCR — see "Revised: `personal` deploy model" above), and `develop`'s ephemeral stack
+runs entirely on a GitHub-hosted runner — neither needs an Azure *subscription* just to deploy the
+app itself. Two pieces are genuinely cloud-only services the code already calls or will call —
+nothing to do with hosting, and both entirely optional to provision right now:
 
 - **Azure Notification Hub (ANH)** — already wired in code (`AzureNotificationHubNotifier`,
   the only `IPushNotifier` implementation) for push-MFA challenge delivery. It no-ops silently if
@@ -653,8 +650,9 @@ diagnosable from the workflow run itself without needing anything to persist on 
 ## Quality Gate tooling — decided (phase 1, revised)
 
 **Decided**: three checks on every PR into `develop`, all free — coverage threshold, Snyk, and
-self-hosted SonarQube (moved up from "phase 2, deferred" — see below for why). **CodeQL was tried
-and removed** — see its own note below.
+SonarCloud (moved up from "phase 2, deferred" — see below for why). **CodeQL runs too, but via
+GitHub's Default Setup rather than a custom workflow job** — see its own note below for why that
+path won out over a hand-rolled `codeql-action` job.
 
 - **Coverage threshold in CI** — the repo already produces coverage via ReportGenerator
   (`TestResults\html`, see `CONTEXT.md`'s test suite bullet). Add a CI step that runs the test
@@ -671,55 +669,59 @@ and removed** — see its own note below.
   no dotnet-specific replacement; the generic setup-action-plus-CLI path is what Snyk recommends
   instead. Also drops the Docker-container overhead the old action had (`docker run
   snyk/snyk:dotnet`) in favor of shelling out to the .NET SDK already on the runner.
-- **SonarQube Community Edition, self-hosted** — moved from deferred to decided now: you want to run
-  it on your own NUC (the same Ubuntu machine as the self-hosted runner) rather than pay for
-  SonarCloud, which changes the cost/effort calculus that justified deferring it. Runs as a Docker
-  container alongside Postgres (its backing store) — since it's the same machine as the runner, the
-  CI step reaches it over `localhost`/the Docker network, no cross-machine networking or public
-  exposure needed; the analysis never leaves your home network. CI wraps the build with
-  `dotnet-sonarscanner` (`begin` → `dotnet build` → `dotnet test` → `end`), pointed at your local
-  SonarQube URL + a project token. Covers code smells, duplication, and maintainability, plus
-  Security Hotspots — security-sensitive code flagged for manual review (not the deeper
-  dataflow/taint-tracking CodeQL does, but real coverage). The solution is mixed-language (.NET +
-  TS/JS in `Client.React`) — `dotnet-sonarscanner` wraps the general SonarScanner engine, which
-  analyzes every recognized language it finds under `sonar.sources` in the same pass, not just C#.
-  The CI job just needs a Node.js runtime available (for the bundled JS/TS sensor) and
-  `node_modules`/`bin`/`obj`/`dist` excluded from analysis — no separate scanner run or second
-  SonarQube project needed for the React client.
+- **SonarCloud** — **superseded the original "self-hosted SonarQube on the NUC" plan**: once the
+  decision to run every workflow job on GitHub-hosted runners was made (see "Status" above), self-
+  hosting SonarQube on the NUC would have meant either exposing it to the internet (so GitHub-hosted
+  runners could reach it) or routing CI traffic back through a home-network tunnel — both worse than
+  just using SonarCloud's free tier for a public/private-personal repo. CI wraps the build with
+  `dotnet-sonarscanner` (`begin` → `dotnet build` → `dotnet test` → `end`), pointed at
+  `sonarcloud.io` (`SONAR_TOKEN` repository secret, `SONAR_ORGANIZATION` repository variable — no
+  `SONAR_HOST_URL` needed, it defaults there) instead of a local instance. Covers code smells,
+  duplication, and maintainability, plus Security Hotspots — security-sensitive code flagged for
+  manual review (not the deeper dataflow/taint-tracking CodeQL does, but real coverage). The solution
+  is mixed-language (.NET + TS/JS in `Client.React`) — `dotnet-sonarscanner` wraps the general
+  SonarScanner engine, which analyzes every recognized language it finds under `sonar.sources` in the
+  same pass, not just C#. The CI job just needs a Node.js runtime available (for the bundled JS/TS
+  sensor) and `node_modules`/`bin`/`obj`/`dist` excluded from analysis — no separate scanner run or
+  second SonarCloud project needed for the React client. Runs twice: as PR decoration on every PR
+  into `develop` (`01-pr-quality-gate.yml`) and as a plain branch analysis on every push to `develop`
+  (`02-develop-quality-gate.yml`'s `sonar` job) — the latter is what makes SonarCloud treat `develop`
+  as a real analyzed branch instead of showing "branch not analyzed."
 
-### CodeQL — tried, then removed (revisit on a paid GitHub tier)
+### CodeQL — tried as a custom job, hit friction, now runs via GitHub's Default Setup instead
 
-Added initially as a fourth, free, GitHub-native security scanner. Dropped after hitting three
-compounding problems, none fatal individually but adding up to more friction than it was worth for
-now:
+Added initially as a fourth, free, GitHub-native security scanner, as an explicit workflow job
+(`codeql-action/analyze`). Hit three compounding problems with that approach, none fatal
+individually but adding up to more friction than it was worth:
 
-1. **No code-scanning upload on this plan.** GitHub code scanning (the Security-tab feature
-   `codeql-action/analyze` uploads SARIF to) isn't available for private repos below GitHub Team/
-   Enterprise — confirmed against GitHub's own docs after `analyze` failed with "Code scanning is
-   not enabled for this repository." Worked around with `upload: never` + attaching the SARIF as a
-   plain workflow artifact, which technically ran, but with no inline PR annotations or Security
-   tab, most of CodeQL's usual value was already gone.
+1. **No code-scanning upload on this plan, originally.** GitHub code scanning (the Security-tab
+   feature `codeql-action/analyze` uploads SARIF to) wasn't available for private repos below GitHub
+   Team/Enterprise at the time — confirmed against GitHub's own docs after `analyze` failed with
+   "Code scanning is not enabled for this repository." Worked around with `upload: never` +
+   attaching the SARIF as a plain workflow artifact, which technically ran, but with no inline PR
+   annotations or Security tab, most of CodeQL's usual value was already gone.
 2. **`autobuild` couldn't handle this repo's shape.** It found `DgDevelopment.Identity.slnx` and
    tried to build the *entire* solution, including `Client.Maui`'s `net10.0-android` target — which
    needs the `maui-android` workload, not present by default, so the whole build failed. Fixed by
    replacing `autobuild` with an explicit build of just the AppHost's dependency graph + test
-   projects (the same buildable-on-Linux subset `build-test-sonar` already builds), but that's more
-   hand-maintained surface area for something that was supposed to be a low-effort addition.
-3. **A third job competing for `dgnuc1`'s one execution slot.** Once moved to the self-hosted runner
-   (see "everything self-hosted" below), CodeQL needed an explicit `needs` chain (`snyk` →
-   `codeql` → `build-test-sonar`) to avoid racing the other two jobs for the runner's single
-   concurrent-job capacity — workable, but it's real overlap with SonarQube's Security Hotspots
-   (both flag security-sensitive code) for a check whose main differentiator (deeper
-   dataflow/taint-tracking) wasn't reaching anywhere visible anyway given point 1.
+   projects, but that's more hand-maintained surface area for something that was supposed to be a
+   low-effort addition.
+3. **A third job's build-mode/version maintenance burden**, with real overlap with SonarCloud's
+   Security Hotspots (both flag security-sensitive code) for a check whose main differentiator
+   (deeper dataflow/taint-tracking) wasn't reaching anywhere visible anyway given point 1.
 
-**Decision: remove it for now, revisit if/when this repo moves to a paid GitHub tier** (Team or
-Enterprise) that actually unlocks code-scanning upload for private repos — at that point CodeQL's
-upload-based value proposition (inline PR annotations, Security tab, no artifact-digging) is real
-again and worth the reintroduction.
+**Current setup: CodeQL's custom workflow job was dropped in favor of GitHub's own Default Setup**
+(repo Settings → Code security → Code scanning), configured once outside the repo rather than
+maintained as a workflow file — simpler, no CodeQL Action version/build-mode upkeep, and a custom
+("advanced configuration") job can't run alongside Default Setup anyway (GitHub rejects the SARIF
+upload when both are active). Default Setup runs its own `Analyze (csharp)`/`Analyze (actions)`/
+`Analyze (javascript-typescript)` checks on every PR and push to `develop`, visible as ordinary
+check runs — superseding point 1 above now that code-scanning upload/Default Setup is available for
+this repo.
 
-Ordering in the PR pipeline: Snyk (dependency scan, fast) → build → SonarQube scan + coverage
-(wraps the test run). Both jobs run on `dgnuc1` (see "Manual, out-of-band setup" item 8), chained
-with `needs` since the single self-hosted runner has one execution slot.
+Ordering in the PR pipeline (`01-pr-quality-gate.yml`): Snyk (dependency scan, fast) → build →
+SonarCloud scan + coverage (wraps the test run), both on GitHub-hosted `ubuntu-latest`. CodeQL's
+Default Setup runs independently, outside this workflow's own job graph.
 
 ## Open items
 
@@ -734,8 +736,10 @@ with `needs` since the single self-hosted runner has one execution slot.
   `personal` Environments, created with no required reviewer so they stay ungated) — not Azure Key
   Vault as first proposed. Simpler, no Azure login needed for these two branches at all, at the cost
   of secrets sitting in GitHub rather than a dedicated secrets service. Also corrected: the actual
-  home PC for `develop`/`personal` is **Ubuntu**, not Windows as first assumed — the self-hosted
-  runner setup and `02-develop-quality-gate.yml`/`05-deploy-personal.yml` target Linux accordingly.
+  home PC (the NUC) hosting `personal` is **Ubuntu**, not Windows as first assumed. Also later
+  revised: `02-develop-quality-gate.yml`/`05-deploy-personal.yml` both ended up on GitHub-hosted
+  `ubuntu-latest` rather than a runner on that NUC — see "Status" at the top and "Revised: `personal`
+  deploy model" above.
 - ~~Tag creation process~~ → **automatic**, via `04-promote.yml` for app deploy tags (date+run-number
   scheme), and via **release-please** for `Client.Core`/`Client.Blazor`/`Client.Maui`/`Client.Wpf`/
   `Client.React`/`Server`/`IdentityPlatform` (real semver from Conventional Commits).
@@ -763,9 +767,10 @@ with `needs` since the single self-hosted runner has one execution slot.
   promotion PR on its own.
 - ~~Add a Quality Gate scanner before the test suite?~~ → **Snyk**, confirmed — dependency + Docker
   image vulnerability scanning, runs early (fail fast, before the test suite).
-- ~~SonarQube/SonarCloud, still deferred?~~ → **No longer deferred** — self-hosted SonarQube
-  Community Edition on your own NUC (the same Ubuntu machine as the runner), decided now rather than
-  phase 2, since self-hosting removes the cost/ops reason it was deferred for.
+- ~~SonarQube/SonarCloud, still deferred?~~ → **No longer deferred** — SonarCloud (free tier),
+  decided now rather than phase 2. Originally planned as self-hosted SonarQube on the NUC, revised
+  to SonarCloud once every workflow job moved to GitHub-hosted runners (self-hosting would have
+  meant exposing it to the internet or tunneling CI traffic home) — see "Quality Gate tooling" above.
 
 **Still open:**
 
@@ -799,9 +804,9 @@ not now).
    provisioned — `personal`/`develop`'s workflows are self-contained for now, not worth abstracting
    with only one real caller each.
 4. ✅ `.github/workflows/01-pr-quality-gate.yml` on `develop` PRs: Snyk → build/test/coverage threshold
-   wrapped by the SonarQube scan (CodeQL tried and removed — see "Quality Gate tooling" above).
-   **Will fail until its secrets exist** (`SNYK_TOKEN`, `SONAR_HOST_URL`, `SONAR_TOKEN`, per items
-   10-11 below) — expected, not a bug.
+   wrapped by the SonarCloud scan (CodeQL runs via GitHub's Default Setup instead of a job here — see
+   "Quality Gate tooling" above). **Will fail until its secrets exist** (`SNYK_TOKEN`, `SONAR_TOKEN`,
+   plus the `SONAR_ORGANIZATION` repository variable, per items 10-11 below) — expected, not a bug.
 5. ✅ `.github/workflows/03-release-please.yml` (triggered on push to `develop`) + its manifest config
    for all seven components: the five `clients/*` projects (`Client.React` included once discovered
    mid-implementation — see above) plus `Server`/`IdentityPlatform` (added later — see "Client and
@@ -814,14 +819,16 @@ not now).
 
 **Needs your Azure/GitHub/NUC access, can happen in parallel with the above:**
 
-8. Self-hosted runner registered on the home PC (Ubuntu/Linux setup).
+8. ~~Self-hosted runner registered on the home PC~~ — **superseded, nothing to do**: every workflow
+   job runs on GitHub-hosted runners. The NUC instead needs Docker + Compose + Portainer for
+   `personal`'s own stack — see `deploy/personal/README.md`'s one-time setup.
 9. `develop` and `personal` GitHub Environments created (no required reviewer) + `personal`'s
    secrets populated (`Parameters__IdentityDb` isn't needed for either once step 2 lands — Aspire
-   provisions and wires the containerized DB itself; `develop` mainly needs Snyk/SonarQube-related
+   provisions and wires the containerized DB itself; `develop` mainly needs Snyk/SonarCloud-related
    secrets, see below).
-10. **SonarQube Community Edition + Postgres** running as containers on the NUC (same machine as the
-    runner) — reachable from the runner over `localhost`/Docker network; generate a project token
-    for the `dotnet-sonarscanner` CI step.
+10. **SonarCloud project** — create the project at sonarcloud.io, linked to this repo, generate a
+    project token for the `dotnet-sonarscanner` CI step (`SONAR_TOKEN`), and set the
+    `SONAR_ORGANIZATION` repository variable. No NUC/Postgres/self-hosting involved.
 11. **Snyk account + API token**, stored as a repository secret for the CI scan step.
 12. Azure Notification Hub for `personal` (not urgent for `develop` — see "Shared or per-environment
     resources?" above) + Communication Services (shared, once its consuming code exists) — optional,
