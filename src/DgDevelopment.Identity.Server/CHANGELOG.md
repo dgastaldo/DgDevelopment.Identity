@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.1](https://github.com/dgastaldo/DgDevelopment.Identity/compare/server-v0.2.0...server-v0.2.1) (2026-10-17)
+
+
+### Bug Fixes
+
+* resolve another ~15 SonarCloud code smells ([79cf1a0](https://github.com/dgastaldo/DgDevelopment.Identity/commit/79cf1a05c767b12182eb034aae40c42d7bab28f9))
+* resolve SessionEventClient bug and ~30 SonarCloud code smells ([6094735](https://github.com/dgastaldo/DgDevelopment.Identity/commit/609473574e3b23c95199a537f1d7ba8db5f82cb0))
+* resolve SonarCloud reliability bugs and minor vulnerabilities ([055a2c5](https://github.com/dgastaldo/DgDevelopment.Identity/commit/055a2c5cc77ae69f1f683025ad1ca8b5b705fe3b))
+
 ## [0.2.0](https://github.com/dgastaldo/DgDevelopment.Identity/compare/server-v0.1.0...server-v0.2.0) (2026-09-26)
 
 
