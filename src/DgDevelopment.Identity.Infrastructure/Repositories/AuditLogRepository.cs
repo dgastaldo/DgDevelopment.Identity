@@ -22,6 +22,7 @@ public sealed class AuditLogRepository : IAuditLogRepository
 
     public async Task<IReadOnlyCollection<AuditLog>> GetPagedAsync(AuditLogFilter filter, int skip = 0, int take = 50, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(filter);
         var query = Filter(filter);
 
         return await query
@@ -33,6 +34,7 @@ public sealed class AuditLogRepository : IAuditLogRepository
 
     public async Task<int> CountAsync(AuditLogFilter filter, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(filter);
         var query = Filter(filter);
         return await query.CountAsync(ct).ConfigureAwait(false);
     }

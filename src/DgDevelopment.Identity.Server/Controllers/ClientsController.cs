@@ -76,6 +76,7 @@ public sealed class ClientsController(
     [RequirePermission("identity-platform.client.update")]
     public Task<IActionResult> UpdateClient(Guid id, [FromBody] UpdateClientRequest request, [FromQuery] bool allTenants, CancellationToken ct)
     {
+        ArgumentNullException.ThrowIfNull(request);
         var command = new UpdateClientCommand(
             request.Name, request.RequireConsent, request.PlatformId,
             request.GrantTypes ?? [], request.Scopes ?? [], request.RedirectUris ?? [],

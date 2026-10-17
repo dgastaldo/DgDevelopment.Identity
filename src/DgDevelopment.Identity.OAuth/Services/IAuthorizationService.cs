@@ -3,7 +3,7 @@ using DgDevelopment.Identity.Domain.Entities;
 namespace DgDevelopment.Identity.OAuth.Services;
 
 public sealed record AuthorizationCodeRequest(
-    Guid TenantId, Client Client, User User, string[] Scopes, string RedirectUri,
+    Guid TenantId, Client Client, User User, IReadOnlyList<string> Scopes, string RedirectUri,
     string? CodeChallenge = null, string? CodeChallengeMethod = null);
 
 public interface IAuthorizationService
