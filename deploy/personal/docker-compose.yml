@@ -50,10 +50,24 @@ services:
       # Where the admin OAuth client's redirect URIs need to point for a browser login to work -
       # the ones seeded by default are Aspire's local dev ports only. See DbSeeder.EnsureAdminClientRedirectUriAsync.
       AdminPlatformBaseUrl: ${IDENTITY_PLATFORM_PUBLIC_URL}
+      # Every host this server may legitimately see itself issue tokens as (see Program.cs's
+      # ValidIssuers comment) - the Docker-internal hostname identity-platform's server-side calls
+      # use, and the LAN address a browser uses. Add a real public domain here too once this
+      # server is reachable from outside the LAN.
+      Identity__Issuer: http://identity-server:8080,${IDENTITY_SERVER_PUBLIC_URL}
     volumes:
       - admin-client-config:/shared
     ports:
       - "8081:8080"
+    healthcheck:
+      # SeedAsync runs before Kestrel starts accepting requests (Program.cs), so a successful
+      # /health response already implies seeding finished - identity-platform's depends_on below
+      # relies on exactly that, instead of racing it (see deploy/personal/README.md).
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
     labels:
       com.centurylinklabs.watchtower.enable: "true"
 
@@ -61,7 +75,8 @@ services:
     image: ghcr.io/dgastaldo/dgdevelopment-identity-platform:personal-latest
     restart: unless-stopped
     depends_on:
-      - identity-server
+      identity-server:
+        condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080

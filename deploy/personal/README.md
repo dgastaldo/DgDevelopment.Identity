@@ -26,6 +26,20 @@ before `identity-server` (which runs as a non-root user) ever needs to write to 
 first seed or `rotate-admin-client-secret` fails with `UnauthorizedAccessException: Access to the
 path '/shared/admin-client-config.json' is denied`.
 
+`identity-server`'s healthcheck (`curl -f http://localhost:8080/health`) only turns healthy once
+seeding has finished - `SeedAsync` runs before Kestrel starts accepting requests, so a successful
+health response already implies it's done. `identity-platform`'s `depends_on: condition:
+service_healthy` relies on exactly that instead of racing it: starting before seeding finishes
+used to leave it without `admin-client-config.json` until a manual restart (see the first-run race
+note below) - this removes that race entirely.
+
+`identity-server`'s `Identity__Issuer` lists every host this server may legitimately see itself
+issue OAuth tokens as - the `iss` claim is stamped from the *request's own* host
+(`OidcIssuerProvider`), so a browser calling through the LAN address and `identity-platform`'s
+server-side calling through the Docker-internal hostname produce different, both-legitimate issuer
+values for the same server. Comma-separated, so a real public domain (once this server is exposed
+beyond the LAN) or a future federated tenant's issuer is one more entry, not a code change.
+
 ## One-time NUC setup
 
 1. Install Docker + the Compose plugin if not already present, and make sure your user can run
@@ -56,11 +70,9 @@ path '/shared/admin-client-config.json' is denied`.
    `identity-server` migrates its database, seeds a *random* admin OAuth client (unique to this
    environment, not something you choose), and writes its id/secret to the `admin-client-config`
    volume shared with `identity-platform` - which reads that file automatically at startup, no
-   manual copying. The only race to be aware of: if `identity-platform` happens to start before
-   `identity-server` finishes its first seed, it just won't have the file yet - one
-   `docker compose restart identity-platform` once you've confirmed the server has seeded
-   (`docker compose logs identity-server`, look for "Admin client config for identity-platform
-   written to") fixes it. Same logs also show the seeded superadmin *user* password
+   manual copying. `identity-platform` waits on `identity-server`'s healthcheck (see above), so it
+   never starts before that file exists - no race, no manual restart needed here. Check
+   `docker compose logs identity-server` for the seeded superadmin *user* password
    (`SUPERADMIN CREDENTIALS` block) - that one really is only ever in the logs, not recoverable
    afterwards other than resetting the user.
 
