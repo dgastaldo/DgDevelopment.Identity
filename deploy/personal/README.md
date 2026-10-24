@@ -15,6 +15,12 @@ config (volumes, env vars) lives entirely on the `identity-watchtower` service a
 only ever runs `docker start identity-watchtower` on a schedule, it doesn't recreate or duplicate
 Watchtower's setup.
 
+`containrrr/watchtower` is unmaintained (archived upstream) and its embedded Docker client hardcodes
+API version 1.25, which a Docker Engine new enough to have dropped that version rejects
+(`client version 1.25 is too old`) - `DOCKER_API_VERSION` pins it to the oldest version still
+accepted instead. If a future Docker Engine update moves that floor again, bump the value to match
+the error message's "Minimum supported API version" - or, longer term, switch to a maintained fork.
+
 ## One-time NUC setup
 
 1. Install Docker + the Compose plugin if not already present, and make sure your user can run
@@ -32,6 +38,11 @@ Watchtower's setup.
    `~/.docker/config.json` written in step 2, and `IDENTITY_SERVER_PUBLIC_URL`/
    `IDENTITY_PLATFORM_PUBLIC_URL` should be the NUC's actual LAN address (e.g. `http://192.168.1.5:8081`
    / `:8082`), not `localhost` - the browser, not the NUC itself, is what follows these redirects.
+   `identity-server` also needs `IDENTITY_PLATFORM_PUBLIC_URL`'s value (wired through as
+   `AdminPlatformBaseUrl`) so the seeded admin OAuth client's redirect URI matches wherever
+   `identity-platform` is actually reached from - without it, login fails with "Invalid
+   redirect_uri" regardless of what `IDENTITY_SERVER_PUBLIC_URL` is set to, since the two problems
+   are independent (see `DbSeeder.EnsureAdminClientRedirectUriAsync`).
 4. First run:
    ```bash
    docker compose pull
