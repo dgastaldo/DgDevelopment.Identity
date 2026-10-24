@@ -15,6 +15,11 @@ public sealed class ServerIdentityAuthStateProvider(
     IHttpContextAccessor httpContextAccessor)
     : IdentityAuthStateProvider(client, tokenStore, markerService, sessionEventClient, options)
 {
+    // Explicit field instead of referencing the markerService parameter directly below - it's also
+    // passed to the base constructor above, and using the same primary-constructor parameter in an
+    // instance member here as well trips CS9107 (ambiguous double-capture).
+    private readonly ISessionMarkerService _markerService = markerService;
+
     // HttpContext.User is populated by SessionMarkerAuthenticationHandler (see Program.cs) from the
     // same identity_marker cookie this used to hand-decode directly - reusing it here instead of
     // decoding twice keeps this and the ASP.NET Core SSR-level [Authorize] check (which only ever
@@ -35,7 +40,7 @@ public sealed class ServerIdentityAuthStateProvider(
         if (httpContext is not null)
             return new AuthenticationState(httpContext.User);
 
-        if (SessionMarkerService.Decode(await markerService.GetAsync().ConfigureAwait(false)) is { } marker)
+        if (SessionMarkerService.Decode(await _markerService.GetAsync().ConfigureAwait(false)) is { } marker)
         {
             var userInfo = new UserInfo { Sub = marker.Sub, Name = marker.Name, Email = marker.Email };
             return new AuthenticationState(BuildPrincipal(userInfo));
