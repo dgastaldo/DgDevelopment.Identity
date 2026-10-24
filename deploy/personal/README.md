@@ -21,6 +21,18 @@ API version 1.25, which a Docker Engine new enough to have dropped that version 
 accepted instead. If a future Docker Engine update moves that floor again, bump the value to match
 the error message's "Minimum supported API version" - or, longer term, switch to a maintained fork.
 
+`admin-client-config-init` fixes a fresh `admin-client-config` volume's default root ownership
+before `identity-server` (which runs as a non-root user) ever needs to write to it - without it,
+first seed or `rotate-admin-client-secret` fails with `UnauthorizedAccessException: Access to the
+path '/shared/admin-client-config.json' is denied`.
+
+`identity-server`'s `Identity__Issuer` lists every host this server may legitimately see itself
+issue OAuth tokens as - the `iss` claim is stamped from the *request's own* host
+(`OidcIssuerProvider`), so a browser calling through the LAN address and `identity-platform`'s
+server-side calling through the Docker-internal hostname produce different, both-legitimate issuer
+values for the same server. Comma-separated, so a real public domain (once this server is exposed
+beyond the LAN) or a future federated tenant's issuer is one more entry, not a code change.
+
 ## One-time NUC setup
 
 1. Install Docker + the Compose plugin if not already present, and make sure your user can run
@@ -55,9 +67,10 @@ the error message's "Minimum supported API version" - or, longer term, switch to
    `identity-server` finishes its first seed, it just won't have the file yet - one
    `docker compose restart identity-platform` once you've confirmed the server has seeded
    (`docker compose logs identity-server`, look for "Admin client config for identity-platform
-   written to") fixes it. Same logs also show the seeded superadmin *user* password
-   (`SUPERADMIN CREDENTIALS` block) - that one really is only ever in the logs, not recoverable
-   afterwards other than resetting the user.
+   written to") fixes it. Same shared volume also gets the seeded superadmin *user* credentials,
+   at `/shared/superadmin-credentials.txt` (`SuperadminCredentialsFile`) - retrieve them with
+   `docker compose exec identity-server cat /shared/superadmin-credentials.txt`, no need to dig
+   through logs for those either.
 
 ### Rotating the admin client secret later
 
