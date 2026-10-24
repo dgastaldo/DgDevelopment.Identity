@@ -1,0 +1,97 @@
+namespace DgDevelopment.Identity.OAuth.Services;
+
+using System.Globalization;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using Microsoft.IdentityModel.Tokens;
+
+public sealed class JwtService(IKeyMaterialService keyMaterial, IOidcIssuerProvider issuerProvider) : IJwtService
+{
+
+    public async Task<string> CreateIdTokenAsync(IdTokenRequest request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var credentials = await keyMaterial.GetSigningCredentialsAsync(ct).ConfigureAwait(false);
+        var now = DateTime.UtcNow;
+        var issuer = issuerProvider.GetIssuer().GetLeftPart(UriPartial.Authority);
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, request.User.Id.ToString(null, CultureInfo.InvariantCulture)),
+            new(JwtRegisteredClaimNames.Iss, issuer),
+            new(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString(CultureInfo.InvariantCulture)),
+            new(JwtRegisteredClaimNames.Exp, EpochTime.GetIntDate(now.AddMinutes(5)).ToString(CultureInfo.InvariantCulture)),
+            new(JwtRegisteredClaimNames.AuthTime, EpochTime.GetIntDate(now).ToString(CultureInfo.InvariantCulture)),
+            new("sid", request.SessionId),
+            new("tid", request.TenantId.ToString(null, CultureInfo.InvariantCulture))
+        };
+
+        if (request.Nonce != null)
+            claims.Add(new(JwtRegisteredClaimNames.Nonce, request.Nonce));
+
+        var primaryEmail = request.User.PrimaryEmail;
+        if (primaryEmail != null)
+        {
+            claims.Add(new(JwtRegisteredClaimNames.Email, primaryEmail.Value));
+            claims.Add(new("email_verified", "true"));
+        }
+
+        claims.Add(new("name", request.User.Username));
+
+        foreach (var method in request.AuthMethods)
+            claims.Add(new("amr", method));
+
+        var token = new JwtSecurityToken(
+            issuer: issuer,
+            audience: request.Client.ClientId.ToString(),
+            claims: claims,
+            notBefore: now,
+            expires: now.AddMinutes(5),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    public async Task<string> CreateAccessTokenAsync(AccessTokenRequest request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var credentials = await keyMaterial.GetSigningCredentialsAsync(ct).ConfigureAwait(false);
+        var now = DateTime.UtcNow;
+        var issuer = issuerProvider.GetIssuer().GetLeftPart(UriPartial.Authority);
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, request.User.Id.ToString(null, CultureInfo.InvariantCulture)),
+            new(JwtRegisteredClaimNames.Iss, issuer),
+            new("client_id", request.Client.ClientId.ToString()),
+            new(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(now).ToString(CultureInfo.InvariantCulture)),
+            new(JwtRegisteredClaimNames.Exp, EpochTime.GetIntDate(now.AddSeconds(request.LifetimeSeconds)).ToString(CultureInfo.InvariantCulture)),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
+            new("scope", string.Join(' ', request.Scopes)),
+            new("tid", request.TenantId.ToString(null, CultureInfo.InvariantCulture))
+        };
+
+        if (request.Permissions is { Count: > 0 })
+            foreach (var permission in request.Permissions)
+                claims.Add(new("permission", permission));
+
+        var token = new JwtSecurityToken(
+            issuer: issuer,
+            audience: request.Client.ClientId.ToString(),
+            claims: claims,
+            notBefore: now,
+            expires: now.AddSeconds(request.LifetimeSeconds),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    public Task<ClaimsPrincipal> ValidateTokenAsync(string token, TokenValidationParameters parameters, CancellationToken ct = default)
+    {
+        // Default MapInboundClaims silently renames well-known short claim names (e.g. "tid", "sub")
+        // to Microsoft's Azure AD claim URIs, so callers reading them back by their original short
+        // name get nothing. The real JWT bearer pipeline in Program.cs disables this explicitly;
+        // this internal validation path (introspection) needs the same to read our own claims back.
+        var handler = new JwtSecurityTokenHandler { MapInboundClaims = false };
+        var principal = handler.ValidateToken(token, parameters, out _);
+        return Task.FromResult(principal);
+    }
+}

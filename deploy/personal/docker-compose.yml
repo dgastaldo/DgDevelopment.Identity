@@ -1,0 +1,99 @@
+## Applied once, by hand, on the NUC (see README.md in this folder). Not run by any GitHub Actions
+## workflow - the pipeline only builds and pushes images to GHCR; identity-watchtower on this machine
+## is what picks them up. Images referenced by the floating `:personal-latest` tag - identity-watchtower
+## watches that tag's digest and recreates the two app containers when it changes. Rollback: edit the
+## tag below to an immutable `:personal-YYYY.MM.DD.N` version and `docker compose up -d`.
+
+services:
+  identity-sql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${SQL_SA_PASSWORD}
+    volumes:
+      - sql-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  identity-server:
+    image: ghcr.io/dgastaldo/dgdevelopment-identity-server:personal-latest
+    restart: unless-stopped
+    depends_on:
+      identity-sql:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__IdentityDb: Server=identity-sql,1433;Database=IdentityDb;User Id=sa;Password=${SQL_SA_PASSWORD};TrustServerCertificate=true
+      # Where the admin OAuth client id/secret get written on first seed and on every
+      # rotate-admin-client-secret run - identity-platform reads the same file below. Random
+      # per environment (never set from outside), matching every other environment's DbSeeder.
+      AdminClientConfigFile: /shared/admin-client-config.json
+    volumes:
+      - admin-client-config:/shared
+    ports:
+      - "8081:8080"
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+
+  identity-platform:
+    image: ghcr.io/dgastaldo/dgdevelopment-identity-platform:personal-latest
+    restart: unless-stopped
+    depends_on:
+      - identity-server
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      IdentityBaseUrl: http://identity-server:8080
+      # The browser can't resolve the Docker-internal hostname above - needed for /connect/authorize
+      # and /connect/endsession redirects, and for the WASM client (runs entirely in-browser).
+      IdentityPublicBaseUrl: ${IDENTITY_SERVER_PUBLIC_URL}
+      AdminBaseUrl: ${IDENTITY_PLATFORM_PUBLIC_URL}
+      AdminClientConfigFile: /shared/admin-client-config.json
+    volumes:
+      - admin-client-config:/shared:ro
+    ports:
+      - "8082:8080"
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+
+  # Runs one check-and-update pass then exits 0 (--run-once), same as e.g. Nextcloud AIO's
+  # watchtower - sits "Exited (0)" between runs instead of staying Up all the time. Needs something
+  # to start it again on a schedule, since Docker's restart policies only react to a container
+  # exiting, not to a timer - that's identity-watchtower-scheduler below.
+  identity-watchtower:
+    image: containrrr/watchtower:latest
+    container_name: identity-watchtower
+    restart: "no"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${GHCR_DOCKER_CONFIG_FILE}:/config.json:ro
+    environment:
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_RUN_ONCE: "true"
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_ROLLING_RESTART: "true"
+
+  # Restarts the already-configured, already-stopped identity-watchtower container every 5 minutes -
+  # `docker start` reuses its existing volumes/environment as-is, so Watchtower's own config above
+  # doesn't need to be duplicated here. Ofelia itself stays continuously Up (it's the scheduler, not
+  # the thing being scheduled); only the container it restarts cycles Exited -> Up -> Exited.
+  identity-watchtower-scheduler:
+    image: mcuadros/ofelia:latest
+    restart: unless-stopped
+    command: daemon --docker
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    labels:
+      ofelia.job-run.identity-watchtower-restart.schedule: "@every 5m"
+      ofelia.job-run.identity-watchtower-restart.image: "docker:cli"
+      ofelia.job-run.identity-watchtower-restart.volume: "/var/run/docker.sock:/var/run/docker.sock:rw"
+      ofelia.job-run.identity-watchtower-restart.command: "docker start identity-watchtower"
+
+volumes:
+  sql-data:
+  admin-client-config:

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="DgDevelopment.Identity.Client.Maui.Pages.LoginPage"
+             Title="Sign in">
+    <VerticalStackLayout Padding="24" Spacing="16" VerticalOptions="Center">
+        <Label Text="DgDevelopment Identity" FontSize="24" HorizontalOptions="Center" />
+        <Label x:Name="ErrorLabel" TextColor="Red" IsVisible="False" HorizontalOptions="Center" />
+        <Button x:Name="SignInButton" Text="Sign in" Clicked="OnSignInClicked" />
+        <ActivityIndicator x:Name="Spinner" IsRunning="False" IsVisible="False" />
+    </VerticalStackLayout>
+</ContentPage>

@@ -4,6 +4,10 @@
     <ProjectReference Include="..\DgDevelopment.Identity.Domain\DgDevelopment.Identity.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Common\CommonPasswords.txt" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

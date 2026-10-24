@@ -8,6 +8,8 @@
 - Email verification via confirmation link
 - User profile with basic fields (first name, last name, date of birth, profile pictures)
 
+> **Status (M1)**: registration and email verification implemented (`/register` - create a new tenant and become its owner, or join an existing one via `?tenant=slug`; `/account/verify-email`). Profile page (`/profile`) covers self-service password/email management; the richer profile fields listed above (first/last name, date of birth, profile pictures) are not yet modeled.
+
 ### 1.2 Email Aliases
 
 - Each user has one primary email and N secondary email aliases
@@ -31,6 +33,8 @@
 - Account lockout after N failed attempts
 - Password reset via email
 
+> **Status (M1)**: all implemented - `PasswordPolicy` (length, complexity, common-password blocklist), `PasswordExpirationPolicy` (90 days), `PasswordHistoryEntry`/`IPasswordHistoryService` (last 5 passwords), `UserAuthenticationService` (15-min lockout after 5 failed attempts), `/account/forgot-password` + `/account/reset-password`. Changing a password now also revokes every other session/refresh token, with a real-time push to any connected client - see CONTEXT.md's session-revocation bullet.
+
 ### 2.2 External Identity Providers (Milestone 3)
 
 - Google, Microsoft, GitHub
@@ -46,6 +50,8 @@
 - Single-use backup codes generated at enrollment
 - Ability to regenerate backup codes
 - MFA configurable as mandatory per user/role
+
+> **Status (M1)**: mandatory MFA is implemented for `GlobalAdmin`/`SuperAdmin` role holders specifically (per-tenant, 14-day grace period before enforcement), not as a general per-user/per-arbitrary-role toggle - see `docs/mfa.md`'s "Mandatory MFA for privileged roles" section.
 
 #### Push Notification — Milestone 3
 
@@ -198,6 +204,8 @@ For significant domain operations, an event is emitted:
 - Events are immutable and append-only
 - Used for audit trail and future projections
 
+> **Status**: scaffolded early on, then **removed** during the M1 close-out - zero consumers ever used it, and the Audit Log (6.1) already covers what it would have offered except a per-aggregate version counter, which only matters for actual replay/projection consumers. Kept here as a requirement to revisit if a real consumer (a webhook, an external integration) shows up.
+
 ### 6.3 Traced Operations
 
 - User creation/modification/deletion
@@ -271,6 +279,8 @@ For significant domain operations, an event is emitted:
 - `IdentityHttpMessageHandler` for HttpClient
 
 ### 8.5 MAUI — Milestone 3
+
+> **Status**: first cut implemented (`DgDevelopment.Identity.Client.Maui`, targets Android and Windows - iOS/MacCatalyst need a Mac toolchain to build past the C# entry point), built opportunistically during M1 rather than waiting for Milestone 3. See `docs/client-sdk.md`.
 
 - Web authenticator browser for login
 - SecureStorage for tokens

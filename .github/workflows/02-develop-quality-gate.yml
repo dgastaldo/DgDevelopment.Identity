@@ -1,0 +1,141 @@
+name: 02 - Develop Quality Gate (ephemeral stack)
+
+# develop is never a persistently-deployed environment - every merge spins up a throwaway Docker
+# Compose stack (Server + IdentityPlatform + a containerized SQL Server), proves the deployment
+# itself works, and tears it down regardless of outcome. See docs/deployment.md.
+#
+# DgDevelopment.Identity.IntegrationTests still runs in-process (WebApplicationFactory) for this
+# first pass - it doesn't hit the deployed stack yet. Migrating it to real HTTP against this
+# ephemeral stack is a deliberate, tracked follow-up phase (see docs/deployment.md's "Open items"),
+# not part of this workflow yet. Until then, the "aspire deploy"/"aspire destroy" steps below are a
+# smoke test of the deployment mechanism itself (does the Compose stack actually come up cleanly?),
+# separate from the application-level regression coverage the test step provides.
+#
+# The `sonar` job below re-runs the same SonarCloud scan as 01-pr-quality-gate.yml, but on a plain
+# push to develop instead of a pull_request - that's what makes SonarScanner submit it as a real
+# branch analysis instead of PR decoration. Without this, SonarCloud never receives an analysis for
+# develop itself (only for PR branches), which is what its "branch not analyzed" warning is about.
+# Snyk isn't repeated here - the PR gate already blocks a merge on a dependency vulnerability, no
+# need to pay for that scan again on every push.
+#
+# Needs repository secrets: SONAR_TOKEN (SonarCloud - no SONAR_HOST_URL needed, it defaults to
+# sonarcloud.io), plus the SONAR_ORGANIZATION repository variable - same ones 01-pr-quality-gate.yml
+# uses.
+
+on:
+  push:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+jobs:
+  # CodeQL runs via GitHub's own Default Setup (Settings > Code security > Code scanning) instead
+  # of a custom job here - simpler, no CodeQL Action version/build-mode maintenance, and a
+  # workflow-based ("advanced configuration") job can't run alongside Default Setup anyway - GitHub
+  # rejects the SARIF upload when both are active ("CodeQL analyses from advanced configurations
+  # cannot be processed when the default setup is enabled").
+  test:
+    runs-on: ubuntu-latest
+    environment: develop
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore and build
+        run: |
+          dotnet restore src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj
+          dotnet build src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj --no-restore
+
+      - name: Run integration tests (in-process, WebApplicationFactory)
+        run: >
+          dotnet test tests/DgDevelopment.Identity.IntegrationTests/DgDevelopment.Identity.IntegrationTests.csproj
+          --no-build --configuration Debug
+
+      # Fetch-then-execute (not curl | bash) and --proto/--tlsv1.2 pinned so a redirect can't
+      # silently downgrade to plain HTTP: reduces MITM/downgrade risk, though this still can't
+      # verify the script's contents against a checksum or signature - Aspire's install.sh doesn't
+      # publish one to check against.
+      - name: Install Aspire CLI
+        run: |
+          curl -fsSL --proto '=https' --tlsv1.2 -o install-aspire.sh https://aspire.dev/install.sh
+          bash install-aspire.sh
+          rm install-aspire.sh
+          echo "$HOME/.aspire/bin" >> "$GITHUB_PATH"
+
+      - name: Smoke-test the deployment (spin up the ephemeral Compose stack)
+        env:
+          Parameters__deploy_target: develop
+        run: aspire deploy --non-interactive
+
+      # TODO(implementation): confirm the exact way to reach the generated Compose project's logs -
+      # depends on where `aspire deploy` writes its Compose output for this AppHost/environment.
+      - name: Dump container logs on failure
+        if: failure()
+        run: docker compose logs || true
+
+      - name: Tear down the ephemeral stack
+        if: always()
+        env:
+          Parameters__deploy_target: develop
+        run: aspire destroy --yes --non-interactive
+
+  sonar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # SonarQube wants full history for blame/new-code analysis
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Setup Java (required by the SonarScanner for .NET)
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '21'
+
+      # The bundled JS/TS sensor (for clients/DgDevelopment.Identity.Client.React) needs a Node
+      # runtime to execute even though nothing here runs the app itself.
+      - name: Setup Node.js (for the JS/TS analyzer)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+
+      # --ignore-scripts: this only needs the installed packages on disk for the analyzer to read,
+      # not to actually build/run anything - no reason to let install-time lifecycle scripts
+      # (postinstall etc.) execute arbitrary code from third-party packages.
+      - name: Install React client dependencies (improves type-aware JS/TS analysis)
+        working-directory: clients/DgDevelopment.Identity.Client.React
+        run: npm ci --ignore-scripts
+
+      - name: Install SonarScanner for .NET
+        run: dotnet tool install --global dotnet-sonarscanner
+
+      # Same sonar.* parameters as 01-pr-quality-gate.yml's build-test-sonar job - no sonar.pullrequest.*
+      # args here, so the scanner submits this as a branch analysis (develop) instead of PR decoration.
+      - name: Begin SonarCloud analysis
+        run: >
+          dotnet sonarscanner begin
+          /k:"dgastaldo_DgDevelopment.Identity"
+          /o:"${{ vars.SONAR_ORGANIZATION }}"
+          /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+          /d:sonar.cs.cobertura.reportsPaths="tests/**/TestResults/coverage/**/coverage.cobertura.xml"
+          /d:sonar.exclusions="**/node_modules/**,**/bin/**,**/obj/**,**/dist/**,clients/DgDevelopment.Identity.Client.React/**,**/Migrations/**"
+          /d:sonar.coverage.exclusions="src/DgDevelopment.Identity.Server/Program.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/Program.cs,src/DgDevelopment.Identity.AppHost/AppHost.cs,src/DgDevelopment.Identity.Server/Controllers/ConnectController.cs,src/DgDevelopment.Identity.Server/Controllers/AuditController.cs,src/DgDevelopment.Identity.Server/Controllers/ClientsController.cs,src/DgDevelopment.Identity.Server/Controllers/GroupsController.cs,src/DgDevelopment.Identity.Server/Controllers/PlatformsController.cs,src/DgDevelopment.Identity.Server/Controllers/RolesController.cs,src/DgDevelopment.Identity.Server/Controllers/TenantsController.cs,src/DgDevelopment.Identity.Server/Controllers/UsersController.cs,src/DgDevelopment.Identity.Server/Services/AuditService.cs,src/DgDevelopment.Identity.Application/Services/IAuditService.cs,src/DgDevelopment.Identity.Server/Pages/Account/ExpiredPassword.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/MfaEnroll.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/Register.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Connect/Authorize.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/Consent.cshtml.cs,clients/DgDevelopment.Identity.Client.Core/SessionEventClient.cs,clients/DgDevelopment.Identity.Client.Core/IdentityClient.cs,clients/DgDevelopment.Identity.Client.Blazor/IdentityAuthStateProvider.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform.Client/**,src/DgDevelopment.Identity.Infrastructure/Security/AzureNotificationHubNotifier.cs,src/DgDevelopment.Identity.Server/Security/SecurityHeadersMiddleware.cs"
+
+      - name: Build and generate coverage
+        run: |
+          dotnet restore src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj
+          dotnet build src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj --no-restore
+          dotnet build tests/DgDevelopment.Identity.Server.UnitTests/DgDevelopment.Identity.Server.UnitTests.csproj
+
+      - name: End SonarQube analysis
+        run: dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"

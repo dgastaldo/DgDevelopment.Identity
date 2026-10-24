@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="DgDevelopment.Identity.Client.Maui.Pages.MfaPage"
+             Title="Multi-factor authentication">
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="16">
+            <Label x:Name="ErrorLabel" TextColor="Red" IsVisible="False" />
+
+            <Label Text="Authenticator app" FontAttributes="Bold" FontSize="18" />
+            <Label x:Name="TotpStatusLabel" />
+            <Image x:Name="QrImage" HeightRequest="200" WidthRequest="200" IsVisible="False" />
+            <Label x:Name="SecretLabel" IsVisible="False" />
+            <Entry x:Name="CodeEntry" Placeholder="6-digit code" IsVisible="False" Keyboard="Numeric" />
+            <Button x:Name="EnableButton" Text="Enable" Clicked="OnEnableClicked" IsVisible="False" />
+            <Button x:Name="EnrollButton" Text="Enable authenticator app" Clicked="OnEnrollClicked" IsVisible="False" />
+            <Button x:Name="DisableButton" Text="Disable" Clicked="OnDisableClicked" IsVisible="False" />
+            <Label x:Name="BackupCodesLabel" IsVisible="False" />
+
+            <BoxView HeightRequest="1" Color="LightGray" />
+
+            <Label Text="Push devices" FontAttributes="Bold" FontSize="18" />
+            <Label FontSize="12" TextColor="Gray" Text="Registers with a placeholder token today - swap it for a real FCM/APNs token once push notifications are wired up." />
+            <VerticalStackLayout x:Name="DevicesContainer" Spacing="8" />
+            <Button x:Name="RegisterDeviceButton" Text="Register this device" Clicked="OnRegisterDeviceClicked" />
+
+            <ActivityIndicator x:Name="Spinner" IsRunning="False" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
