@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/dgastaldo/DgDevelopment.Identity/compare/identity-platform-v0.2.0...identity-platform-v0.2.1) (2026-10-17)
+
+
+### Bug Fixes
+
+* 2 of 3 Sonar findings this PR's own fixes introduced ([9d6c7bd](https://github.com/dgastaldo/DgDevelopment.Identity/commit/9d6c7bdb7ff146bdf18a0578a51f41804cbf8971))
+* resolve another ~15 SonarCloud code smells ([79cf1a0](https://github.com/dgastaldo/DgDevelopment.Identity/commit/79cf1a05c767b12182eb034aae40c42d7bab28f9))
+
 ## [0.2.0](https://github.com/dgastaldo/DgDevelopment.Identity/compare/identity-platform-v0.1.0...identity-platform-v0.2.0) (2026-09-26)
 
 
