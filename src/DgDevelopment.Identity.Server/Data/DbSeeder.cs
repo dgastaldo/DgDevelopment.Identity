@@ -40,6 +40,7 @@ public sealed class DbSeeder(IServiceProvider serviceProvider, IConfiguration co
 
         var clientCredentials = await SeedClientsAsync(db, tenant.Id).ConfigureAwait(false);
         await SeedMauiClientAsync(db, tenant.Id).ConfigureAwait(false);
+        await EnsureAdminClientRedirectUriAsync(db, configuration["AdminPlatformBaseUrl"]).ConfigureAwait(false);
         var hasher = scope.ServiceProvider.GetRequiredService<Domain.Services.IPasswordHasher>();
         var superadminPassword = await SeedUsersAsync(db, hasher, tenant.Id).ConfigureAwait(false);
 
@@ -72,6 +73,29 @@ public sealed class DbSeeder(IServiceProvider serviceProvider, IConfiguration co
         });
         File.WriteAllText(path, json);
         Console.WriteLine($"Admin client config for identity-platform written to: {path}");
+    }
+
+    // Self-healing like the permission/role reconciliation above: the "identity-platform" client is
+    // seeded once with only the local Aspire dev redirect URIs (https://localhost:7018/callback,
+    // http://localhost:5133/callback) - a container deployment's identity-platform is reachable at
+    // a different, environment-specific URL (see deploy/personal/docker-compose.yml's
+    // AdminPlatformBaseUrl), which the hardcoded dev URIs never cover. Runs on every startup, not
+    // just first seed, so an existing client - already seeded before this URL was configured, or
+    // before this method existed - still gets the redirect URI it needs. AddRedirectUri/
+    // AddPostLogoutRedirectUri are no-ops if already present, so this is safe to call every time.
+    // A no-op when AdminPlatformBaseUrl isn't set (e.g. local dev, Aspire), same pattern as
+    // AdminClientConfigFile elsewhere in this class.
+    internal static async Task EnsureAdminClientRedirectUriAsync(IdentityDbContext db, string? adminPlatformBaseUrl)
+    {
+        if (string.IsNullOrWhiteSpace(adminPlatformBaseUrl)) return;
+
+        var client = await db.Clients.FirstOrDefaultAsync(c => c.Name == "identity-platform").ConfigureAwait(false);
+        if (client is null) return;
+
+        var baseUri = new Uri(adminPlatformBaseUrl.TrimEnd('/') + "/");
+        client.AddRedirectUri(new Uri(baseUri, "callback"));
+        client.AddPostLogoutRedirectUri(baseUri);
+        await db.SaveChangesAsync().ConfigureAwait(false);
     }
 
     private static async Task<(Guid ClientId, string ClientSecret)?> SeedClientsAsync(IdentityDbContext db, Guid tenantId)
