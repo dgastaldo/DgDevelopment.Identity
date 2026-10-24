@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- CA5350: HMAC-SHA1 is mandated by RFC 6238 for TOTP interoperability. -->
+    <NoWarn>CS8618;CA1711;CA1721;CA5350</NoWarn>
   </PropertyGroup>
 
 </Project>

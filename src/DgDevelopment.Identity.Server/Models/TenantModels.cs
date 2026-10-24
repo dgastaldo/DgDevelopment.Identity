@@ -1,0 +1,17 @@
+using System.Text.Json.Serialization;
+using DgDevelopment.Identity.Domain.Entities;
+
+namespace DgDevelopment.Identity.Server.Models;
+
+public sealed record CreateTenantRequest(string Name, string Slug);
+
+public sealed record SetTenantActiveRequest([property: JsonRequired] bool IsActive);
+
+public sealed record TenantAdminResponse(Guid Id, string Name, string Slug, bool IsActive, bool IsPlatformTenant, DateTime CreatedAt)
+{
+    public static TenantAdminResponse From(Tenant tenant)
+    {
+        ArgumentNullException.ThrowIfNull(tenant);
+        return new(tenant.Id, tenant.Name, tenant.Slug, tenant.IsActive, tenant.IsPlatformTenant, tenant.CreatedAt);
+    }
+}
