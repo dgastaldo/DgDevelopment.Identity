@@ -61,17 +61,38 @@ services:
     labels:
       com.centurylinklabs.watchtower.enable: "true"
 
+  # Runs one check-and-update pass then exits 0 (--run-once), same as e.g. Nextcloud AIO's
+  # watchtower - sits "Exited (0)" between runs instead of staying Up all the time. Needs something
+  # to start it again on a schedule, since Docker's restart policies only react to a container
+  # exiting, not to a timer - that's identity-watchtower-scheduler below.
   identity-watchtower:
     image: containrrr/watchtower:latest
-    restart: unless-stopped
+    container_name: identity-watchtower
+    restart: "no"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${GHCR_DOCKER_CONFIG_FILE}:/config.json:ro
     environment:
       WATCHTOWER_LABEL_ENABLE: "true"
-      WATCHTOWER_POLL_INTERVAL: "300"
+      WATCHTOWER_RUN_ONCE: "true"
       WATCHTOWER_CLEANUP: "true"
       WATCHTOWER_ROLLING_RESTART: "true"
+
+  # Restarts the already-configured, already-stopped identity-watchtower container every 5 minutes -
+  # `docker start` reuses its existing volumes/environment as-is, so Watchtower's own config above
+  # doesn't need to be duplicated here. Ofelia itself stays continuously Up (it's the scheduler, not
+  # the thing being scheduled); only the container it restarts cycles Exited -> Up -> Exited.
+  identity-watchtower-scheduler:
+    image: mcuadros/ofelia:latest
+    restart: unless-stopped
+    command: daemon --docker
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    labels:
+      ofelia.job-run.identity-watchtower-restart.schedule: "@every 5m"
+      ofelia.job-run.identity-watchtower-restart.image: "docker:cli"
+      ofelia.job-run.identity-watchtower-restart.volume: "/var/run/docker.sock:/var/run/docker.sock:rw"
+      ofelia.job-run.identity-watchtower-restart.command: "docker start identity-watchtower"
 
 volumes:
   sql-data:

@@ -4,8 +4,16 @@ No GitHub Actions runner lives on the NUC. The pipeline (`05-deploy-personal.yml
 `ubuntu-latest`) only builds `identity-server`/`identity-platform` container images and pushes them
 to GHCR as `ghcr.io/dgastaldo/dgdevelopment-identity-server:personal-latest` and
 `ghcr.io/dgastaldo/dgdevelopment-identity-platform:personal-latest`. `identity-watchtower`, running
-on the NUC, polls GHCR every 5 minutes and recreates the containers when a new `personal-latest`
+on the NUC, checks GHCR every 5 minutes and recreates the containers when a new `personal-latest`
 digest appears.
+
+`identity-watchtower` runs with `--run-once`: each check is a single pass that exits 0 immediately
+after - same as e.g. Nextcloud AIO's watchtower, it sits `Exited (0)` between checks instead of
+staying `Up` continuously. `identity-watchtower-scheduler` (a tiny `ofelia` container) is what
+restarts it every 5 minutes; it's the one long-running/`Up` container of the pair. Watchtower's own
+config (volumes, env vars) lives entirely on the `identity-watchtower` service above - the scheduler
+only ever runs `docker start identity-watchtower` on a schedule, it doesn't recreate or duplicate
+Watchtower's setup.
 
 ## One-time NUC setup
 
