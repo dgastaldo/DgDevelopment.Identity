@@ -1,4 +1,6 @@
 @page "/mfa"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
 @inject IdentityClient Api
 
 <PageTitle>MFA | IdentityPlatform</PageTitle>
