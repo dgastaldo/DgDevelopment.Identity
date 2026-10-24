@@ -20,7 +20,7 @@ Provides authentication, authorization, user profile management and multi-client
 |---|---|
 | .NET (SDK) | 10.0 |
 | ASP.NET Core | 10.0 |
-| .NET Aspire | 13.4 |
+| .NET Aspire | 13.6 |
 | Entity Framework Core | 10.0 |
 | SQL Server | >= 2022 |
 | OpenAPI | Microsoft.AspNetCore.OpenApi + Scalar + Swagger |
