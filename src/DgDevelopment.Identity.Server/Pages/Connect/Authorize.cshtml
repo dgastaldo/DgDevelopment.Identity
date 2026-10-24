@@ -1,0 +1,11 @@
+@page "/connect/authorize"
+@model DgDevelopment.Identity.Server.Pages.Connect.AuthorizeModel
+@{
+    ViewData["Title"] = "Login";
+}
+
+<div class="auth-card">
+    <h1 class="auth-brand">DgDevelopment Identity Server</h1>
+    <p class="text-sm text-gray-600 mb-4 text-center">Redirecting you to sign in…</p>
+    <a href="/account/login" class="auth-btn text-center no-underline block">Continue</a>
+</div>

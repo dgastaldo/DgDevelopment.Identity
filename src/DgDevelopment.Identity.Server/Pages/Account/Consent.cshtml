@@ -1,0 +1,44 @@
+@page "/account/consent"
+@model DgDevelopment.Identity.Server.Pages.Account.ConsentModel
+@{
+    ViewData["Title"] = "Consent";
+}
+
+<div class="auth-card">
+    <h1 class="auth-brand">DgDevelopment Identity Server</h1>
+    <h2 class="text-lg font-semibold text-gray-800 mb-2">Consent</h2>
+    <p class="text-sm text-gray-600 mb-6">
+        <strong>@Model.ClientName</strong> is requesting access to your account.
+    </p>
+
+    <div class="mb-6">
+        <p class="text-sm font-medium text-gray-800 mb-2">This will allow @Model.ClientName to:</p>
+        <ul class="space-y-3">
+            @foreach (var scope in Model.RequestedScopes)
+            {
+                <li class="text-sm text-gray-700">
+                    <span class="font-medium">@scope.Scope</span>
+                    <span class="block text-gray-500">@scope.Description</span>
+                </li>
+            }
+        </ul>
+        @if (Model.AdminApprovedScopes.Count > 0)
+        {
+            <p class="mt-4 text-xs text-gray-400">
+                Already pre-approved by the application admin:
+                @string.Join(", ", Model.AdminApprovedScopes)
+            </p>
+        }
+    </div>
+
+    <form method="post">
+        <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+        <div class="flex gap-2">
+            <button type="submit" name="action" value="approve" class="auth-btn">Approve</button>
+            <button type="submit" name="action" value="deny"
+                    class="flex-1 rounded-md bg-gray-200 px-4 py-2 text-gray-800 font-medium hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                Deny
+            </button>
+        </div>
+    </form>
+</div>

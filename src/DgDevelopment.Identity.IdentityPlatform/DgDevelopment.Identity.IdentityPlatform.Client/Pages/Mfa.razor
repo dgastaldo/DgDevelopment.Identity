@@ -1,0 +1,199 @@
+@page "/mfa"
+@inject IdentityClient Api
+
+<PageTitle>MFA | IdentityPlatform</PageTitle>
+
+@if (Loading)
+{
+    <div class="h-64 animate-pulse rounded-2xl bg-slate-100"></div>
+}
+else
+{
+    <div class="mb-8">
+        <p class="text-xs font-semibold tracking-[0.2em] text-violet-700 uppercase">Security</p>
+        <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Multi-factor authentication</h1>
+        <p class="mt-2 text-sm text-slate-500">Manage how you verify your identity when signing in.</p>
+    </div>
+
+    @if (Error is not null)
+    {
+        <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">@Error</div>
+    }
+
+    <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <p class="text-xs font-semibold tracking-[0.16em] text-slate-400 uppercase">Authenticator app</p>
+
+        @if (BackupCodes is not null)
+        {
+            <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                <p class="font-semibold">Save these backup codes now — they won't be shown again.</p>
+                <ul class="mt-2 grid grid-cols-2 gap-1 font-mono text-xs">
+                    @foreach (var backupCode in BackupCodes)
+                    {
+                        <li>@backupCode</li>
+                    }
+                </ul>
+                <button class="mt-3 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white" @onclick="() => BackupCodes = null">Done</button>
+            </div>
+        }
+        else if (TotpStatus is { IsEnabled: true })
+        {
+            <p class="mt-2 text-sm text-slate-600">Enabled — @TotpStatus.AvailableBackupCodes backup codes remaining.</p>
+            <div class="mt-4 flex gap-3">
+                <button disabled="@Busy" @onclick="RegenerateBackupCodesAsync" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Regenerate backup codes</button>
+                <button disabled="@Busy" @onclick="DisableTotpAsync" class="rounded-lg bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100">Disable</button>
+            </div>
+        }
+        else if (Enrollment is not null)
+        {
+            <p class="mt-2 text-sm text-slate-600">Scan this QR code with your authenticator app, then enter the 6-digit code to confirm.</p>
+            <div class="mt-4 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+                <img src="@Enrollment.QrCodeDataUri" alt="TOTP provisioning QR code" class="h-40 w-40 rounded-lg border border-slate-200" />
+                <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase">Manual entry key</p>
+                    <code class="text-sm text-slate-700">@Enrollment.SecretKey</code>
+                </div>
+            </div>
+            <EditForm Model="EnrollModel" OnValidSubmit="EnableTotpAsync" class="mt-4 flex items-end gap-3">
+                <div><label class="mb-1 block text-xs font-semibold text-slate-500 uppercase">Verification code</label><InputText @bind-Value="EnrollModel.Code" class="w-40 rounded-lg border-slate-300" /></div>
+                <button disabled="@Busy" class="rounded-lg bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800">Enable</button>
+            </EditForm>
+        }
+        else
+        {
+            <p class="mt-2 text-sm text-slate-600">Not enabled.</p>
+            <button disabled="@Busy" @onclick="StartEnrollAsync" class="mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800">Enable authenticator app</button>
+        }
+    </section>
+
+    <section class="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <p class="text-xs font-semibold tracking-[0.16em] text-slate-400 uppercase">Push devices</p>
+        <ul class="mt-4 divide-y divide-slate-100">
+            @foreach (var device in PushDevices)
+            {
+                <li class="flex items-center justify-between py-3">
+                    <div>
+                        <p class="text-sm font-semibold text-slate-800">@(device.DeviceName ?? device.Platform)</p>
+                        <p class="text-xs text-slate-400">@device.Platform · registered @device.CreatedAt.ToLocalTime().ToString("g")</p>
+                    </div>
+                    <button disabled="@Busy" @onclick="() => RemovePushDeviceAsync(device.Id)" class="text-xs font-semibold text-rose-600 hover:text-rose-800">Remove</button>
+                </li>
+            }
+            @if (PushDevices.Count == 0)
+            {
+                <li class="py-3 text-sm text-slate-400">No push devices registered.</li>
+            }
+        </ul>
+    </section>
+}
+
+@code {
+    private TotpStatusResponse? TotpStatus;
+    private TotpEnrollmentResponse? Enrollment;
+    private IReadOnlyCollection<string>? BackupCodes;
+    private IReadOnlyCollection<PushDeviceResponse> PushDevices = [];
+    private bool Loading = true;
+    private bool Busy;
+    private string? Error;
+    private EnrollForm EnrollModel = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && OperatingSystem.IsBrowser())
+            await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            TotpStatus = await Api.GetTotpStatusAsync().ConfigureAwait(false);
+            PushDevices = await Api.GetPushDevicesAsync().ConfigureAwait(false) ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            Error = "MFA status could not be loaded.";
+        }
+        finally
+        {
+            Loading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task StartEnrollAsync()
+    {
+        Busy = true;
+        Error = null;
+        try
+        {
+            Enrollment = await Api.EnrollTotpAsync().ConfigureAwait(false);
+        }
+        catch (HttpRequestException) { Error = "Enrollment could not be started."; }
+        finally { Busy = false; }
+    }
+
+    private async Task EnableTotpAsync()
+    {
+        Busy = true;
+        Error = null;
+        try
+        {
+            var result = await Api.EnableTotpAsync(EnrollModel.Code).ConfigureAwait(false);
+            BackupCodes = result?.BackupCodes;
+            Enrollment = null;
+            EnrollModel = new();
+            await LoadAsync();
+        }
+        catch (HttpRequestException) { Error = "The verification code is invalid."; }
+        finally { Busy = false; }
+    }
+
+    private async Task RegenerateBackupCodesAsync()
+    {
+        Busy = true;
+        Error = null;
+        try
+        {
+            var result = await Api.RegenerateBackupCodesAsync().ConfigureAwait(false);
+            BackupCodes = result?.BackupCodes;
+        }
+        catch (HttpRequestException) { Error = "Backup codes could not be regenerated."; }
+        finally { Busy = false; }
+    }
+
+    private async Task DisableTotpAsync()
+    {
+        Busy = true;
+        Error = null;
+        try
+        {
+            using var response = await Api.DisableTotpAsync().ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            await LoadAsync();
+        }
+        catch (HttpRequestException) { Error = "TOTP could not be disabled."; }
+        finally { Busy = false; }
+    }
+
+    private async Task RemovePushDeviceAsync(Guid id)
+    {
+        Busy = true;
+        Error = null;
+        try
+        {
+            using var response = await Api.RemovePushDeviceAsync(id).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            await LoadAsync();
+        }
+        catch (HttpRequestException) { Error = "The device could not be removed."; }
+        finally { Busy = false; }
+    }
+
+    private sealed class EnrollForm
+    {
+        public string Code { get; set; } = string.Empty;
+    }
+}

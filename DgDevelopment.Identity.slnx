@@ -6,6 +6,8 @@
     <Project Path="clients/DgDevelopment.Identity.Client.Wpf/DgDevelopment.Identity.Client.Wpf.csproj" />
   </Folder>
   <Folder Name="/src/">
+    <Project Path="src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform.Client/DgDevelopment.Identity.IdentityPlatform.Client.csproj" />
+    <Project Path="src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform.csproj" />
     <Project Path="src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj" />
     <Project Path="src/DgDevelopment.Identity.Application/DgDevelopment.Identity.Application.csproj" />
     <Project Path="src/DgDevelopment.Identity.Domain/DgDevelopment.Identity.Domain.csproj" />
@@ -17,6 +19,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/DgDevelopment.Identity.IntegrationTests/DgDevelopment.Identity.IntegrationTests.csproj" />
-    <Project Path="tests/DgDevelopment.Identity.UnitTests/DgDevelopment.Identity.UnitTests.csproj" />
+    <Project Path="tests/DgDevelopment.Identity.Server.UnitTests/DgDevelopment.Identity.Server.UnitTests.csproj" />
   </Folder>
 </Solution>

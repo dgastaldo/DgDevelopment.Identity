@@ -1,0 +1,12 @@
+@page "/error"
+@model DgDevelopment.Identity.Server.Pages.ErrorModel
+@{
+    ViewData["Title"] = "Error";
+}
+
+<div class="auth-card">
+    <h1 class="auth-brand">DgDevelopment Identity Server</h1>
+    <h2 class="text-lg font-semibold text-gray-800 mb-2">Error</h2>
+    <div class="auth-alert">@Model.ErrorMessage</div>
+    <a href="/" class="auth-btn text-center no-underline block">Home</a>
+</div>
