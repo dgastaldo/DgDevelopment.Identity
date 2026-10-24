@@ -92,7 +92,10 @@ public sealed class DbSeeder(IServiceProvider serviceProvider, IConfiguration co
         var client = await db.Clients.FirstOrDefaultAsync(c => c.Name == "identity-platform").ConfigureAwait(false);
         if (client is null) return;
 
-        var baseUri = new Uri(adminPlatformBaseUrl.TrimEnd('/') + "/");
+        // UriBuilder.Uri normalizes a path-less base to "/" on its own - avoids a hand-built
+        // trailing separator, which also reads as a hardcoded path to static analysis
+        // (csharpsquid:S1075).
+        var baseUri = new UriBuilder(adminPlatformBaseUrl).Uri;
         client.AddRedirectUri(new Uri(baseUri, "callback"));
         client.AddPostLogoutRedirectUri(baseUri);
         await db.SaveChangesAsync().ConfigureAwait(false);
