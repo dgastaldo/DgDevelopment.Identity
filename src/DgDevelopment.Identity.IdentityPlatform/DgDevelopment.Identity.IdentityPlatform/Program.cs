@@ -4,6 +4,7 @@ using DgDevelopment.Identity.IdentityPlatform.Components;
 using DgDevelopment.Identity.Client.Blazor;
 using DgDevelopment.Identity.Client.Core;
 using DgDevelopment.Identity.ServiceDefaults;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -49,6 +50,15 @@ builder.Services.AddIdentityAuthentication(new OidcOptions
     PostLogoutRedirectUri = adminBaseUri,
     Scopes = ["openid", "profile", "email"]
 });
+
+// [Authorize] on a Razor component also becomes authorization metadata on its SSR endpoint, which
+// ASP.NET Core's own AuthorizationMiddleware enforces independently of Blazor's AuthorizeRouteView -
+// on a failure it calls ChallengeAsync, which needs a registered IAuthenticationService. This app's
+// real auth state comes entirely from ServerIdentityAuthStateProvider's hand-decoded session cookie
+// (no ASP.NET Core cookie ticket is ever written), so this scheme exists only to give the challenge
+// somewhere to go - LoginPath mirrors RedirectToLogin.razor's client-side redirect for the same case.
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options => options.LoginPath = "/login");
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ServerIdentityAuthStateProvider>();
