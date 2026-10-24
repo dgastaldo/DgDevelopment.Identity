@@ -47,6 +47,10 @@ services:
       # rotate-admin-client-secret run - identity-platform reads the same file below. Random
       # per environment (never set from outside), matching every other environment's DbSeeder.
       AdminClientConfigFile: /shared/admin-client-config.json
+      # Same shared volume as AdminClientConfigFile above, rather than the default local-dev
+      # location (the container's own, read-only content root) - readable without digging through
+      # `docker compose logs` for the one-time console printout.
+      SuperadminCredentialsFile: /shared/superadmin-credentials.txt
       # Where the admin OAuth client's redirect URIs need to point for a browser login to work -
       # the ones seeded by default are Aspire's local dev ports only. See DbSeeder.EnsureAdminClientRedirectUriAsync.
       AdminPlatformBaseUrl: ${IDENTITY_PLATFORM_PUBLIC_URL}
@@ -59,15 +63,6 @@ services:
       - admin-client-config:/shared
     ports:
       - "8081:8080"
-    healthcheck:
-      # SeedAsync runs before Kestrel starts accepting requests (Program.cs), so a successful
-      # /health response already implies seeding finished - identity-platform's depends_on below
-      # relies on exactly that, instead of racing it (see deploy/personal/README.md).
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-      start_period: 10s
     labels:
       com.centurylinklabs.watchtower.enable: "true"
 
@@ -75,8 +70,7 @@ services:
     image: ghcr.io/dgastaldo/dgdevelopment-identity-platform:personal-latest
     restart: unless-stopped
     depends_on:
-      identity-server:
-        condition: service_healthy
+      - identity-server
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
