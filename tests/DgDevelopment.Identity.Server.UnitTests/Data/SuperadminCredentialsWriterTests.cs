@@ -21,9 +21,9 @@ public sealed class SuperadminCredentialsWriterTests
             var path = Path.Combine(contentRoot, "superadmin-credentials.txt");
             Assert.True(File.Exists(path));
             var content = File.ReadAllText(path);
-            Assert.Contains(username, content);
-            Assert.Contains(email, content);
-            Assert.Contains(password, content);
+            Assert.Contains(username, content, StringComparison.Ordinal);
+            Assert.Contains(email, content, StringComparison.Ordinal);
+            Assert.Contains(password, content, StringComparison.Ordinal);
         }
         finally
         {

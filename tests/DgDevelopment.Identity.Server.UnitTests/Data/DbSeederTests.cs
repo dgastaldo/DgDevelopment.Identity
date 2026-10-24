@@ -61,8 +61,8 @@ public sealed class DbSeederTests
             var path = Path.Combine(contentRoot, "admin-client-credentials.txt");
             Assert.True(File.Exists(path));
             var content = File.ReadAllText(path);
-            Assert.Contains(clientId.ToString(), content);
-            Assert.Contains(clientSecret, content);
+            Assert.Contains(clientId.ToString(), content, StringComparison.Ordinal);
+            Assert.Contains(clientSecret, content, StringComparison.Ordinal);
         }
         finally
         {
