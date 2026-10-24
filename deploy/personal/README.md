@@ -21,6 +21,11 @@ API version 1.25, which a Docker Engine new enough to have dropped that version 
 accepted instead. If a future Docker Engine update moves that floor again, bump the value to match
 the error message's "Minimum supported API version" - or, longer term, switch to a maintained fork.
 
+`admin-client-config-init` fixes a fresh `admin-client-config` volume's default root ownership
+before `identity-server` (which runs as a non-root user) ever needs to write to it - without it,
+first seed or `rotate-admin-client-secret` fails with `UnauthorizedAccessException: Access to the
+path '/shared/admin-client-config.json' is denied`.
+
 ## One-time NUC setup
 
 1. Install Docker + the Compose plugin if not already present, and make sure your user can run
