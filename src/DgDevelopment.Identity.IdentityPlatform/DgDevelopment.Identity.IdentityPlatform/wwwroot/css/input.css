@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @source "../../Components";
+@source "../../../DgDevelopment.Identity.IdentityPlatform.Client";
 
 @theme {
     --color-brand-500: #258cfb;
