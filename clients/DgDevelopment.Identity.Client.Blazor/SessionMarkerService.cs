@@ -9,6 +9,7 @@ public interface ISessionMarkerService
 {
     Task SetAsync(UserInfo userInfo, CancellationToken ct = default);
     Task ClearAsync(CancellationToken ct = default);
+    Task<string?> GetAsync(CancellationToken ct = default);
 }
 
 public sealed class SessionMarkerService(IJSRuntime jsRuntime) : ISessionMarkerService
@@ -33,6 +34,16 @@ public sealed class SessionMarkerService(IJSRuntime jsRuntime) : ISessionMarkerS
     {
         var module = await GetModuleAsync(ct).ConfigureAwait(false);
         await module.InvokeVoidAsync("clearMarker", ct, CookieName).ConfigureAwait(false);
+    }
+
+    // Lets a live interactive Server circuit re-derive auth state from the same cookie the initial
+    // SSR request used (via HttpContext.Request.Cookies) instead of falling back to OAuth tokens in
+    // sessionStorage - HttpContext goes away once the circuit connects, but JS interop (this) still
+    // works, and reusing the exact same source of truth avoids the two layers disagreeing.
+    public async Task<string?> GetAsync(CancellationToken ct = default)
+    {
+        var module = await GetModuleAsync(ct).ConfigureAwait(false);
+        return await module.InvokeAsync<string?>("getMarker", ct, CookieName).ConfigureAwait(false);
     }
 
     public static SessionMarkerDto? Decode(string? raw)
