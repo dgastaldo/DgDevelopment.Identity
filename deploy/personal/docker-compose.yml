@@ -73,6 +73,12 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${GHCR_DOCKER_CONFIG_FILE}:/config.json:ro
     environment:
+      # containrrr/watchtower is unmaintained (archived) and its vendored Docker client hardcodes
+      # API version 1.25, which newer Docker Engines reject outright ("client version 1.25 is too
+      # old"). Pins the client to the oldest version still accepted instead of relying on
+      # auto-negotiation, which this image's client never actually performs. Raise this if a future
+      # Docker Engine version moves the floor past it.
+      DOCKER_API_VERSION: "1.40"
       WATCHTOWER_LABEL_ENABLE: "true"
       WATCHTOWER_RUN_ONCE: "true"
       WATCHTOWER_CLEANUP: "true"

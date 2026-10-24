@@ -15,6 +15,12 @@ config (volumes, env vars) lives entirely on the `identity-watchtower` service a
 only ever runs `docker start identity-watchtower` on a schedule, it doesn't recreate or duplicate
 Watchtower's setup.
 
+`containrrr/watchtower` is unmaintained (archived upstream) and its embedded Docker client hardcodes
+API version 1.25, which a Docker Engine new enough to have dropped that version rejects
+(`client version 1.25 is too old`) - `DOCKER_API_VERSION` pins it to the oldest version still
+accepted instead. If a future Docker Engine update moves that floor again, bump the value to match
+the error message's "Minimum supported API version" - or, longer term, switch to a maintained fork.
+
 ## One-time NUC setup
 
 1. Install Docker + the Compose plugin if not already present, and make sure your user can run
