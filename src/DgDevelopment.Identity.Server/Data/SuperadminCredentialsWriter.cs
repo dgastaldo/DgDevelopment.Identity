@@ -22,7 +22,16 @@ public static class SuperadminCredentialsWriter
         ==============================================
         """;
 
-        File.WriteAllText(path, content);
-        Console.WriteLine($"SuperAdmin credentials saved to: {path}");
+        try
+        {
+            File.WriteAllText(path, content);
+            Console.WriteLine($"SuperAdmin credentials saved to: {path}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Optional convenience snapshot only (the credentials are already on the console above) -
+            // a containerized deploy's read-only content root must not crash startup over this.
+            Console.WriteLine($"Could not write {path}, skipping (credentials are in the console output above): {ex.Message}");
+        }
     }
 }

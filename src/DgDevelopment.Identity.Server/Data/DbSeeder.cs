@@ -173,8 +173,17 @@ public sealed class DbSeeder(IServiceProvider serviceProvider, IConfiguration co
         ==============================================
         """;
 
-        File.WriteAllText(path, content);
-        Console.WriteLine($"Admin client credentials saved to: {path}");
+        try
+        {
+            File.WriteAllText(path, content);
+            Console.WriteLine($"Admin client credentials saved to: {path}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Optional convenience snapshot only (the credentials are already on the console above) -
+            // a containerized deploy's read-only content root must not crash startup over this.
+            Console.WriteLine($"Could not write {path}, skipping (credentials are in the console output above): {ex.Message}");
+        }
     }
 
     private static async Task SyncClientSecretToAppHostAsync(string contentRoot, Guid clientId, string clientSecret, CancellationToken ct = default)

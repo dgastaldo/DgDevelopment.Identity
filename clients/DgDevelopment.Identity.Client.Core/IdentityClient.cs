@@ -8,7 +8,7 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
 {
     public Uri GetAuthorizeUrl(string? state = null, string? codeChallenge = null, string? tenant = null)
     {
-        var url = $"{options.Authority}/connect/authorize" +
+        var url = $"{options.PublicAuthority ?? options.Authority}/connect/authorize" +
                   $"?client_id={Uri.EscapeDataString(options.ClientId)}" +
                   $"&redirect_uri={Uri.EscapeDataString(options.RedirectUri!.ToString())}" +
                   $"&response_type=code" +
@@ -28,7 +28,7 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
 
     public Uri GetLogoutUrl(string? idTokenHint = null)
     {
-        var url = $"{options.Authority}/connect/endsession" +
+        var url = $"{options.PublicAuthority ?? options.Authority}/connect/endsession" +
                   $"?post_logout_redirect_uri={Uri.EscapeDataString(options.PostLogoutRedirectUri!.ToString())}";
 
         if (idTokenHint != null)
