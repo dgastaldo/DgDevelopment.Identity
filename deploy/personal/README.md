@@ -38,6 +38,11 @@ the error message's "Minimum supported API version" - or, longer term, switch to
    `~/.docker/config.json` written in step 2, and `IDENTITY_SERVER_PUBLIC_URL`/
    `IDENTITY_PLATFORM_PUBLIC_URL` should be the NUC's actual LAN address (e.g. `http://192.168.1.5:8081`
    / `:8082`), not `localhost` - the browser, not the NUC itself, is what follows these redirects.
+   `identity-server` also needs `IDENTITY_PLATFORM_PUBLIC_URL`'s value (wired through as
+   `AdminPlatformBaseUrl`) so the seeded admin OAuth client's redirect URI matches wherever
+   `identity-platform` is actually reached from - without it, login fails with "Invalid
+   redirect_uri" regardless of what `IDENTITY_SERVER_PUBLIC_URL` is set to, since the two problems
+   are independent (see `DbSeeder.EnsureAdminClientRedirectUriAsync`).
 4. First run:
    ```bash
    docker compose pull

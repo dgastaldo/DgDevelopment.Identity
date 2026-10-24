@@ -33,6 +33,9 @@ services:
       # rotate-admin-client-secret run - identity-platform reads the same file below. Random
       # per environment (never set from outside), matching every other environment's DbSeeder.
       AdminClientConfigFile: /shared/admin-client-config.json
+      # Where the admin OAuth client's redirect URIs need to point for a browser login to work -
+      # the ones seeded by default are Aspire's local dev ports only. See DbSeeder.EnsureAdminClientRedirectUriAsync.
+      AdminPlatformBaseUrl: ${IDENTITY_PLATFORM_PUBLIC_URL}
     volumes:
       - admin-client-config:/shared
     ports:
