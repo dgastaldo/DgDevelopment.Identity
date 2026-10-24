@@ -45,4 +45,51 @@ public sealed class DbSeederTests
 
         Assert.Null(exception);
     }
+
+    [Fact]
+    public void WriteClientCredentialsWritesExpectedContent()
+    {
+        var contentRoot = Path.Combine(Path.GetTempPath(), $"dbseeder-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(contentRoot);
+        var clientId = Guid.NewGuid();
+        const string clientSecret = "test-client-secret";
+
+        try
+        {
+            DbSeeder.WriteClientCredentials(contentRoot, clientId, clientSecret);
+
+            var path = Path.Combine(contentRoot, "admin-client-credentials.txt");
+            Assert.True(File.Exists(path));
+            var content = File.ReadAllText(path);
+            Assert.Contains(clientId.ToString(), content, StringComparison.Ordinal);
+            Assert.Contains(clientSecret, content, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(contentRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void WriteClientCredentialsDoesNotThrowWhenContentRootIsUnwritable()
+    {
+        // A file, not a directory - Path.Combine(contentRoot, "...") then fails to write with
+        // DirectoryNotFoundException (an IOException), the same shape of failure a read-only
+        // container filesystem produces with UnauthorizedAccessException. Covers the "local dev
+        // convenience snapshot must not crash seeding" catch path.
+        var unwritableContentRoot = Path.Combine(Path.GetTempPath(), $"dbseeder-test-file-{Guid.NewGuid():N}");
+        File.WriteAllText(unwritableContentRoot, "");
+
+        try
+        {
+            var exception = Record.Exception(() =>
+                DbSeeder.WriteClientCredentials(unwritableContentRoot, Guid.NewGuid(), "unused-secret"));
+
+            Assert.Null(exception);
+        }
+        finally
+        {
+            File.Delete(unwritableContentRoot);
+        }
+    }
 }

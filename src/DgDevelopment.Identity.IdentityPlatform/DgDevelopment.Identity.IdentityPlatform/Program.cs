@@ -27,6 +27,11 @@ builder.Services.AddRazorComponents()
 builder.Services.AddHealthChecks();
 
 string identityBaseUriString = builder.Configuration.GetValue<string>("IdentityBaseUrl") ?? "https://localhost:7157";
+// Only needed when IdentityBaseUrl is a server-to-server address the browser can't resolve (e.g.
+// http://identity-server:8080 on the Docker network in deploy/personal) - see OidcOptions.PublicAuthority.
+// Falls back to IdentityBaseUrl, which is already correct wherever front/back share one address
+// (local dev, Aspire).
+string identityPublicBaseUriString = builder.Configuration.GetValue<string>("IdentityPublicBaseUrl") ?? identityBaseUriString;
 string adminBaseUriString = builder.Configuration.GetValue<string>("AdminBaseUrl") ?? "https://localhost:7018";
 var adminBaseUri = new Uri(adminBaseUriString.TrimEnd('/') + "/");
 string adminClientId = builder.Configuration.GetValue<string>("Identity:AdminClientId") ?? "";
@@ -35,6 +40,7 @@ string adminClientSecret = builder.Configuration.GetValue<string>("Identity:Admi
 builder.Services.AddIdentityAuthentication(new OidcOptions
 {
     Authority = identityBaseUriString,
+    PublicAuthority = identityPublicBaseUriString,
     ClientId = adminClientId,
     ClientSecret = adminClientSecret,
     RedirectUri = new Uri(adminBaseUri, "callback"),
@@ -76,7 +82,9 @@ app.MapRazorComponents<App>()
 app.MapHealthChecks("/health");
 app.MapGet("/config/identity.json", () => Results.Json(new
 {
-    IdentityBaseUrl = identityBaseUriString,
+    // The WASM client runs entirely in the browser, so every call it makes - including
+    // /connect/authorize - needs the publicly-reachable address, never the server-to-server one.
+    IdentityBaseUrl = identityPublicBaseUriString,
     AdminClientId = adminClientId
 }));
 

@@ -4,8 +4,16 @@ No GitHub Actions runner lives on the NUC. The pipeline (`05-deploy-personal.yml
 `ubuntu-latest`) only builds `identity-server`/`identity-platform` container images and pushes them
 to GHCR as `ghcr.io/dgastaldo/dgdevelopment-identity-server:personal-latest` and
 `ghcr.io/dgastaldo/dgdevelopment-identity-platform:personal-latest`. `identity-watchtower`, running
-on the NUC, polls GHCR every 5 minutes and recreates the containers when a new `personal-latest`
+on the NUC, checks GHCR every 5 minutes and recreates the containers when a new `personal-latest`
 digest appears.
+
+`identity-watchtower` runs with `--run-once`: each check is a single pass that exits 0 immediately
+after - same as e.g. Nextcloud AIO's watchtower, it sits `Exited (0)` between checks instead of
+staying `Up` continuously. `identity-watchtower-scheduler` (a tiny `ofelia` container) is what
+restarts it every 5 minutes; it's the one long-running/`Up` container of the pair. Watchtower's own
+config (volumes, env vars) lives entirely on the `identity-watchtower` service above - the scheduler
+only ever runs `docker start identity-watchtower` on a schedule, it doesn't recreate or duplicate
+Watchtower's setup.
 
 ## One-time NUC setup
 
@@ -21,7 +29,9 @@ digest appears.
    long-lived credential.
 3. Copy `docker-compose.yml` and `.env.example` (renamed to `.env`) from this folder onto the NUC.
    Fill in `.env` with real values - in particular `GHCR_DOCKER_CONFIG_FILE` should point at the
-   `~/.docker/config.json` written in step 2.
+   `~/.docker/config.json` written in step 2, and `IDENTITY_SERVER_PUBLIC_URL`/
+   `IDENTITY_PLATFORM_PUBLIC_URL` should be the NUC's actual LAN address (e.g. `http://192.168.1.5:8081`
+   / `:8082`), not `localhost` - the browser, not the NUC itself, is what follows these redirects.
 4. First run:
    ```bash
    docker compose pull
