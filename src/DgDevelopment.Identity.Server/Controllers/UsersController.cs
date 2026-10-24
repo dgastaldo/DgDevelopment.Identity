@@ -8,6 +8,7 @@ using DgDevelopment.Identity.Server.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 
 namespace DgDevelopment.Identity.Server.Controllers;
@@ -20,7 +21,8 @@ public sealed class UsersController(
     IPermissionEvaluator permissionEvaluator,
     IAuditService auditService,
     ITenantContext tenantContext,
-    IHostEnvironment hostEnvironment) : ControllerBase
+    IHostEnvironment hostEnvironment,
+    IConfiguration configuration) : ControllerBase
 {
     [HttpGet]
     [RequirePermission("identity-platform.user.read")]
@@ -94,7 +96,7 @@ public sealed class UsersController(
             // the system account's own password is changed through the admin UI/API instead of the
             // one-time seed - only for IsSystemAccount, never for a regular tenant user's password.
             if (user.IsSystemAccount)
-                SuperadminCredentialsWriter.Write(hostEnvironment.ContentRootPath, user.Username, user.PrimaryEmail?.Value ?? string.Empty, request.Password);
+                SuperadminCredentialsWriter.Write(configuration, hostEnvironment.ContentRootPath, user.Username, user.PrimaryEmail?.Value ?? string.Empty, request.Password);
 
             return NoContent();
         }
