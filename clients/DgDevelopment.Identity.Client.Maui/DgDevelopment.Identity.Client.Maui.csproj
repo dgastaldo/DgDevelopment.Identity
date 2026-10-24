@@ -52,13 +52,13 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.Maui.Controls" Version="10.0.120" />
-		<PackageReference Include="Microsoft.Extensions.Http" Version="10.0.13" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.13" />
+		<PackageReference Include="Microsoft.Maui.Controls" Version="10.0.120"/>
+		<PackageReference Include="Microsoft.Extensions.Http" Version="10.0.13"/>
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.13"/>
 	</ItemGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\DgDevelopment.Identity.Client.Core\DgDevelopment.Identity.Client.Core.csproj" />
+	  <ProjectReference Include="..\DgDevelopment.Identity.Client.Core\DgDevelopment.Identity.Client.Core.csproj"/>
 	</ItemGroup>
 
 </Project>
