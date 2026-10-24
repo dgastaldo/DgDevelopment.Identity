@@ -1,6 +1,7 @@
 namespace DgDevelopment.Identity.Server.UnitTests.Data;
 
 using DgDevelopment.Identity.Server.Data;
+using Microsoft.Extensions.Configuration;
 using Xunit;
 
 public sealed class SuperadminCredentialsWriterTests
@@ -10,13 +11,14 @@ public sealed class SuperadminCredentialsWriterTests
     {
         var contentRoot = Path.Combine(Path.GetTempPath(), $"superadmin-writer-test-{Guid.NewGuid():N}");
         Directory.CreateDirectory(contentRoot);
+        var configuration = new ConfigurationBuilder().Build();
         const string username = "identity.superadmin";
         const string email = "identity.superadmin@dgdevelopment.it";
         const string password = "test-password";
 
         try
         {
-            SuperadminCredentialsWriter.Write(contentRoot, username, email, password);
+            SuperadminCredentialsWriter.Write(configuration, contentRoot, username, email, password);
 
             var path = Path.Combine(contentRoot, "superadmin-credentials.txt");
             Assert.True(File.Exists(path));
@@ -32,6 +34,27 @@ public sealed class SuperadminCredentialsWriterTests
     }
 
     [Fact]
+    public void WriteUsesSuperadminCredentialsFileWhenConfigured()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"superadmin-writer-test-{Guid.NewGuid():N}.txt");
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["SuperadminCredentialsFile"] = path })
+            .Build();
+
+        try
+        {
+            SuperadminCredentialsWriter.Write(configuration, contentRoot: Path.GetTempPath(), "identity.superadmin", "identity.superadmin@dgdevelopment.it", "test-password");
+
+            Assert.True(File.Exists(path));
+            Assert.Contains("test-password", File.ReadAllText(path), StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void WriteDoesNotThrowWhenContentRootIsUnwritable()
     {
         // Same shape of failure a read-only container filesystem produces (UnauthorizedAccessException) -
@@ -39,11 +62,12 @@ public sealed class SuperadminCredentialsWriterTests
         // DirectoryNotFoundException (an IOException) instead, exercising the same catch path.
         var unwritableContentRoot = Path.Combine(Path.GetTempPath(), $"superadmin-writer-test-file-{Guid.NewGuid():N}");
         File.WriteAllText(unwritableContentRoot, "");
+        var configuration = new ConfigurationBuilder().Build();
 
         try
         {
             var exception = Record.Exception(() =>
-                SuperadminCredentialsWriter.Write(unwritableContentRoot, "identity.superadmin", "identity.superadmin@dgdevelopment.it", "unused-password"));
+                SuperadminCredentialsWriter.Write(configuration, unwritableContentRoot, "identity.superadmin", "identity.superadmin@dgdevelopment.it", "unused-password"));
 
             Assert.Null(exception);
         }
