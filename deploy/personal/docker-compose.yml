@@ -49,6 +49,9 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
       IdentityBaseUrl: http://identity-server:8080
+      # The browser can't resolve the Docker-internal hostname above - needed for /connect/authorize
+      # and /connect/endsession redirects, and for the WASM client (runs entirely in-browser).
+      IdentityPublicBaseUrl: ${IDENTITY_SERVER_PUBLIC_URL}
       AdminBaseUrl: ${IDENTITY_PLATFORM_PUBLIC_URL}
       AdminClientConfigFile: /shared/admin-client-config.json
     volumes:
