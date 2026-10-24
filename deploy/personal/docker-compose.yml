@@ -19,12 +19,26 @@ services:
       timeout: 5s
       retries: 10
 
+  # A fresh named volume is root-owned by default, but identity-server's container runs as a
+  # non-root user (the .NET SDK's published container images do this since .NET 8) - without this,
+  # its first write to /shared (seeding, or `rotate-admin-client-secret`) fails with
+  # UnauthorizedAccessException. Runs once per `docker compose up`, not on every container restart
+  # (identity-server's depends_on below only waits for this one to exit 0 once) - idempotent either
+  # way, chmod on an already-777 directory is a no-op.
+  admin-client-config-init:
+    image: alpine:latest
+    command: ["chmod", "777", "/shared"]
+    volumes:
+      - admin-client-config:/shared
+
   identity-server:
     image: ghcr.io/dgastaldo/dgdevelopment-identity-server:personal-latest
     restart: unless-stopped
     depends_on:
       identity-sql:
         condition: service_healthy
+      admin-client-config-init:
+        condition: service_completed_successfully
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
