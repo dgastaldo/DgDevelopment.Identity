@@ -102,7 +102,15 @@ builder.Services.AddOptions<JwtBearerOptions>("Bearer")
         {
             ValidateIssuerSigningKey = true,
             ValidateIssuer = true,
-            ValidIssuer = builder.Configuration["Identity:Issuer"] ?? "https://localhost:7157",
+            // OidcIssuerProvider stamps the `iss` claim from the *request's own* scheme+host, so
+            // the same server legitimately issues tokens under more than one value: the
+            // Docker-internal hostname identity-platform's server-side calls use, and the
+            // LAN/public address a browser uses - see deploy/personal/docker-compose.yml's
+            // Identity__Issuer. Comma-separated so a future federated-tenant issuer (or, once this
+            // server is reachable from outside the LAN, a real public domain) is one more entry,
+            // not a code change.
+            ValidIssuers = (builder.Configuration["Identity:Issuer"] ?? "https://localhost:7157")
+                .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries),
             ValidateAudience = true,
             AudienceValidator = (audiences, _, _) => audiences.Any(clientIdCache.IsValidClientId),
             IssuerSigningKeyResolver = (_, _, _, _) =>
