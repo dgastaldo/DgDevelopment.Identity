@@ -4,7 +4,7 @@ using DgDevelopment.Identity.IdentityPlatform.Components;
 using DgDevelopment.Identity.Client.Blazor;
 using DgDevelopment.Identity.Client.Core;
 using DgDevelopment.Identity.ServiceDefaults;
-using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Components.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -52,13 +52,14 @@ builder.Services.AddIdentityAuthentication(new OidcOptions
 });
 
 // [Authorize] on a Razor component also becomes authorization metadata on its SSR endpoint, which
-// ASP.NET Core's own AuthorizationMiddleware enforces independently of Blazor's AuthorizeRouteView -
-// on a failure it calls ChallengeAsync, which needs a registered IAuthenticationService. This app's
-// real auth state comes entirely from ServerIdentityAuthStateProvider's hand-decoded session cookie
-// (no ASP.NET Core cookie ticket is ever written), so this scheme exists only to give the challenge
-// somewhere to go - LoginPath mirrors RedirectToLogin.razor's client-side redirect for the same case.
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-    .AddCookie(options => options.LoginPath = "/login");
+// ASP.NET Core's own AuthorizationMiddleware enforces independently of Blazor's AuthorizeRouteView,
+// using HttpContext.User - populated here by SessionMarkerAuthenticationHandler from the same
+// identity_marker cookie ServerIdentityAuthStateProvider reads, so both layers agree on who's
+// signed in instead of HttpContext.User always reading anonymous (which 404'd into an endless
+// redirect-to-login loop even for a genuinely authenticated user). See that handler for the rest.
+const string sessionMarkerScheme = "IdentitySessionMarker";
+builder.Services.AddAuthentication(sessionMarkerScheme)
+    .AddScheme<AuthenticationSchemeOptions, SessionMarkerAuthenticationHandler>(sessionMarkerScheme, configureOptions: null);
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ServerIdentityAuthStateProvider>();
