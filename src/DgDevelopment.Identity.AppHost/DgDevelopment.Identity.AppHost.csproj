@@ -1,4 +1,4 @@
-﻿<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
+﻿<Project Sdk="Aspire.AppHost.Sdk/13.6.4">
 
   <ItemGroup>
     <ProjectReference Include="..\DgDevelopment.Identity.IdentityPlatform\DgDevelopment.Identity.IdentityPlatform.Client\DgDevelopment.Identity.IdentityPlatform.Client.csproj" />
@@ -7,8 +7,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Aspire.Hosting.Docker" Version="13.4.6" />
-    <PackageReference Include="Aspire.Hosting.SqlServer" Version="13.4.6" />
+    <PackageReference Include="Aspire.Hosting.Docker" Version="13.6.4" />
+    <PackageReference Include="Aspire.Hosting.SqlServer" Version="13.6.4" />
   </ItemGroup>
 
   <PropertyGroup>
