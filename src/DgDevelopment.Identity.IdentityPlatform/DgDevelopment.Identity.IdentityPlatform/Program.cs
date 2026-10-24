@@ -33,7 +33,9 @@ string identityBaseUriString = builder.Configuration.GetValue<string>("IdentityB
 // (local dev, Aspire).
 string identityPublicBaseUriString = builder.Configuration.GetValue<string>("IdentityPublicBaseUrl") ?? identityBaseUriString;
 string adminBaseUriString = builder.Configuration.GetValue<string>("AdminBaseUrl") ?? "https://localhost:7018";
-var adminBaseUri = new Uri(adminBaseUriString.TrimEnd('/') + "/");
+// UriBuilder.Uri normalizes a path-less base to "/" on its own - avoids a hand-built trailing
+// separator, which also reads as a hardcoded path to static analysis (csharpsquid:S1075).
+var adminBaseUri = new UriBuilder(adminBaseUriString).Uri;
 string adminClientId = builder.Configuration.GetValue<string>("Identity:AdminClientId") ?? "";
 string adminClientSecret = builder.Configuration.GetValue<string>("Identity:AdminClientSecret") ?? "";
 

@@ -1,12 +1,23 @@
 namespace DgDevelopment.Identity.Server.UnitTests.Data;
 
 using System.Text.Json;
+using DgDevelopment.Identity.Infrastructure.Data;
 using DgDevelopment.Identity.Server.Data;
+using DgDevelopment.Identity.Server.UnitTests.Testing;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Xunit;
 
-public sealed class DbSeederTests
+public sealed class DbSeederTests : IClassFixture<DatabaseFixture<DbSeederTests>>
 {
+    private readonly DatabaseFixture<DbSeederTests> _fixture;
+
+    public DbSeederTests(DatabaseFixture<DbSeederTests> fixture)
+    {
+        _fixture = fixture;
+    }
+
     [Fact]
     public void WriteAdminClientConfigForPlatformWritesExpectedJsonWhenPathConfigured()
     {
@@ -91,5 +102,64 @@ public sealed class DbSeederTests
         {
             File.Delete(unwritableContentRoot);
         }
+    }
+
+    [Fact]
+    public async Task EnsureAdminClientRedirectUriAsyncAddsConfiguredUri()
+    {
+        var clientId = await _fixture.GetSeededClientIdAsync();
+        await using var context = _fixture.CreateContext();
+
+        await DbSeeder.EnsureAdminClientRedirectUriAsync(context, "http://192.168.1.5:8082");
+
+        await using var verifyContext = _fixture.CreateContext();
+        var client = await verifyContext.Clients.SingleAsync(c => c.Id == clientId);
+        Assert.Contains(client.RedirectUris, r => r.RedirectUri == new Uri("http://192.168.1.5:8082/callback"));
+        Assert.Contains(client.PostLogoutRedirectUris, r => r.RedirectUri == new Uri("http://192.168.1.5:8082/"));
+        // The hardcoded local Aspire dev URIs seeded alongside the client stay untouched.
+        Assert.Contains(client.RedirectUris, r => r.RedirectUri == new Uri("https://localhost:7018/callback"));
+    }
+
+    [Fact]
+    public async Task EnsureAdminClientRedirectUriAsyncIsIdempotent()
+    {
+        var clientId = await _fixture.GetSeededClientIdAsync();
+        await using var context = _fixture.CreateContext();
+        await DbSeeder.EnsureAdminClientRedirectUriAsync(context, "http://192.168.1.5:8082");
+
+        await using var secondContext = _fixture.CreateContext();
+        await DbSeeder.EnsureAdminClientRedirectUriAsync(secondContext, "http://192.168.1.5:8082");
+
+        await using var verifyContext = _fixture.CreateContext();
+        var client = await verifyContext.Clients.SingleAsync(c => c.Id == clientId);
+        Assert.Single(client.RedirectUris, r => r.RedirectUri == new Uri("http://192.168.1.5:8082/callback"));
+    }
+
+    [Fact]
+    public async Task EnsureAdminClientRedirectUriAsyncIsNoOpWhenBaseUrlNotConfigured()
+    {
+        await using var context = _fixture.CreateContext();
+
+        var exception = await Record.ExceptionAsync(() =>
+            DbSeeder.EnsureAdminClientRedirectUriAsync(context, adminPlatformBaseUrl: null));
+
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public async Task EnsureAdminClientRedirectUriAsyncIsNoOpWhenNoAdminClientExists()
+    {
+        var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        await using var context = new IdentityDbContext(new DbContextOptionsBuilder<IdentityDbContext>()
+            .UseSqlite(connection)
+            .Options);
+        await context.Database.EnsureCreatedAsync();
+
+        var exception = await Record.ExceptionAsync(() =>
+            DbSeeder.EnsureAdminClientRedirectUriAsync(context, "http://192.168.1.5:8082"));
+
+        Assert.Null(exception);
+        await connection.DisposeAsync();
     }
 }
