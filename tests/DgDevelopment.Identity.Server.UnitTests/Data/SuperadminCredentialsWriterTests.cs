@@ -55,6 +55,13 @@ public sealed class SuperadminCredentialsWriterTests
     }
 
     [Fact]
+    public void WriteThrowsWhenConfigurationIsNull()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            SuperadminCredentialsWriter.Write(null!, Path.GetTempPath(), "identity.superadmin", "identity.superadmin@dgdevelopment.it", "unused-password"));
+    }
+
+    [Fact]
     public void WriteDoesNotThrowWhenContentRootIsUnwritable()
     {
         // Same shape of failure a read-only container filesystem produces (UnauthorizedAccessException) -

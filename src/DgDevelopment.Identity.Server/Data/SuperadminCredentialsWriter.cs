@@ -13,6 +13,8 @@ public static class SuperadminCredentialsWriter
     // back to contentRoot (the local dev bootstrap snapshot's original location) when unset.
     public static void Write(IConfiguration configuration, string contentRoot, string username, string email, string password)
     {
+        ArgumentNullException.ThrowIfNull(configuration);
+
         var path = configuration["SuperadminCredentialsFile"] ?? Path.Combine(contentRoot, "superadmin-credentials.txt");
         var content = $"""
         ==============================================
