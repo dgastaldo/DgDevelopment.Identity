@@ -158,7 +158,7 @@ public sealed class DbSeeder(IServiceProvider serviceProvider, IConfiguration co
         return password;
     }
 
-    private static void WriteClientCredentials(string contentRoot, Guid clientId, string clientSecret)
+    internal static void WriteClientCredentials(string contentRoot, Guid clientId, string clientSecret)
     {
         var path = Path.Combine(contentRoot, "admin-client-credentials.txt");
         var content = $"""
