@@ -45,7 +45,7 @@ public sealed class DbSeeder(IServiceProvider serviceProvider, IConfiguration co
         var superadminPassword = await SeedUsersAsync(db, hasher, tenant.Id).ConfigureAwait(false);
 
         if (superadminPassword != null)
-            SuperadminCredentialsWriter.Write(contentRoot, "identity.superadmin", "identity.superadmin@dgdevelopment.it", superadminPassword);
+            SuperadminCredentialsWriter.Write(configuration, contentRoot, "identity.superadmin", "identity.superadmin@dgdevelopment.it", superadminPassword);
 
         if (clientCredentials is { } credentials)
         {

@@ -19,12 +19,26 @@ services:
       timeout: 5s
       retries: 10
 
+  # A fresh named volume is root-owned by default, but identity-server's container runs as a
+  # non-root user (the .NET SDK's published container images do this since .NET 8) - without this,
+  # its first write to /shared (seeding, or `rotate-admin-client-secret`) fails with
+  # UnauthorizedAccessException. Runs once per `docker compose up`, not on every container restart
+  # (identity-server's depends_on below only waits for this one to exit 0 once) - idempotent either
+  # way, chmod on an already-777 directory is a no-op.
+  admin-client-config-init:
+    image: alpine:latest
+    command: ["chmod", "777", "/shared"]
+    volumes:
+      - admin-client-config:/shared
+
   identity-server:
     image: ghcr.io/dgastaldo/dgdevelopment-identity-server:personal-latest
     restart: unless-stopped
     depends_on:
       identity-sql:
         condition: service_healthy
+      admin-client-config-init:
+        condition: service_completed_successfully
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
@@ -33,9 +47,18 @@ services:
       # rotate-admin-client-secret run - identity-platform reads the same file below. Random
       # per environment (never set from outside), matching every other environment's DbSeeder.
       AdminClientConfigFile: /shared/admin-client-config.json
+      # Same shared volume as AdminClientConfigFile above, rather than the default local-dev
+      # location (the container's own, read-only content root) - readable without digging through
+      # `docker compose logs` for the one-time console printout.
+      SuperadminCredentialsFile: /shared/superadmin-credentials.txt
       # Where the admin OAuth client's redirect URIs need to point for a browser login to work -
       # the ones seeded by default are Aspire's local dev ports only. See DbSeeder.EnsureAdminClientRedirectUriAsync.
       AdminPlatformBaseUrl: ${IDENTITY_PLATFORM_PUBLIC_URL}
+      # Every host this server may legitimately see itself issue tokens as (see Program.cs's
+      # ValidIssuers comment) - the Docker-internal hostname identity-platform's server-side calls
+      # use, and the LAN address a browser uses. Add a real public domain here too once this
+      # server is reachable from outside the LAN.
+      Identity__Issuer: http://identity-server:8080,${IDENTITY_SERVER_PUBLIC_URL}
     volumes:
       - admin-client-config:/shared
     ports:
