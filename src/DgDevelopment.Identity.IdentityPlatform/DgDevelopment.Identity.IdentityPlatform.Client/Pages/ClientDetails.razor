@@ -1,4 +1,6 @@
 @page "/clients/{Id:guid}"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
 @using DgDevelopment.Identity.IdentityPlatform.Client.State
 @inject IdentityClient Api
 @inject NavigationManager Navigation
