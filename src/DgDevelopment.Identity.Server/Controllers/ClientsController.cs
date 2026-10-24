@@ -50,12 +50,12 @@ public sealed class ClientsController(
         ArgumentNullException.ThrowIfNull(request);
         try
         {
-            var (client, clientSecret) = await clientService.CreateAsync(
+            var command = new CreateClientCommand(
                 request.Name, request.ClientType, request.PlatformId, request.RequireConsent,
                 request.GrantTypes ?? [], request.Scopes ?? [], request.RedirectUris ?? [],
-                request.PostLogoutRedirectUris ?? [], request.AdminConsentScopes ?? [],
-                tenantContext.TenantId, ct).ConfigureAwait(false);
-            await auditService.RecordAsync("client.create", AuditOutcome.Success, tenantContext.TenantId, targetId: client.Id.ToString(), targetType: "client", ct: ct).ConfigureAwait(false);
+                request.PostLogoutRedirectUris ?? [], request.AdminConsentScopes ?? []);
+            var (client, clientSecret) = await clientService.CreateAsync(command, tenantContext.TenantId, ct).ConfigureAwait(false);
+            await auditService.RecordAsync(new AuditEvent("client.create", AuditOutcome.Success, tenantContext.TenantId, TargetId: client.Id.ToString(), TargetType: "client"), ct).ConfigureAwait(false);
             return CreatedAtAction(nameof(GetClientById), new { id = client.Id }, new { client = ClientResponse.From(client), clientSecret });
         }
         catch (ArgumentException ex)
@@ -75,11 +75,15 @@ public sealed class ClientsController(
     [HttpPut("{id:guid}")]
     [RequirePermission("identity-platform.client.update")]
     public Task<IActionResult> UpdateClient(Guid id, [FromBody] UpdateClientRequest request, [FromQuery] bool allTenants, CancellationToken ct)
-        => MutateAsync(id, "client.update", allTenants, canSeeAllTenants => clientService.UpdateAsync(
-            id, request.Name, request.RequireConsent, request.PlatformId,
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var command = new UpdateClientCommand(
+            request.Name, request.RequireConsent, request.PlatformId,
             request.GrantTypes ?? [], request.Scopes ?? [], request.RedirectUris ?? [],
-            request.PostLogoutRedirectUris ?? [], request.AdminConsentScopes ?? [],
-            tenantContext.TenantId, canSeeAllTenants, ct), ct);
+            request.PostLogoutRedirectUris ?? [], request.AdminConsentScopes ?? []);
+        return MutateAsync(id, "client.update", allTenants,
+            canSeeAllTenants => clientService.UpdateAsync(id, command, tenantContext.TenantId, canSeeAllTenants, ct), ct);
+    }
 
     [HttpPost("{id:guid}/regenerate-secret")]
     [RequirePermission("identity-platform.client.update")]
@@ -89,7 +93,7 @@ public sealed class ClientsController(
         {
             var canSeeAllTenants = await CanSeeAllTenantsAsync(allTenants, ct).ConfigureAwait(false);
             var clientSecret = await clientService.RegenerateSecretAsync(id, tenantContext.TenantId, canSeeAllTenants, ct).ConfigureAwait(false);
-            await auditService.RecordAsync("client.secret.regenerate", AuditOutcome.Success, tenantContext.TenantId, targetId: id.ToString(), targetType: "client", ct: ct).ConfigureAwait(false);
+            await auditService.RecordAsync(new AuditEvent("client.secret.regenerate", AuditOutcome.Success, tenantContext.TenantId, TargetId: id.ToString(), TargetType: "client"), ct).ConfigureAwait(false);
             return Ok(new ClientSecretResponse(clientSecret));
         }
         catch (KeyNotFoundException ex)
@@ -124,7 +128,7 @@ public sealed class ClientsController(
         {
             var canSeeAllTenants = await CanSeeAllTenantsAsync(allTenants, ct).ConfigureAwait(false);
             await mutation(canSeeAllTenants).ConfigureAwait(false);
-            await auditService.RecordAsync(action, AuditOutcome.Success, tenantContext.TenantId, targetId: id.ToString(), targetType: "client", ct: ct).ConfigureAwait(false);
+            await auditService.RecordAsync(new AuditEvent(action, AuditOutcome.Success, tenantContext.TenantId, TargetId: id.ToString(), TargetType: "client"), ct).ConfigureAwait(false);
             return NoContent();
         }
         catch (KeyNotFoundException ex)

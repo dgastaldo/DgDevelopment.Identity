@@ -14,6 +14,7 @@ namespace DgDevelopment.Identity.Server.Pages.Connect;
 
 public sealed class AuthorizeModel : PageModel
 {
+    private const string ErrorPage = "/Error";
     private readonly IAuthorizationService _authorizationService;
     private readonly IUserRepository _userRepo;
     private readonly IServerSessionService _sessionService;
@@ -82,14 +83,14 @@ public sealed class AuthorizeModel : PageModel
             CodeChallenge, CodeChallengeMethod)).ConfigureAwait(false);
 
         if (!result.IsValid)
-            return RedirectToPage("/Error", new { errorCode = result.Error, errorDescription = result.ErrorDescription });
+            return RedirectToPage(ErrorPage, new { errorCode = result.Error, errorDescription = result.ErrorDescription });
 
         if (!User.Identity!.IsAuthenticated)
             return RedirectToLogin();
 
         var userIdValue = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!Guid.TryParse(userIdValue, out var userId))
-            return RedirectToPage("/Error", new { errorCode = "invalid_user", errorDescription = "User not found." });
+            return RedirectToPage(ErrorPage, new { errorCode = "invalid_user", errorDescription = "User not found." });
 
         if (await _userRepo.GetByIdAsync(userId).ConfigureAwait(false) == null)
         {
@@ -106,7 +107,7 @@ public sealed class AuthorizeModel : PageModel
 
         var selection = await _tenantSelectionService.ResolveAsync(userId, Tenant).ConfigureAwait(false);
         if (selection.Denied)
-            return RedirectToPage("/Error", new { errorCode = "access_denied", errorDescription = "The user does not belong to any active tenant." });
+            return RedirectToPage(ErrorPage, new { errorCode = "access_denied", errorDescription = "The user does not belong to any active tenant." });
 
         if (selection.TenantId is null)
         {
@@ -143,11 +144,11 @@ public sealed class AuthorizeModel : PageModel
     {
         var user = await _userRepo.GetByIdAsync(userId).ConfigureAwait(false);
         if (user == null)
-            return RedirectToPage("/Error", new { errorCode = "invalid_user", errorDescription = "User not found." });
+            return RedirectToPage(ErrorPage, new { errorCode = "invalid_user", errorDescription = "User not found." });
 
         var scopes = Scope.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var code = await _authorizationService.CreateAuthorizationCodeAsync(
-            tenantId, client, user, scopes, RedirectUri, CodeChallenge, CodeChallengeMethod).ConfigureAwait(false);
+            new AuthorizationCodeRequest(tenantId, client, user, scopes, RedirectUri, CodeChallenge, CodeChallengeMethod)).ConfigureAwait(false);
 
         var redirect = $"{RedirectUri}?code={Uri.EscapeDataString(code)}";
         if (State != null)

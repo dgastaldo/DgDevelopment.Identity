@@ -26,6 +26,7 @@ public sealed class UserRepository : IUserRepository
             .Include(u => u.Roles)
             .Include(u => u.Permissions)
             .Include(u => u.Groups)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(u => u.Id == id, ct).ConfigureAwait(false);
     }
 
@@ -39,6 +40,7 @@ public sealed class UserRepository : IUserRepository
             .Include(u => u.Roles)
             .Include(u => u.Permissions)
             .Include(u => u.Groups)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(u => u.Username == username, ct).ConfigureAwait(false);
     }
 
@@ -54,6 +56,7 @@ public sealed class UserRepository : IUserRepository
             .Include(u => u.Roles)
             .Include(u => u.Permissions)
             .Include(u => u.Groups)
+            .AsSplitQuery()
             .Where(u => u.Emails.Any(e => e.Email.Value == normalizedEmail))
             .FirstOrDefaultAsync(ct).ConfigureAwait(false);
     }
@@ -68,6 +71,7 @@ public sealed class UserRepository : IUserRepository
             .Include(u => u.Roles)
             .Include(u => u.Permissions)
             .Include(u => u.Groups)
+            .AsSplitQuery()
             .Where(u => u.Logins.Any(l => l.Provider == provider && l.ProviderKey == providerKey))
             .FirstOrDefaultAsync(ct).ConfigureAwait(false);
     }
@@ -126,7 +130,8 @@ public sealed class UserRepository : IUserRepository
             .Include(u => u.Logins)
             .Include(u => u.Roles)
             .Include(u => u.Permissions)
-            .Include(u => u.Groups);
+            .Include(u => u.Groups)
+            .AsSplitQuery();
 
     public async Task AddAsync(User user, CancellationToken ct = default)
     {

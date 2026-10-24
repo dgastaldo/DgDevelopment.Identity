@@ -1,12 +1,13 @@
+using System.Text.Json.Serialization;
 using DgDevelopment.Identity.Domain.Entities;
 
 namespace DgDevelopment.Identity.Server.Models;
 
 public sealed record CreateClientRequest(
     string Name,
-    ClientType ClientType,
+    [property: JsonRequired] ClientType ClientType,
     Guid? PlatformId,
-    bool RequireConsent,
+    [property: JsonRequired] bool RequireConsent,
     IReadOnlyCollection<string>? GrantTypes,
     IReadOnlyCollection<string>? Scopes,
     IReadOnlyCollection<Uri>? RedirectUris,
@@ -15,7 +16,7 @@ public sealed record CreateClientRequest(
 
 public sealed record UpdateClientRequest(
     string Name,
-    bool RequireConsent,
+    [property: JsonRequired] bool RequireConsent,
     Guid? PlatformId,
     IReadOnlyCollection<string>? GrantTypes,
     IReadOnlyCollection<string>? Scopes,
@@ -23,7 +24,7 @@ public sealed record UpdateClientRequest(
     IReadOnlyCollection<Uri>? PostLogoutRedirectUris,
     IReadOnlyCollection<string>? AdminConsentScopes);
 
-public sealed record SetClientActiveRequest(bool IsActive);
+public sealed record SetClientActiveRequest([property: JsonRequired] bool IsActive);
 
 public sealed record ClientSecretResponse(string ClientSecret);
 

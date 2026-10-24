@@ -20,11 +20,10 @@ public sealed class AuditLogRepository : IAuditLogRepository
         await _context.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
-    public async Task<IReadOnlyCollection<AuditLog>> GetPagedAsync(Guid tenantId, bool allTenants, string? actorType = null,
-        Guid? actorId = null, string? action = null, string? targetId = null, DateTime? fromDate = null, DateTime? toDate = null,
-        int skip = 0, int take = 50, CancellationToken ct = default)
+    public async Task<IReadOnlyCollection<AuditLog>> GetPagedAsync(AuditLogFilter filter, int skip = 0, int take = 50, CancellationToken ct = default)
     {
-        var query = Filter(tenantId, allTenants, actorType, actorId, action, targetId, fromDate, toDate);
+        ArgumentNullException.ThrowIfNull(filter);
+        var query = Filter(filter);
 
         return await query
             .OrderByDescending(a => a.Timestamp)
@@ -33,38 +32,37 @@ public sealed class AuditLogRepository : IAuditLogRepository
             .ToListAsync(ct).ConfigureAwait(false);
     }
 
-    public async Task<int> CountAsync(Guid tenantId, bool allTenants, string? actorType = null, Guid? actorId = null,
-        string? action = null, string? targetId = null, DateTime? fromDate = null, DateTime? toDate = null, CancellationToken ct = default)
+    public async Task<int> CountAsync(AuditLogFilter filter, CancellationToken ct = default)
     {
-        var query = Filter(tenantId, allTenants, actorType, actorId, action, targetId, fromDate, toDate);
+        ArgumentNullException.ThrowIfNull(filter);
+        var query = Filter(filter);
         return await query.CountAsync(ct).ConfigureAwait(false);
     }
 
-    private IQueryable<AuditLog> Filter(Guid tenantId, bool allTenants, string? actorType, Guid? actorId,
-        string? action, string? targetId, DateTime? fromDate, DateTime? toDate)
+    private IQueryable<AuditLog> Filter(AuditLogFilter filter)
     {
         var query = _context.AuditLogs.AsNoTracking();
 
-        if (!allTenants)
-            query = query.Where(a => a.TenantId == tenantId);
+        if (!filter.AllTenants)
+            query = query.Where(a => a.TenantId == filter.TenantId);
 
-        if (actorType is not null)
-            query = query.Where(a => a.ActorType == actorType);
+        if (filter.ActorType is not null)
+            query = query.Where(a => a.ActorType == filter.ActorType);
 
-        if (actorId.HasValue)
-            query = query.Where(a => a.ActorId == actorId.Value);
+        if (filter.ActorId.HasValue)
+            query = query.Where(a => a.ActorId == filter.ActorId.Value);
 
-        if (action is not null)
-            query = query.Where(a => a.Action == action);
+        if (filter.Action is not null)
+            query = query.Where(a => a.Action == filter.Action);
 
-        if (targetId is not null)
-            query = query.Where(a => a.TargetId == targetId);
+        if (filter.TargetId is not null)
+            query = query.Where(a => a.TargetId == filter.TargetId);
 
-        if (fromDate.HasValue)
-            query = query.Where(a => a.Timestamp >= fromDate.Value);
+        if (filter.FromDate.HasValue)
+            query = query.Where(a => a.Timestamp >= filter.FromDate.Value);
 
-        if (toDate.HasValue)
-            query = query.Where(a => a.Timestamp <= toDate.Value);
+        if (filter.ToDate.HasValue)
+            query = query.Where(a => a.Timestamp <= filter.ToDate.Value);
 
         return query;
     }

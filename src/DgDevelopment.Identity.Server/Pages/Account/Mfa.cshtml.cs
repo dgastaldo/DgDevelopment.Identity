@@ -136,7 +136,6 @@ public sealed class MfaModel : PageModel
 
     public async Task<IActionResult> OnGetChallengeStatusAsync([FromQuery] Guid challengeId)
     {
-        var userId = GetUserId();
         var status = await _pushMfaService.GetChallengeStatusAsync(challengeId).ConfigureAwait(false);
         return new JsonResult(new { status = status.ToString(), approved = status == Domain.Entities.MfaChallengeStatus.Approved });
     }

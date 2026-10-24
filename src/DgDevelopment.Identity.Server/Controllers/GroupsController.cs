@@ -51,7 +51,7 @@ public sealed class GroupsController(
         try
         {
             var group = await groupService.CreateAsync(request.Name, request.Description, request.ParentGroupId, tenantContext.TenantId, ct).ConfigureAwait(false);
-            await auditService.RecordAsync("group.create", AuditOutcome.Success, tenantContext.TenantId, targetId: group.Id.ToString(), targetType: "group", ct: ct).ConfigureAwait(false);
+            await auditService.RecordAsync(new AuditEvent("group.create", AuditOutcome.Success, tenantContext.TenantId, TargetId: group.Id.ToString(), TargetType: "group"), ct).ConfigureAwait(false);
             return CreatedAtAction(nameof(GetGroupById), new { id = group.Id }, GroupResponse.From(group));
         }
         catch (ArgumentException ex)
@@ -102,7 +102,7 @@ public sealed class GroupsController(
         {
             var canSeeAllTenants = await CanSeeAllTenantsAsync(allTenants, ct).ConfigureAwait(false);
             await mutation(canSeeAllTenants).ConfigureAwait(false);
-            await auditService.RecordAsync(action, AuditOutcome.Success, tenantContext.TenantId, targetId: id.ToString(), targetType: "group", ct: ct).ConfigureAwait(false);
+            await auditService.RecordAsync(new AuditEvent(action, AuditOutcome.Success, tenantContext.TenantId, TargetId: id.ToString(), TargetType: "group"), ct).ConfigureAwait(false);
             return NoContent();
         }
         catch (KeyNotFoundException ex)

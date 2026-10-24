@@ -51,7 +51,7 @@ public sealed class PlatformsController(
         try
         {
             var platform = await platformService.CreateAsync(request.Name, request.Description, request.PermissionMode, tenantContext.TenantId, ct).ConfigureAwait(false);
-            await auditService.RecordAsync("platform.create", AuditOutcome.Success, tenantContext.TenantId, targetId: platform.Id.ToString(), targetType: "platform", ct: ct).ConfigureAwait(false);
+            await auditService.RecordAsync(new AuditEvent("platform.create", AuditOutcome.Success, tenantContext.TenantId, TargetId: platform.Id.ToString(), TargetType: "platform"), ct).ConfigureAwait(false);
             return CreatedAtAction(nameof(GetPlatformById), new { id = platform.Id }, PlatformResponse.From(platform));
         }
         catch (ArgumentException ex)
@@ -79,7 +79,7 @@ public sealed class PlatformsController(
         {
             var canSeeAllTenants = await CanSeeAllTenantsAsync(allTenants, ct).ConfigureAwait(false);
             await mutation(canSeeAllTenants).ConfigureAwait(false);
-            await auditService.RecordAsync(action, AuditOutcome.Success, tenantContext.TenantId, targetId: id.ToString(), targetType: "platform", ct: ct).ConfigureAwait(false);
+            await auditService.RecordAsync(new AuditEvent(action, AuditOutcome.Success, tenantContext.TenantId, TargetId: id.ToString(), TargetType: "platform"), ct).ConfigureAwait(false);
             return NoContent();
         }
         catch (KeyNotFoundException ex)

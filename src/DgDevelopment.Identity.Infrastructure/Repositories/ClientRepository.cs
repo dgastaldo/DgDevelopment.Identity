@@ -16,6 +16,7 @@ public sealed class ClientRepository(IdentityDbContext context) : IClientReposit
             .Include(c => c.AdminConsentScopes)
             .Include(c => c.RedirectUris)
             .Include(c => c.PostLogoutRedirectUris)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(c => c.Id == id, ct).ConfigureAwait(false);
     }
 
@@ -31,6 +32,7 @@ public sealed class ClientRepository(IdentityDbContext context) : IClientReposit
             .Include(c => c.AdminConsentScopes)
             .Include(c => c.RedirectUris)
             .Include(c => c.PostLogoutRedirectUris)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(c => c.ClientId == parsedClientId, ct).ConfigureAwait(false);
     }
 
@@ -43,6 +45,7 @@ public sealed class ClientRepository(IdentityDbContext context) : IClientReposit
             .Include(c => c.AdminConsentScopes)
             .Include(c => c.RedirectUris)
             .Include(c => c.PostLogoutRedirectUris)
+            .AsSplitQuery()
             .OrderBy(c => c.Name)
             .ToListAsync(ct).ConfigureAwait(false);
     }
@@ -99,6 +102,7 @@ public sealed class ClientRepository(IdentityDbContext context) : IClientReposit
             .Include(c => c.AdminConsentScopes)
             .Include(c => c.RedirectUris)
             .Include(c => c.PostLogoutRedirectUris)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(c => c.Id == client.Id, ct).ConfigureAwait(false)
             ?? throw new InvalidOperationException("Client not found.");
 

@@ -37,49 +37,14 @@ public class IdentityAuthStateProvider(
         if (_tokens == null)
             return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
 
-        if (_tokens.IsExpired() && _tokens.RefreshToken != null)
-        {
-            try
-            {
-                _tokens = await client.RefreshTokenAsync(_tokens.RefreshToken).ConfigureAwait(false);
-                await tokenStore.SaveTokensAsync(_tokens).ConfigureAwait(false);
-            }
-            catch (HttpRequestException)
-            {
-                return await ClearTokensAndReturnAnonymousAsync().ConfigureAwait(false);
-            }
-            catch (TaskCanceledException)
-            {
-                return await ClearTokensAndReturnAnonymousAsync().ConfigureAwait(false);
-            }
-            catch (JsonException)
-            {
-                return await ClearTokensAndReturnAnonymousAsync().ConfigureAwait(false);
-            }
-        }
+        if (_tokens.IsExpired() && _tokens.RefreshToken != null && !await TryRefreshTokensAsync().ConfigureAwait(false))
+            return await ClearTokensAndReturnAnonymousAsync().ConfigureAwait(false);
 
         if (_tokens == null || _tokens.IsExpired())
             return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
 
-        if (_userInfo == null)
-        {
-            try
-            {
-                _userInfo = await client.GetUserInfoAsync(_tokens.AccessToken).ConfigureAwait(false);
-            }
-            catch (HttpRequestException)
-            {
-                return await ClearTokensAndReturnAnonymousAsync().ConfigureAwait(false);
-            }
-            catch (TaskCanceledException)
-            {
-                return await ClearTokensAndReturnAnonymousAsync().ConfigureAwait(false);
-            }
-            catch (JsonException)
-            {
-                return await ClearTokensAndReturnAnonymousAsync().ConfigureAwait(false);
-            }
-        }
+        if (_userInfo == null && !await TryLoadUserInfoAsync().ConfigureAwait(false))
+            return await ClearTokensAndReturnAnonymousAsync().ConfigureAwait(false);
 
         _currentUser = BuildPrincipal(_userInfo!, _tokens.AccessToken);
 
@@ -98,6 +63,33 @@ public class IdentityAuthStateProvider(
         _currentUser = null;
         _userInfo = null;
         return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+    }
+
+    private async Task<bool> TryRefreshTokensAsync()
+    {
+        try
+        {
+            _tokens = await client.RefreshTokenAsync(_tokens!.RefreshToken!).ConfigureAwait(false);
+            await tokenStore.SaveTokensAsync(_tokens).ConfigureAwait(false);
+            return true;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
+        {
+            return false;
+        }
+    }
+
+    private async Task<bool> TryLoadUserInfoAsync()
+    {
+        try
+        {
+            _userInfo = await client.GetUserInfoAsync(_tokens!.AccessToken).ConfigureAwait(false);
+            return true;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
+        {
+            return false;
+        }
     }
 
     /// <summary>

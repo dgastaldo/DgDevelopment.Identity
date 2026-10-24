@@ -1,5 +1,7 @@
 namespace DgDevelopment.Identity.Domain.Entities;
 
+public sealed record RefreshTokenOptions(Guid? PreviousTokenId = null, int LifetimeDays = 30);
+
 public sealed class RefreshToken
 {
     public Guid Id { get; private set; }
@@ -17,7 +19,7 @@ public sealed class RefreshToken
     private RefreshToken() { }
 
     public RefreshToken(Guid tenantId, string tokenHash, Guid clientId, Guid userId, Guid sessionId, string[] scopes,
-        Guid? previousTokenId = null, int lifetimeDays = 30)
+        RefreshTokenOptions? options = null)
     {
         Id = Guid.NewGuid();
         TenantId = tenantId;
@@ -26,10 +28,10 @@ public sealed class RefreshToken
         UserId = userId;
         SessionId = sessionId;
         Scopes = string.Join(' ', scopes);
-        PreviousTokenId = previousTokenId;
+        PreviousTokenId = options?.PreviousTokenId;
         IsRevoked = false;
         CreatedAt = DateTime.UtcNow;
-        ExpiresAt = DateTime.UtcNow.AddDays(lifetimeDays);
+        ExpiresAt = DateTime.UtcNow.AddDays(options?.LifetimeDays ?? 30);
     }
 
     public void Revoke() => IsRevoked = true;

@@ -55,7 +55,7 @@ public sealed class UsersController(
         try
         {
             var user = await userService.CreateAsync(request.Username, request.Password, request.Email, request.IsSystemAccount, tenantContext.TenantId, ct).ConfigureAwait(false);
-            await auditService.RecordAsync("user.create", AuditOutcome.Success, tenantContext.TenantId, targetId: user.Id.ToString(), targetType: "user", ct: ct).ConfigureAwait(false);
+            await auditService.RecordAsync(new AuditEvent("user.create", AuditOutcome.Success, tenantContext.TenantId, TargetId: user.Id.ToString(), TargetType: "user"), ct).ConfigureAwait(false);
             return CreatedAtAction(nameof(GetUserById), new { id = user.Id }, UserResponse.From(user));
         }
         catch (ArgumentException ex)
@@ -88,7 +88,7 @@ public sealed class UsersController(
         {
             var canSeeAllTenants = await CanSeeAllTenantsAsync(allTenants, ct).ConfigureAwait(false);
             var user = await userService.ResetPasswordAsync(id, request.Password, tenantContext.TenantId, canSeeAllTenants, ct).ConfigureAwait(false);
-            await auditService.RecordAsync("user.reset-password", AuditOutcome.Success, tenantContext.TenantId, targetId: id.ToString(), targetType: "user", ct: ct).ConfigureAwait(false);
+            await auditService.RecordAsync(new AuditEvent("user.reset-password", AuditOutcome.Success, tenantContext.TenantId, TargetId: id.ToString(), TargetType: "user"), ct).ConfigureAwait(false);
 
             // Keeps the local dev bootstrap snapshot (superadmin-credentials.txt) truthful whenever
             // the system account's own password is changed through the admin UI/API instead of the
@@ -155,7 +155,7 @@ public sealed class UsersController(
         {
             var canSeeAllTenants = await CanSeeAllTenantsAsync(allTenants, ct).ConfigureAwait(false);
             await mutation(canSeeAllTenants).ConfigureAwait(false);
-            await auditService.RecordAsync(action, AuditOutcome.Success, tenantContext.TenantId, targetId: id.ToString(), targetType: "user", ct: ct).ConfigureAwait(false);
+            await auditService.RecordAsync(new AuditEvent(action, AuditOutcome.Success, tenantContext.TenantId, TargetId: id.ToString(), TargetType: "user"), ct).ConfigureAwait(false);
             return NoContent();
         }
         catch (KeyNotFoundException ex)

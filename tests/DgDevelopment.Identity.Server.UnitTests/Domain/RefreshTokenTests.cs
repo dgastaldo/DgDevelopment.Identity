@@ -29,7 +29,7 @@ public sealed class RefreshTokenTests
     {
         var previousId = Guid.NewGuid();
 
-        var token = new RefreshToken(TenantId,"h", ClientId, UserId, SessionId, ["openid"], previousId);
+        var token = new RefreshToken(TenantId,"h", ClientId, UserId, SessionId, ["openid"], new RefreshTokenOptions(previousId));
 
         Assert.Equal(previousId, token.PreviousTokenId);
     }
@@ -55,7 +55,7 @@ public sealed class RefreshTokenTests
     [Fact]
     public void IsExpiredTrueForZeroDayLifetime()
     {
-        var token = new RefreshToken(TenantId,"h", ClientId, UserId, SessionId, ["openid"], lifetimeDays: 0);
+        var token = new RefreshToken(TenantId,"h", ClientId, UserId, SessionId, ["openid"], new RefreshTokenOptions(LifetimeDays: 0));
 
         Assert.True(token.IsExpired());
     }

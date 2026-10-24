@@ -218,4 +218,11 @@ app.MapHub<DgDevelopment.Identity.Server.Hubs.SessionHub>("/hubs/session");
 await app.RunAsync();
 return 0;
 
-public partial class Program;
+// protected, not public: WebApplicationFactory<Program> only needs the type itself, never
+// instantiates Program directly (it builds the host its own way).
+public partial class Program
+{
+    protected Program()
+    {
+    }
+}

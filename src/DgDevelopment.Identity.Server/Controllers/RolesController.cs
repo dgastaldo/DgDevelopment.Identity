@@ -51,7 +51,7 @@ public sealed class RolesController(
         try
         {
             var role = await roleService.CreateAsync(request.Name, request.Description, request.PlatformId, tenantContext.TenantId, ct).ConfigureAwait(false);
-            await auditService.RecordAsync("role.create", AuditOutcome.Success, tenantContext.TenantId, targetId: role.Id.ToString(), targetType: "role", ct: ct).ConfigureAwait(false);
+            await auditService.RecordAsync(new AuditEvent("role.create", AuditOutcome.Success, tenantContext.TenantId, TargetId: role.Id.ToString(), TargetType: "role"), ct).ConfigureAwait(false);
             return CreatedAtAction(nameof(GetRoleById), new { id = role.Id }, RoleResponse.From(role));
         }
         catch (ArgumentException ex)
@@ -97,7 +97,7 @@ public sealed class RolesController(
         {
             var canSeeAllTenants = await CanSeeAllTenantsAsync(allTenants, ct).ConfigureAwait(false);
             await mutation(canSeeAllTenants).ConfigureAwait(false);
-            await auditService.RecordAsync(action, AuditOutcome.Success, tenantContext.TenantId, targetId: id.ToString(), targetType: "role", ct: ct).ConfigureAwait(false);
+            await auditService.RecordAsync(new AuditEvent(action, AuditOutcome.Success, tenantContext.TenantId, TargetId: id.ToString(), TargetType: "role"), ct).ConfigureAwait(false);
             return NoContent();
         }
         catch (KeyNotFoundException ex)

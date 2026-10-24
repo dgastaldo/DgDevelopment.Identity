@@ -20,6 +20,7 @@ public sealed class ForgotPasswordModel(
 
     public void OnGet()
     {
+        // No server-side logic needed - the page just renders the request-reset form.
     }
 
     public async Task<IActionResult> OnPostAsync()

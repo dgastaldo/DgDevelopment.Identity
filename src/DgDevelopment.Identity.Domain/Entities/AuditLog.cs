@@ -6,6 +6,12 @@ public enum AuditOutcome
     Failure
 }
 
+public sealed record AuditActorInfo(Guid? Id = null, string? Type = null);
+
+public sealed record AuditTargetInfo(string? Id = null, string? Type = null);
+
+public sealed record AuditRequestContext(string? IpAddress = null, string? UserAgent = null);
+
 public sealed class AuditLog
 {
     public Guid Id { get; private set; }
@@ -23,21 +29,20 @@ public sealed class AuditLog
 
     private AuditLog() { }
 
-    public AuditLog(Guid tenantId, string action, AuditOutcome outcome, Guid? actorId = null, string? actorType = null,
-        string? targetId = null, string? targetType = null, string? details = null,
-        string? ipAddress = null, string? userAgent = null)
+    public AuditLog(Guid tenantId, string action, AuditOutcome outcome, AuditActorInfo? actor = null,
+        AuditTargetInfo? target = null, string? details = null, AuditRequestContext? requestContext = null)
     {
         Id = Guid.NewGuid();
         TenantId = tenantId;
         Action = action;
         Outcome = outcome;
-        ActorId = actorId;
-        ActorType = actorType;
-        TargetId = targetId;
-        TargetType = targetType;
+        ActorId = actor?.Id;
+        ActorType = actor?.Type;
+        TargetId = target?.Id;
+        TargetType = target?.Type;
         Details = details;
-        IpAddress = ipAddress;
-        UserAgent = userAgent;
+        IpAddress = requestContext?.IpAddress;
+        UserAgent = requestContext?.UserAgent;
         Timestamp = DateTime.UtcNow;
     }
 }

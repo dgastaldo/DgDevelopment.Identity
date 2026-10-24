@@ -132,9 +132,9 @@
             var scopes = Split(CreateModel.Scopes);
             var redirectUris = SplitLines(CreateModel.RedirectUris).Select(u => new Uri(u)).ToList();
 
-            var result = await Api.CreateClientAsync(
+            var result = await Api.CreateClientAsync(new CreateClientParameters(
                 CreateModel.Name, CreateModel.ClientType, null, true,
-                grantTypes, scopes, redirectUris, [], []).ConfigureAwait(false);
+                grantTypes, scopes, redirectUris, [], [])).ConfigureAwait(false);
 
             if (result is { } created)
             {
