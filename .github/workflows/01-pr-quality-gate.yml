@@ -27,7 +27,7 @@ jobs:
   snyk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # snyk/actions/dotnet is deprecated (confirmed against snyk/actions' own repo, which lists it
       # under "Deprecated Actions"), with no drop-in dotnet-specific replacement - the recommended
@@ -35,7 +35,7 @@ jobs:
       # overhead the old action had (it ran `docker run snyk/snyk:dotnet`); this shells out to the
       # dotnet SDK already on the runner instead.
       - name: Setup .NET (Snyk's CLI shells out to dotnet to resolve NuGet dependencies)
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
@@ -55,12 +55,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: snyk
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # SonarQube wants full history for blame/new-code analysis
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
@@ -197,8 +197,8 @@ jobs:
   # build-windows:
   #   runs-on: windows-latest
   #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-dotnet@v4
+  #     - uses: actions/checkout@v7
+  #     - uses: actions/setup-dotnet@v6
   #       with:
   #         dotnet-version: 10.0.x
   #     - run: dotnet build clients/DgDevelopment.Identity.Client.Wpf/DgDevelopment.Identity.Client.Wpf.csproj -c Release
