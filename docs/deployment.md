@@ -723,6 +723,32 @@ Ordering in the PR pipeline (`01-pr-quality-gate.yml`): Snyk (dependency scan, f
 SonarCloud scan + coverage (wraps the test run), both on GitHub-hosted `ubuntu-latest`. CodeQL's
 Default Setup runs independently, outside this workflow's own job graph.
 
+### Automatic Dependency Submission (NuGet) — overridden to exclude `Client.Maui`
+
+GitHub auto-generates a "Automatic Dependency Submission (NuGet)" workflow for any repo that
+doesn't already submit its own dependency snapshot for an ecosystem (Settings → Code security →
+Dependency graph). It isn't one of this repo's own workflow files — it only shows up as a check
+run (`dynamic/dependency-graph/auto-submission` in Actions) — and it restores every `*.csproj`/
+`*.sln` in the repo one by one before uploading the dependency graph. It always failed on
+`clients/DgDevelopment.Identity.Client.Maui/DgDevelopment.Identity.Client.Maui.csproj`
+(`net10.0-android`), hitting the same `NETSDK1147: ... maui-android` workload gap as CodeQL's
+`autobuild` did above — the hosted runner this check runs on doesn't have that workload installed.
+Not a regression from any PR's own diff; it would fail identically on any push, including `develop`
+itself, since it isn't scoped to what a PR actually changes.
+
+**Current setup**: replaced with our own `.github/workflows/dependency-submission-nuget.yml`,
+triggered on push to `develop` (plus `workflow_dispatch`), which restores every project except
+`Client.Maui` and then calls the same underlying action GitHub's own auto-generated workflow uses
+(`actions/component-detection-dependency-submission-action`), with `Client.Maui`'s directory also
+passed to that action's `directoryExclusionList` so it's never scanned in a half-restored state.
+GitHub's documented behavior is to stop auto-generating a submission workflow for an ecosystem once
+the repo submits its own snapshot for that ecosystem - this wasn't independently verified against
+GitHub's docs pages in the session that wrote this workflow (`docs.github.com` was unreachable from
+that sandbox's network at the time), so if the auto-generated check still shows up on `develop`
+after this merges, that assumption needs revisiting - the fallback is either installing the
+`maui-android` workload in a step before restore, or disabling automatic dependency submission for
+this repo entirely under the Settings page above.
+
 ## Open items
 
 **Resolved this round:**
