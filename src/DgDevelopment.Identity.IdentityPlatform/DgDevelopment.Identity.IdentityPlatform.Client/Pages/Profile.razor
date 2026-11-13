@@ -1,4 +1,6 @@
 @page "/profile"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
 @inject IdentityClient Api
 
 <PageTitle>Profile | IdentityPlatform</PageTitle>
