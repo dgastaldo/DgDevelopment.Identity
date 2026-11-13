@@ -5,7 +5,7 @@
     "build:css": "tailwindcss -i ./wwwroot/css/input.css -o ./wwwroot/css/tailwind.css --minify"
   },
   "devDependencies": {
-    "tailwindcss": "^4.1.0",
+    "tailwindcss": "^4.3.5",
     "@tailwindcss/cli": "^4.1.0"
   },
   "dependencies": {
