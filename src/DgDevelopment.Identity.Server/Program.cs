@@ -21,7 +21,6 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
-using System.Net;
 using System.Threading.RateLimiting;
 
 if (args.Length > 0 && args[0] == "rotate-admin-client-secret")
@@ -188,7 +187,7 @@ if (!string.IsNullOrWhiteSpace(trustedProxySubnet))
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
     {
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-        options.KnownNetworks.Add(IPNetwork.Parse(trustedProxySubnet));
+        options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(trustedProxySubnet));
     });
 }
 

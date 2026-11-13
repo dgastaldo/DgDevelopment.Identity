@@ -7,7 +7,6 @@ using DgDevelopment.Identity.ServiceDefaults;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
-using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -81,7 +80,7 @@ if (!string.IsNullOrWhiteSpace(trustedProxySubnet))
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
     {
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-        options.KnownNetworks.Add(IPNetwork.Parse(trustedProxySubnet));
+        options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(trustedProxySubnet));
     });
 }
 
