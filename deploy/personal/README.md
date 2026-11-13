@@ -96,8 +96,49 @@ Edit the two `image:` tags in `docker-compose.yml` from `:personal-latest` to a 
 version at the time it was deployed), then `docker compose up -d`. `identity-watchtower` will leave a
 pinned version tag alone since it only watches `personal-latest`'s digest.
 
+## Public access (nginx + step-ca)
+
+Beyond the LAN, the two apps are reachable at `https://idp.homenet.dgdevelopment.it` (identity-server)
+and `https://identity-admin.homenet.dgdevelopment.it` (identity-platform) - both on Azure DNS zones
+you already control, kept pointed at the NUC's dynamic public IP by the separate
+`azure-ddns-updater` project. `nginx` (added to `docker-compose.yml`) terminates TLS for both
+hostnames on `443` and proxies to the two apps in plain HTTP over the `identity-net` Docker network -
+the apps themselves never see TLS directly. The `8081`/`8082` LAN HTTP ports still work as before,
+unaffected.
+
+Setup, once the DNS records already resolve to the NUC's public IP and port `443` is forwarded to it
+on your router:
+
+1. **Certificates**: this repo never requests or renews anything - that stays entirely on your
+   step-ca machine's own ACME/issuance process, for both `idp.homenet.dgdevelopment.it` and
+   `identity-admin.homenet.dgdevelopment.it`. Land each domain's `fullchain.pem`/`privkey.pem` in a
+   directory on the NUC laid out as:
+   ```
+   <TLS_CERTS_DIR>/idp.homenet.dgdevelopment.it/fullchain.pem
+   <TLS_CERTS_DIR>/idp.homenet.dgdevelopment.it/privkey.pem
+   <TLS_CERTS_DIR>/identity-admin.homenet.dgdevelopment.it/fullchain.pem
+   <TLS_CERTS_DIR>/identity-admin.homenet.dgdevelopment.it/privkey.pem
+   ```
+   (however they actually get there from the step-ca machine - rsync/scp/shared mount - is outside
+   this repo.) `nginx` doesn't reload a renewed certificate on its own: add
+   `docker compose exec nginx nginx -s reload` as a post-renewal hook wherever step-ca's renewal
+   runs, or restart the container by hand after each renewal.
+2. In `.env`, set `TLS_CERTS_DIR` to that directory, keep `TRUSTED_PROXY_SUBNET` matching
+   `docker-compose.yml`'s `identity-net` subnet (`172.28.0.0/24` by default - only change one if you
+   change the other), and point `IDENTITY_SERVER_PUBLIC_URL`/`IDENTITY_PLATFORM_PUBLIC_URL` at the
+   two `https://` domains above (no port - nginx listens on the standard `443`). See
+   `.env.example`'s comments for exactly what each does.
+3. `docker compose up -d` (re-)creates `nginx` alongside the two apps. `TrustedProxySubnet` makes
+   `identity-server`/`identity-platform` trust nginx's `X-Forwarded-Proto`/`X-Forwarded-For`
+   headers (and only nginx's - anything hitting `:8081`/`:8082` directly can't forge them from
+   outside `identity-net`), so `OidcIssuerProvider`'s `iss` claim, OAuth redirect URIs, and every
+   link the apps build come out as the real public `https://` address instead of nginx's own
+   plain-HTTP connection to them.
+4. If you change either domain, also rerun `DbSeeder.EnsureAdminClientRedirectUriAsync`'s
+   trigger (an `identity-server` restart) so the seeded admin OAuth client's redirect URI gets
+   updated to match - same as the existing LAN-only setup already requires in step 3 of "One-time
+   NUC setup" above.
+
 ## What this doesn't cover yet
 
-- No TLS/reverse proxy in front of the two apps - they're plain HTTP on `8081`/`8082`. Fine for a
-  home LAN; put a reverse proxy (Caddy/nginx) in front before exposing this beyond your LAN.
 - No automated backup of the `sql-data` volume.
