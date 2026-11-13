@@ -17,6 +17,7 @@ using DgDevelopment.Identity.Server.Services;
 using DgDevelopment.Identity.ServiceDefaults;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
@@ -174,7 +175,26 @@ builder.Services.AddOpenApi(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// The personal deploy puts nginx in front of this app to terminate TLS for the public domain
+// (see deploy/personal/README.md) and proxies over plain HTTP on the internal Docker network -
+// without this, Request.Scheme/Host (which OidcIssuerProvider and every redirect_uri/iss value
+// derive from) would always read "http"/the internal hostname instead of the real public
+// https://... address. TrustedProxySubnet is only set in that deployment (deploy/personal/.env);
+// elsewhere (local dev, Aspire) there's no proxy in front and this is a no-op.
+var trustedProxySubnet = builder.Configuration["TrustedProxySubnet"];
+if (!string.IsNullOrWhiteSpace(trustedProxySubnet))
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(trustedProxySubnet));
+    });
+}
+
 var app = builder.Build();
+
+if (!string.IsNullOrWhiteSpace(trustedProxySubnet))
+    app.UseForwardedHeaders();
 
 app.UseExceptionHandler();
 app.UseSecurityHeaders();
