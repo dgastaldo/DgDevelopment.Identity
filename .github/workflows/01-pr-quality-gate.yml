@@ -44,13 +44,22 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Restore
-        run: dotnet restore DgDevelopment.Identity.slnx
-
-      - name: Fail on vulnerable NuGet packages
+      # Client.Maui needs the maui-android workload, which this (and every other non-build-test-
+      # sonar/dotnet-list) runner doesn't have installed (NETSDK1147) - same gap as
+      # dependency-submission-nuget.yml and the old submit-nuget check, so excluded here the same
+      # way: restore/list every project individually instead of the whole .slnx at once.
+      - name: Restore and check every project except the MAUI client
         run: |
-          dotnet list DgDevelopment.Identity.slnx package --vulnerable --include-transitive 2>&1 | tee vulnerabilities.txt
-          if grep -q "has the following vulnerable packages" vulnerabilities.txt; then exit 1; fi
+          find . -type f -name "*.csproj" -not -path "./clients/DgDevelopment.Identity.Client.Maui/*" | while IFS= read -r project; do
+            echo "::group::$project"
+            dotnet restore "$project"
+            dotnet list "$project" package --vulnerable --include-transitive 2>&1 | tee -a vulnerabilities.txt
+            echo "::endgroup::"
+          done
+          if grep -q "has the following vulnerable packages" vulnerabilities.txt; then
+            echo "::error::Vulnerable NuGet package(s) found - see the groups above"
+            exit 1
+          fi
 
       # package-lock.json already exists for all three - npm audit reads it directly, no
       # npm ci/install needed first.
