@@ -1,0 +1,53 @@
+name: Dependency submission (NuGet)
+
+# Replaces GitHub's own auto-generated "Automatic Dependency Submission (NuGet)" workflow (visible
+# in Actions as path dynamic/dependency-graph/auto-submission, not one of our own files here).
+# That one restores every *.csproj/*.sln in the repo one by one and always fails on
+# clients/DgDevelopment.Identity.Client.Maui/DgDevelopment.Identity.Client.Maui.csproj, because the
+# hosted runner has no maui-android workload installed (NETSDK1147) - see PR dgastaldo/
+# DgDevelopment.Identity#123's comment thread for the original diagnosis.
+#
+# GitHub's documented behavior is to stop auto-generating a dependency submission workflow for an
+# ecosystem once the repo submits its own snapshot for that ecosystem - this workflow does that for
+# NuGet, using the same underlying action GitHub's own auto-generated workflow uses
+# (actions/component-detection-dependency-submission-action), but restoring every project EXCEPT
+# the MAUI client and excluding its directory from the scan too.
+#
+# NOT independently confirmed end-to-end: docs.github.com was unreachable from the sandbox that
+# wrote this (network policy), so the "adding your own workflow suppresses the auto-generated one"
+# claim comes from GitHub's generally documented dependency-submission behavior, not a page read in
+# this session. If the auto-generated "Automatic Dependency Submission (NuGet)" check still shows
+# up on PRs/pushes to develop after this merges, that assumption was wrong - the real fix then is
+# either installing the maui-android workload before restore, or disabling automatic dependency
+# submission for this repo under Settings > Code security > Dependency graph.
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  dependency-submission:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+
+      - name: Restore every project except the MAUI client
+        run: |
+          find . -type f \( -name "*.csproj" -o -name "*.sln" \) \
+            -not -path "./clients/DgDevelopment.Identity.Client.Maui/*" \
+            | while IFS= read -r project; do
+                echo "Restoring: $project"
+                dotnet restore "$project"
+              done
+
+      - name: Component detection
+        uses: actions/component-detection-dependency-submission-action@98beaea5a1227f3db476e4c9ca959a0cacd7ac4f
+        with:
+          # Not restored above (missing the maui-android workload on this runner - see header
+          # comment), so excluded here too rather than scanned in a half-restored state.
+          directoryExclusionList: clients/DgDevelopment.Identity.Client.Maui
