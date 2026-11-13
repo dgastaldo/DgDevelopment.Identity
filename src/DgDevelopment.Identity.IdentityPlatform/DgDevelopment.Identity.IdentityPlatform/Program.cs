@@ -4,7 +4,9 @@ using DgDevelopment.Identity.IdentityPlatform.Components;
 using DgDevelopment.Identity.Client.Blazor;
 using DgDevelopment.Identity.Client.Core;
 using DgDevelopment.Identity.ServiceDefaults;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -50,6 +52,16 @@ builder.Services.AddIdentityAuthentication(new OidcOptions
     Scopes = ["openid", "profile", "email"]
 });
 
+// [Authorize] on a Razor component also becomes authorization metadata on its SSR endpoint, which
+// ASP.NET Core's own AuthorizationMiddleware enforces independently of Blazor's AuthorizeRouteView,
+// using HttpContext.User - populated here by SessionMarkerAuthenticationHandler from the same
+// identity_marker cookie ServerIdentityAuthStateProvider reads, so both layers agree on who's
+// signed in instead of HttpContext.User always reading anonymous (which 404'd into an endless
+// redirect-to-login loop even for a genuinely authenticated user). See that handler for the rest.
+const string sessionMarkerScheme = "IdentitySessionMarker";
+builder.Services.AddAuthentication(sessionMarkerScheme)
+    .AddScheme<AuthenticationSchemeOptions, SessionMarkerAuthenticationHandler>(sessionMarkerScheme, configureOptions: null);
+
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ServerIdentityAuthStateProvider>();
 builder.Services.AddScoped<IdentityAuthStateProvider>(sp => sp.GetRequiredService<ServerIdentityAuthStateProvider>());
@@ -58,7 +70,24 @@ builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredServ
 builder.Services.AddHttpClient<IdentityClient>().AddHttpMessageHandler<IdentityRefreshHandler>();
 builder.Services.AddScoped<TenantState>();
 
+// Same reasoning as identity-server's Program.cs: nginx terminates TLS in front of this app in
+// the personal deploy and proxies over plain HTTP internally, so without this Request.Scheme/Host
+// (which the SSR [Authorize] challenge redirect and every link this app builds derive from) would
+// read "http"/the internal hostname instead of the real public https://... address.
+var trustedProxySubnet = builder.Configuration["TrustedProxySubnet"];
+if (!string.IsNullOrWhiteSpace(trustedProxySubnet))
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(trustedProxySubnet));
+    });
+}
+
 var app = builder.Build();
+
+if (!string.IsNullOrWhiteSpace(trustedProxySubnet))
+    app.UseForwardedHeaders();
 
 if (app.Environment.IsDevelopment())
 {

@@ -1,4 +1,6 @@
 @page "/tenants"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
 @using DgDevelopment.Identity.IdentityPlatform.Client.State
 @inject IdentityClient Api
 @inject TenantState TenantState

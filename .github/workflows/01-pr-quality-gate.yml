@@ -27,7 +27,7 @@ jobs:
   snyk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # snyk/actions/dotnet is deprecated (confirmed against snyk/actions' own repo, which lists it
       # under "Deprecated Actions"), with no drop-in dotnet-specific replacement - the recommended
@@ -35,7 +35,7 @@ jobs:
       # overhead the old action had (it ran `docker run snyk/snyk:dotnet`); this shells out to the
       # dotnet SDK already on the runner instead.
       - name: Setup .NET (Snyk's CLI shells out to dotnet to resolve NuGet dependencies)
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
@@ -55,12 +55,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: snyk
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # SonarQube wants full history for blame/new-code analysis
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
@@ -73,7 +73,7 @@ jobs:
       # The bundled JS/TS sensor (for clients/DgDevelopment.Identity.Client.React) needs a Node
       # runtime to execute even though nothing here runs the app itself.
       - name: Setup Node.js (for the JS/TS analyzer)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22.x
 
@@ -145,6 +145,13 @@ jobs:
       # - AuditService.cs / IAuditService.cs: AuditService.RecordAsync reads HttpContext (actor
       #   claims, remote IP, user agent) - same real-HTTP-pipeline gap as the controllers above.
       #   Pre-existing 0% on develop.
+      # - ServerIdentityAuthStateProvider.cs / SessionMarkerAuthenticationHandler.cs: same
+      #   no-test-harness gap as IdentityAuthStateProvider.cs above - both need a real
+      #   IHttpContextAccessor/AuthenticationHandler pipeline (cookies, HttpContext.User,
+      #   ChallengeAsync's redirect) that no test infra in this codebase exercises yet.
+      # - SessionMarkerService.cs / identitySession.js: same no-test-harness gap as
+      #   IdentityAuthStateProvider.cs above - needs a real IJSRuntime/browser cookie pipeline
+      #   (document.cookie via JS interop) that no test infra in this codebase exercises yet.
       - name: Begin SonarCloud analysis
         run: >
           dotnet sonarscanner begin
@@ -153,7 +160,7 @@ jobs:
           /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
           /d:sonar.cs.cobertura.reportsPaths="tests/**/TestResults/coverage/**/coverage.cobertura.xml"
           /d:sonar.exclusions="**/node_modules/**,**/bin/**,**/obj/**,**/dist/**,clients/DgDevelopment.Identity.Client.React/**,**/Migrations/**"
-          /d:sonar.coverage.exclusions="src/DgDevelopment.Identity.Server/Program.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/Program.cs,src/DgDevelopment.Identity.AppHost/AppHost.cs,src/DgDevelopment.Identity.Server/Controllers/ConnectController.cs,src/DgDevelopment.Identity.Server/Controllers/AuditController.cs,src/DgDevelopment.Identity.Server/Controllers/ClientsController.cs,src/DgDevelopment.Identity.Server/Controllers/GroupsController.cs,src/DgDevelopment.Identity.Server/Controllers/PlatformsController.cs,src/DgDevelopment.Identity.Server/Controllers/RolesController.cs,src/DgDevelopment.Identity.Server/Controllers/TenantsController.cs,src/DgDevelopment.Identity.Server/Controllers/UsersController.cs,src/DgDevelopment.Identity.Server/Services/AuditService.cs,src/DgDevelopment.Identity.Application/Services/IAuditService.cs,src/DgDevelopment.Identity.Server/Pages/Account/ExpiredPassword.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/MfaEnroll.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/Register.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Connect/Authorize.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/Consent.cshtml.cs,clients/DgDevelopment.Identity.Client.Core/SessionEventClient.cs,clients/DgDevelopment.Identity.Client.Core/IdentityClient.cs,clients/DgDevelopment.Identity.Client.Blazor/IdentityAuthStateProvider.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform.Client/**,src/DgDevelopment.Identity.Infrastructure/Security/AzureNotificationHubNotifier.cs,src/DgDevelopment.Identity.Server/Security/SecurityHeadersMiddleware.cs"
+          /d:sonar.coverage.exclusions="src/DgDevelopment.Identity.Server/Program.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/Program.cs,src/DgDevelopment.Identity.AppHost/AppHost.cs,src/DgDevelopment.Identity.Server/Controllers/ConnectController.cs,src/DgDevelopment.Identity.Server/Controllers/AuditController.cs,src/DgDevelopment.Identity.Server/Controllers/ClientsController.cs,src/DgDevelopment.Identity.Server/Controllers/GroupsController.cs,src/DgDevelopment.Identity.Server/Controllers/PlatformsController.cs,src/DgDevelopment.Identity.Server/Controllers/RolesController.cs,src/DgDevelopment.Identity.Server/Controllers/TenantsController.cs,src/DgDevelopment.Identity.Server/Controllers/UsersController.cs,src/DgDevelopment.Identity.Server/Services/AuditService.cs,src/DgDevelopment.Identity.Application/Services/IAuditService.cs,src/DgDevelopment.Identity.Server/Pages/Account/ExpiredPassword.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/MfaEnroll.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/Register.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Connect/Authorize.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/Consent.cshtml.cs,clients/DgDevelopment.Identity.Client.Core/SessionEventClient.cs,clients/DgDevelopment.Identity.Client.Core/IdentityClient.cs,clients/DgDevelopment.Identity.Client.Blazor/IdentityAuthStateProvider.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/ServerIdentityAuthStateProvider.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/SessionMarkerAuthenticationHandler.cs,clients/DgDevelopment.Identity.Client.Blazor/SessionMarkerService.cs,clients/DgDevelopment.Identity.Client.Blazor/wwwroot/identitySession.js,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform.Client/**,src/DgDevelopment.Identity.Infrastructure/Security/AzureNotificationHubNotifier.cs,src/DgDevelopment.Identity.Server/Security/SecurityHeadersMiddleware.cs"
 
       # Debug config auto-generates coverage.cobertura.xml via GenerateCoverageAfterBuild in
       # DgDevelopment.Identity.Server.UnitTests.csproj - no extra --collect flags needed here, and
@@ -190,8 +197,8 @@ jobs:
   # build-windows:
   #   runs-on: windows-latest
   #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-dotnet@v4
+  #     - uses: actions/checkout@v7
+  #     - uses: actions/setup-dotnet@v6
   #       with:
   #         dotnet-version: 10.0.x
   #     - run: dotnet build clients/DgDevelopment.Identity.Client.Wpf/DgDevelopment.Identity.Client.Wpf.csproj -c Release
