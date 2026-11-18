@@ -891,3 +891,5 @@ you're not provisioning those yet, so items 8-15 above are scoped to `develop`/`
 `Client.Maui`/the promotion mechanism itself (items 14-15, the signing certificate and the PAT, are
 scoped to `Client.Maui`/`04-promote.yml` respectively rather than to an environment, but grouped here
 since they're the same "needs your access outside the repo" category).
+
+<!-- probe: diagnosing why SONAR_TOKEN arrives empty on recent Dependabot PRs -->
