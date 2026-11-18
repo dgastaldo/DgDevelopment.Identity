@@ -7,6 +7,8 @@ using DgDevelopment.Identity.ServiceDefaults;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,6 +29,17 @@ builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents();
 
 builder.Services.AddHealthChecks();
+
+// Global baseline only - no "auth" policy here like identity-server's, since this app has no
+// local login/credential endpoints of its own (every form lives on identity-server; this is
+// purely a Blazor front-end that redirects there for OIDC). Protects the OIDC /callback and the
+// Blazor Server SignalR circuit negotiate/reconnect endpoints from gross abuse/DoS.
+var rateLimiting = builder.Configuration.GetSection(RateLimitingOptions.SectionName).Get<RateLimitingOptions>() ?? new RateLimitingOptions();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.GlobalLimiter = PartitionedRateLimiter.Create(RateLimiterFactory.CreatePartitioner(rateLimiting.Global));
+});
 
 string identityBaseUriString = builder.Configuration.GetValue<string>("IdentityBaseUrl") ?? "https://localhost:7157";
 // Only needed when IdentityBaseUrl is a server-to-server address the browser can't resolve (e.g.
@@ -101,6 +114,8 @@ else
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
+
+app.UseRateLimiter();
 
 app.UseAntiforgery();
 
