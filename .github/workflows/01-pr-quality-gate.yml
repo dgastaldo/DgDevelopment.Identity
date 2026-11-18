@@ -14,20 +14,24 @@ name: 01 - PR Quality Gate
 # 02-develop-quality-gate.yml on push to develop - GitHub only populates the Security tab's
 # baseline from the default branch, not PRs.
 #
-# dependency-audit replaced snyk as the required check: Snyk's free tier caps out at 200 tests/
-# month, and every PR (plus every push to a Dependabot PR, which re-tests on each commit) burns
-# through that fast - a required check failing because of an external quota, not a real finding,
-# blocks every PR until the month rolls over. `dotnet list package --vulnerable` (same free,
-# no-quota tool already used on DgDevelopment.PrintServer) and `npm audit` give the same CVE
-# coverage against NuGet/npm's own advisory databases with no quota at all. Snyk still runs, same
-# as on PrintServer, but only as an optional, non-required extra that skips itself when SNYK_TOKEN
-# isn't set - so a quota failure there is just a log, never a merge blocker.
+# dependency-audit replaced snyk as the required check, and snyk was dropped entirely (not just
+# made optional) - same reasoning as DgDevelopment.PrintServer: Snyk's free tier caps out at 200
+# tests/month, and every PR (plus every push to a Dependabot PR, which re-tests on each commit)
+# burns through that fast, for no coverage `dotnet list package --vulnerable` and `npm audit`
+# don't already give against the same NuGet/npm advisory databases, with no quota at all.
+#
+# dependency-audit's npm audit runs --omit=dev (required, blocking) because devDependencies can
+# carry a finding with no fix available upstream (see its own comment below) that would then block
+# every PR indefinitely. dependency-audit-full re-runs the same npm audit with every dependency in
+# scope, including dev - optional and non-blocking (continue-on-error), purely so a *new*
+# devDependency finding is visible on the PR instead of silently invisible, even though it can't
+# gate the merge the same way.
 #
 # build-test-sonar authenticates to SonarQube Cloud via secretless OIDC (SonarSource/
 # sonarqube-auth-action) - no SONAR_TOKEN secret needed, and no SONAR_ORGANIZATION variable
 # either (the action returns both the org and the project key as outputs). Requires an org admin
 # to enable "Secretless analysis for GitHub Actions" once in SonarQube Cloud's organization
-# settings. SNYK_TOKEN is optional.
+# settings.
 
 on:
   pull_request:
@@ -83,34 +87,27 @@ jobs:
         working-directory: src/DgDevelopment.Identity.Server
         run: npm audit --audit-level=high --omit=dev
 
-  # Optional, non-blocking: Snyk's free tier caps at 200 tests/month (see header comment), so this
-  # is never a required status check. Skips itself entirely when SNYK_TOKEN isn't set (PRs from
-  # forks and Dependabot don't receive repository secrets) - same pattern as PrintServer's snyk job.
-  snyk:
+  # Optional, non-blocking: a second pass of the same three npm audits, minus --omit=dev, so a
+  # devDependency-only finding (which dependency-audit above deliberately can't gate on - see its
+  # comment) still shows up somewhere on the PR instead of being invisible. continue-on-error
+  # because a devDependency finding without a fix is still unfixable even once it's visible.
+  dependency-audit-full:
     runs-on: ubuntu-latest
-    env:
-      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v7
-        if: env.SNYK_TOKEN != ''
 
-      - name: Setup .NET (Snyk's CLI shells out to dotnet to resolve NuGet dependencies)
-        if: env.SNYK_TOKEN != ''
-        uses: actions/setup-dotnet@v6
-        with:
-          dotnet-version: 10.0.x
+      - name: Audit npm dependencies, including devDependencies (React client)
+        working-directory: clients/DgDevelopment.Identity.Client.React
+        run: npm audit --audit-level=high
 
-      - name: Install Snyk CLI
-        if: env.SNYK_TOKEN != ''
-        uses: snyk/actions/setup@9adf32b1121593767fc3c057af55b55db032dc04 # v1
+      - name: Audit npm dependencies, including devDependencies (IdentityPlatform admin UI)
+        working-directory: src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform
+        run: npm audit --audit-level=high
 
-      # There's a DgDevelopment.Identity.slnx (the newer XML-free solution format), but Snyk
-      # doesn't recognize it and, without --all-projects, only looks at the repo root and finds
-      # nothing ("Could not detect supported target files") - confirmed against Snyk's own docs.
-      # --all-projects falls back to detecting each .csproj individually instead.
-      - name: Run Snyk to check for dependency and image vulnerabilities
-        if: env.SNYK_TOKEN != ''
-        run: snyk test --all-projects
+      - name: Audit npm dependencies, including devDependencies (Server)
+        working-directory: src/DgDevelopment.Identity.Server
+        run: npm audit --audit-level=high
 
   build-test-sonar:
     runs-on: ubuntu-latest
