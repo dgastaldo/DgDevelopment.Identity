@@ -2,7 +2,7 @@ namespace DgDevelopment.Identity.IntegrationTests;
 
 using System.Net;
 using System.Threading.RateLimiting;
-using DgDevelopment.Identity.Server.Security;
+using DgDevelopment.Identity.ServiceDefaults;
 using Microsoft.AspNetCore.Http;
 
 /// <summary>

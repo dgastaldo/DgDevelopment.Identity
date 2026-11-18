@@ -1,6 +1,7 @@
-namespace DgDevelopment.Identity.Server.Security;
+namespace DgDevelopment.Identity.ServiceDefaults;
 
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
 
 /// <summary>
@@ -9,7 +10,8 @@ using Microsoft.AspNetCore.RateLimiting;
 /// login/registration/password-recovery/MFA pages and /connect/token - the endpoints an
 /// attacker would actually want to brute-force or spam. Both are per-client-IP sliding
 /// windows (Microsoft.AspNetCore.RateLimiting.SlidingWindowRateLimiterOptions), not a fixed
-/// count over the process lifetime.
+/// count over the process lifetime. Shared between Server (both tiers) and IdentityPlatform
+/// (Global only - it has no local login/credential endpoints of its own, see its Program.cs).
 /// </summary>
 public sealed class RateLimitingOptions
 {
