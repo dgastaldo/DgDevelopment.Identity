@@ -2,7 +2,12 @@ using DgDevelopment.Identity.Domain.Entities;
 
 namespace DgDevelopment.Identity.Server.Models;
 
-public sealed record CreateUserRequest(string Username, string Password, string Email, bool IsSystemAccount = false);
+// No IsSystemAccount here: nothing ever creates a system account through this public API (the
+// bootstrap SuperAdmin is seeded directly by DbSeeder, bypassing UserService entirely) - exposing
+// it as a settable JSON field would let anyone with user-create permission mint one, bypassing
+// EnsureNotSystemAccount's deactivation protection and triggering SuperadminCredentialsWriter on
+// a later password reset. Also what SonarCloud's under-posting rule was flagging here.
+public sealed record CreateUserRequest(string Username, string Password, string Email);
 
 public sealed record ResetPasswordRequest(string Password);
 
