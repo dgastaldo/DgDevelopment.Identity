@@ -187,12 +187,18 @@ jobs:
         with:
           node-version: 22.x
 
-      # --ignore-scripts: this only needs the installed packages on disk for the analyzer to read,
-      # not to actually build/run anything - no reason to let install-time lifecycle scripts
-      # (postinstall etc.) execute arbitrary code from third-party packages.
-      - name: Install React client dependencies (improves type-aware JS/TS analysis)
+      # --ignore-scripts: @swc/core (the test transform below) ships prebuilt binaries as
+      # per-platform optionalDependencies, no install-time script needed to use them - no reason
+      # to let one run anyway and execute arbitrary code from a third-party package.
+      - name: Install React client dependencies
         working-directory: clients/DgDevelopment.Identity.Client.React
         run: npm ci --ignore-scripts
+
+      # Feeds sonar.javascript.lcov.reportPaths below - without it, every line in this package
+      # reads as 0% covered on SonarCloud's new-code gate regardless of the real unit tests.
+      - name: Run React client tests with coverage
+        working-directory: clients/DgDevelopment.Identity.Client.React
+        run: npm run test:coverage
 
       - name: Install SonarScanner for .NET
         run: dotnet tool install --global dotnet-sonarscanner
@@ -206,16 +212,6 @@ jobs:
       # on the project's own page.
       #
       # sonar.exclusions also drops:
-      # - Client.React: that package's tsconfig.json declares "include": ["src/**/*"], but there's
-      #   no src/ directory yet (same "empty scaffold" state as Client.Wpf, just not commented out
-      #   of a build job since nothing here builds it) - the TypeScript sensor logs "No inputs were
-      #   found in config file" as an ERROR on every run regardless (its tsconfig.json *discovery*
-      #   step globs the whole checkout independently of this exclusion, which only filters which
-      #   files get analyzed) - harmless, doesn't fail the job, just log noise. Tried silencing it
-      #   with sonar.typescript.tsconfigPaths="" but dotnet-sonarscanner rejects an empty value for
-      #   that property outright ("format ... is invalid"); not worth another guess without being
-      #   able to check the scanner's docs from here. Drop the exclusion once Client.React has real
-      #   source under src/ - the ERROR goes away on its own at that point too.
       # - Migrations/: EF Core-generated, never hand-edited - findings there (e.g. "use Guid.Empty"
       #   on a scaffolded `new Guid("000...")` default value) aren't actionable without touching
       #   generated code.
@@ -272,8 +268,9 @@ jobs:
           /o:"${{ steps.sonar_auth.outputs.organization }}"
           /d:sonar.token="${{ steps.sonar_auth.outputs.sonar-token }}"
           /d:sonar.cs.cobertura.reportsPaths="tests/**/TestResults/coverage/**/coverage.cobertura.xml"
-          /d:sonar.exclusions="**/node_modules/**,**/bin/**,**/obj/**,**/dist/**,clients/DgDevelopment.Identity.Client.React/**,**/Migrations/**"
-          /d:sonar.coverage.exclusions="src/DgDevelopment.Identity.Server/Program.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/Program.cs,src/DgDevelopment.Identity.AppHost/AppHost.cs,src/DgDevelopment.Identity.Server/Controllers/ConnectController.cs,src/DgDevelopment.Identity.Server/Controllers/AuditController.cs,src/DgDevelopment.Identity.Server/Controllers/ClientsController.cs,src/DgDevelopment.Identity.Server/Controllers/GroupsController.cs,src/DgDevelopment.Identity.Server/Controllers/PlatformsController.cs,src/DgDevelopment.Identity.Server/Controllers/RolesController.cs,src/DgDevelopment.Identity.Server/Controllers/TenantsController.cs,src/DgDevelopment.Identity.Server/Controllers/UsersController.cs,src/DgDevelopment.Identity.Server/Services/AuditService.cs,src/DgDevelopment.Identity.Application/Services/IAuditService.cs,src/DgDevelopment.Identity.Server/Pages/Account/ExpiredPassword.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/MfaEnroll.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/Register.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Connect/Authorize.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/Consent.cshtml.cs,clients/DgDevelopment.Identity.Client.Core/SessionEventClient.cs,clients/DgDevelopment.Identity.Client.Core/IdentityClient.cs,clients/DgDevelopment.Identity.Client.Blazor/IdentityAuthStateProvider.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/ServerIdentityAuthStateProvider.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/SessionMarkerAuthenticationHandler.cs,clients/DgDevelopment.Identity.Client.Blazor/SessionMarkerService.cs,clients/DgDevelopment.Identity.Client.Blazor/wwwroot/identitySession.js,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform.Client/**,src/DgDevelopment.Identity.Infrastructure/Security/AzureNotificationHubNotifier.cs,src/DgDevelopment.Identity.Server/Security/SecurityHeadersMiddleware.cs,src/DgDevelopment.Identity.ServiceDefaults/RateLimitingOptions.cs"
+          /d:sonar.javascript.lcov.reportPaths="clients/DgDevelopment.Identity.Client.React/coverage/lcov.info"
+          /d:sonar.exclusions="**/node_modules/**,**/bin/**,**/obj/**,**/dist/**,**/Migrations/**"
+          /d:sonar.coverage.exclusions="src/DgDevelopment.Identity.Server/Program.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/Program.cs,src/DgDevelopment.Identity.AppHost/AppHost.cs,src/DgDevelopment.Identity.Server/Controllers/ConnectController.cs,src/DgDevelopment.Identity.Server/Controllers/AuditController.cs,src/DgDevelopment.Identity.Server/Controllers/ClientsController.cs,src/DgDevelopment.Identity.Server/Controllers/GroupsController.cs,src/DgDevelopment.Identity.Server/Controllers/PlatformsController.cs,src/DgDevelopment.Identity.Server/Controllers/RolesController.cs,src/DgDevelopment.Identity.Server/Controllers/TenantsController.cs,src/DgDevelopment.Identity.Server/Controllers/UsersController.cs,src/DgDevelopment.Identity.Server/Services/AuditService.cs,src/DgDevelopment.Identity.Application/Services/IAuditService.cs,src/DgDevelopment.Identity.Server/Pages/Account/ExpiredPassword.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/MfaEnroll.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/Register.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Connect/Authorize.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/Consent.cshtml.cs,clients/DgDevelopment.Identity.Client.Core/SessionEventClient.cs,clients/DgDevelopment.Identity.Client.Core/IdentityClient.cs,clients/DgDevelopment.Identity.Client.Blazor/IdentityAuthStateProvider.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/ServerIdentityAuthStateProvider.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/SessionMarkerAuthenticationHandler.cs,clients/DgDevelopment.Identity.Client.Blazor/SessionMarkerService.cs,clients/DgDevelopment.Identity.Client.Blazor/wwwroot/identitySession.js,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform.Client/**,src/DgDevelopment.Identity.Infrastructure/Security/AzureNotificationHubNotifier.cs,src/DgDevelopment.Identity.Server/Security/SecurityHeadersMiddleware.cs"
 
       # Debug config auto-generates coverage.cobertura.xml via GenerateCoverageAfterBuild in
       # DgDevelopment.Identity.Server.UnitTests.csproj - no extra --collect flags needed here, and
