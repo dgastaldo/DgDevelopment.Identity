@@ -1,6 +1,7 @@
 using DgDevelopment.Identity.IdentityPlatform;
 using DgDevelopment.Identity.IdentityPlatform.Client.State;
 using DgDevelopment.Identity.IdentityPlatform.Components;
+using DgDevelopment.Identity.IdentityPlatform.Security;
 using DgDevelopment.Identity.Client.Blazor;
 using DgDevelopment.Identity.Client.Core;
 using DgDevelopment.Identity.ServiceDefaults;
@@ -111,6 +112,8 @@ else
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
 }
+
+app.UseSecurityHeaders();
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
