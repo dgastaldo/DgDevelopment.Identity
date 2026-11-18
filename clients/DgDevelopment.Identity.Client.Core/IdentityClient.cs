@@ -446,7 +446,7 @@ public sealed record UserResponse(
     [property: JsonPropertyName("permissions")] IReadOnlyCollection<UserPermissionAssignmentResponse> Permissions,
     [property: JsonPropertyName("groups")] IReadOnlyCollection<UserGroupAssignmentResponse> Groups);
 
-public sealed record CreateUserRequest(string Username, string Password, string Email, bool IsSystemAccount = false);
+public sealed record CreateUserRequest(string Username, string Password, string Email);
 
 public sealed record PagedPermissionsResponse(
     [property: JsonPropertyName("items")] IReadOnlyCollection<PermissionResponse> Items,

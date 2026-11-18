@@ -56,7 +56,8 @@ public sealed class UsersController(
         ArgumentNullException.ThrowIfNull(request);
         try
         {
-            var user = await userService.CreateAsync(request.Username, request.Password, request.Email, request.IsSystemAccount, tenantContext.TenantId, ct).ConfigureAwait(false);
+            // isSystemAccount is always false here - see CreateUserRequest's comment.
+            var user = await userService.CreateAsync(request.Username, request.Password, request.Email, isSystemAccount: false, tenantContext.TenantId, ct).ConfigureAwait(false);
             await auditService.RecordAsync(new AuditEvent("user.create", AuditOutcome.Success, tenantContext.TenantId, TargetId: user.Id.ToString(), TargetType: "user"), ct).ConfigureAwait(false);
             return CreatedAtAction(nameof(GetUserById), new { id = user.Id }, UserResponse.From(user));
         }
