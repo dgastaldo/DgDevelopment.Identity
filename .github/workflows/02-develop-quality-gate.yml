@@ -18,9 +18,8 @@ name: 02 - Develop Quality Gate (ephemeral stack)
 # Snyk isn't repeated here - the PR gate already blocks a merge on a dependency vulnerability, no
 # need to pay for that scan again on every push.
 #
-# Needs repository secrets: SONAR_TOKEN (SonarCloud - no SONAR_HOST_URL needed, it defaults to
-# sonarcloud.io), plus the SONAR_ORGANIZATION repository variable - same ones 01-pr-quality-gate.yml
-# uses.
+# sonar authenticates to SonarQube Cloud via secretless OIDC (SonarSource/sonarqube-auth-action) -
+# no SONAR_TOKEN secret or SONAR_ORGANIZATION variable needed, same as 01-pr-quality-gate.yml.
 
 on:
   push:
@@ -86,10 +85,19 @@ jobs:
 
   sonar:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # secretless SonarQube Cloud auth below - exchanges this for a 30min token
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # SonarQube wants full history for blame/new-code analysis
+
+      - name: Authenticate to SonarQube Cloud
+        id: sonar_auth
+        uses: SonarSource/sonarqube-auth-action@v1
+        with:
+          export-env: "false"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
@@ -124,9 +132,9 @@ jobs:
       - name: Begin SonarCloud analysis
         run: >
           dotnet sonarscanner begin
-          /k:"dgastaldo_DgDevelopment.Identity"
-          /o:"${{ vars.SONAR_ORGANIZATION }}"
-          /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+          /k:"${{ steps.sonar_auth.outputs.project-key }}"
+          /o:"${{ steps.sonar_auth.outputs.organization }}"
+          /d:sonar.token="${{ steps.sonar_auth.outputs.sonar-token }}"
           /d:sonar.cs.cobertura.reportsPaths="tests/**/TestResults/coverage/**/coverage.cobertura.xml"
           /d:sonar.exclusions="**/node_modules/**,**/bin/**,**/obj/**,**/dist/**,clients/DgDevelopment.Identity.Client.React/**,**/Migrations/**"
           /d:sonar.coverage.exclusions="src/DgDevelopment.Identity.Server/Program.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/Program.cs,src/DgDevelopment.Identity.AppHost/AppHost.cs,src/DgDevelopment.Identity.Server/Controllers/ConnectController.cs,src/DgDevelopment.Identity.Server/Controllers/AuditController.cs,src/DgDevelopment.Identity.Server/Controllers/ClientsController.cs,src/DgDevelopment.Identity.Server/Controllers/GroupsController.cs,src/DgDevelopment.Identity.Server/Controllers/PlatformsController.cs,src/DgDevelopment.Identity.Server/Controllers/RolesController.cs,src/DgDevelopment.Identity.Server/Controllers/TenantsController.cs,src/DgDevelopment.Identity.Server/Controllers/UsersController.cs,src/DgDevelopment.Identity.Server/Services/AuditService.cs,src/DgDevelopment.Identity.Application/Services/IAuditService.cs,src/DgDevelopment.Identity.Server/Pages/Account/ExpiredPassword.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/MfaEnroll.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/Register.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Connect/Authorize.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/Consent.cshtml.cs,clients/DgDevelopment.Identity.Client.Core/SessionEventClient.cs,clients/DgDevelopment.Identity.Client.Core/IdentityClient.cs,clients/DgDevelopment.Identity.Client.Blazor/IdentityAuthStateProvider.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform.Client/**,src/DgDevelopment.Identity.Infrastructure/Security/AzureNotificationHubNotifier.cs,src/DgDevelopment.Identity.Server/Security/SecurityHeadersMiddleware.cs"
@@ -138,4 +146,4 @@ jobs:
           dotnet build tests/DgDevelopment.Identity.Server.UnitTests/DgDevelopment.Identity.Server.UnitTests.csproj
 
       - name: End SonarQube analysis
-        run: dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+        run: dotnet sonarscanner end /d:sonar.token="${{ steps.sonar_auth.outputs.sonar-token }}"
