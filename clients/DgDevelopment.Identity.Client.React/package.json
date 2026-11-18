@@ -10,13 +10,18 @@
   "scripts": {
     "build": "tsc",
     "lint": "eslint src/",
-    "test": "jest"
+    "test": "jest",
+    "test:coverage": "jest --coverage"
   },
   "peerDependencies": {
     "react": "^19.0.0"
   },
   "devDependencies": {
+    "@swc/core": "^1.16.22",
+    "@swc/jest": "^0.2.39",
+    "@types/jest": "^30.0.0",
     "@types/react": "^19.0.0",
+    "jest": "^30.5.2",
     "typescript": "^7.0.2"
   }
 }
