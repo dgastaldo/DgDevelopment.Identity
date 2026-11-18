@@ -5,14 +5,16 @@ name: 01 - PR Quality Gate
 # docs/deployment.md's "Quality Gate tooling" section.
 #
 # Order: dependency-audit first (vulnerable-package scan, fast/cheap - fail before spending time
-# on the rest) -> build + unit tests + coverage threshold, wrapped by the SonarCloud scan. All jobs
-# run on GitHub-hosted ubuntu-latest - moved off the self-hosted NUC runner deliberately: this
-# workflow triggers on every PR, including (once the repo is public) PRs from forks, and
-# self-hosted runners must never execute code reachable from an untrusted PR. Platform-specific
-# clients (Client.Wpf today, a Mac/iOS target later) get their own compile-only job per OS in
-# parallel - see build-windows/build-macos below. CodeQL runs separately, in
-# 02-develop-quality-gate.yml on push to develop - GitHub only populates the Security tab's
-# baseline from the default branch, not PRs.
+# on the rest) -> build + unit tests + coverage threshold. sonar is a separate, optional extra
+# (code quality, not a build/test gate) that runs its own build+test in parallel and never blocks
+# the PR - same shape as DgDevelopment.PrintServer's build-test/sonar split, so the required
+# status checks line up across both repos. All jobs run on GitHub-hosted ubuntu-latest - moved off
+# the self-hosted NUC runner deliberately: this workflow triggers on every PR, including (once the
+# repo is public) PRs from forks, and self-hosted runners must never execute code reachable from
+# an untrusted PR. Platform-specific clients (Client.Wpf today, a Mac/iOS target later) get their
+# own compile-only job per OS in parallel - see build-windows/build-macos below. CodeQL runs
+# separately, in 02-develop-quality-gate.yml on push to develop - GitHub only populates the
+# Security tab's baseline from the default branch, not PRs.
 #
 # dependency-audit replaced snyk as the required check, and snyk was dropped entirely (not just
 # made optional) - same reasoning as DgDevelopment.PrintServer: Snyk's free tier caps out at 200
@@ -27,11 +29,10 @@ name: 01 - PR Quality Gate
 # devDependency finding is visible on the PR instead of silently invisible, even though it can't
 # gate the merge the same way.
 #
-# build-test-sonar authenticates to SonarQube Cloud via secretless OIDC (SonarSource/
-# sonarqube-auth-action) - no SONAR_TOKEN secret needed, and no SONAR_ORGANIZATION variable
-# either (the action returns both the org and the project key as outputs). Requires an org admin
-# to enable "Secretless analysis for GitHub Actions" once in SonarQube Cloud's organization
-# settings.
+# sonar authenticates to SonarQube Cloud via secretless OIDC (SonarSource/sonarqube-auth-action) -
+# no SONAR_TOKEN secret needed, and no SONAR_ORGANIZATION variable either (the action returns both
+# the org and the project key as outputs). Requires an org admin to enable "Secretless analysis for
+# GitHub Actions" once in SonarQube Cloud's organization settings. SNYK_TOKEN is optional.
 
 on:
   pull_request:
@@ -109,9 +110,47 @@ jobs:
         working-directory: src/DgDevelopment.Identity.Server
         run: npm audit --audit-level=high
 
-  build-test-sonar:
+  build-test:
     runs-on: ubuntu-latest
     needs: dependency-audit
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      # Debug config auto-generates coverage.cobertura.xml via GenerateCoverageAfterBuild in
+      # DgDevelopment.Identity.Server.UnitTests.csproj - no extra --collect flags needed here, and
+      # no reportgenerator/tool install needed either: that project's separate
+      # GenerateCoverageReport target (HTML report, needs reportgenerator) is a manual local-only
+      # convenience, never run here - CI only needs the raw cobertura.xml for the threshold check.
+      - name: Build and generate coverage
+        run: |
+          dotnet restore src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj
+          dotnet build src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj --no-restore
+          dotnet build tests/DgDevelopment.Identity.Server.UnitTests/DgDevelopment.Identity.Server.UnitTests.csproj
+
+      # Real baseline established once EF Core's auto-generated migrations were excluded from
+      # coverage (coverlet.runsettings) - they were ~94% of Infrastructure's coverable lines, all
+      # at 0%, dragging the aggregate down to ~13% even though every real package sits at 83-100%.
+      # With migrations excluded, actual coverage is ~85% - 80% leaves a margin without being a
+      # rubber stamp.
+      - name: Enforce coverage threshold
+        run: |
+          COVERAGE_FILE=$(find tests/DgDevelopment.Identity.Server.UnitTests/TestResults/coverage -name coverage.cobertura.xml | head -1)
+          LINE_RATE=$(grep -oP '(?<=line-rate=")[^"]+' "$COVERAGE_FILE" | head -1)
+          THRESHOLD="0.80"
+          awk -v rate="$LINE_RATE" -v threshold="$THRESHOLD" 'BEGIN { exit (rate < threshold) }' \
+            || { echo "Line coverage $LINE_RATE is below the $THRESHOLD threshold"; exit 1; }
+
+  # Optional, non-blocking: code quality/coverage reporting only, not a build/test gate (build-test
+  # above already covers that, required). Runs its own build+test in parallel rather than needing
+  # build-test's output, same as PrintServer's independent sonar job.
+  sonar:
+    runs-on: ubuntu-latest
+    continue-on-error: true
     permissions:
       contents: read
       id-token: write # secretless SonarQube Cloud auth below - exchanges this for a 30min token
@@ -238,24 +277,13 @@ jobs:
       # no reportgenerator/tool install needed either: that project's separate
       # GenerateCoverageReport target (HTML report, needs reportgenerator) is a manual local-only
       # convenience, never run here - CI only needs the raw cobertura.xml SonarCloud reads below.
+      # Build + test only to feed SonarCloud its coverage report - the coverage threshold itself
+      # is enforced by build-test above, not duplicated here since this job never blocks the PR.
       - name: Build and generate coverage
         run: |
           dotnet restore src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj
           dotnet build src/DgDevelopment.Identity.AppHost/DgDevelopment.Identity.AppHost.csproj --no-restore
           dotnet build tests/DgDevelopment.Identity.Server.UnitTests/DgDevelopment.Identity.Server.UnitTests.csproj
-
-      # Real baseline established once EF Core's auto-generated migrations were excluded from
-      # coverage (coverlet.runsettings) - they were ~94% of Infrastructure's coverable lines, all
-      # at 0%, dragging the aggregate down to ~13% even though every real package sits at 83-100%.
-      # With migrations excluded, actual coverage is ~85% - 80% leaves a margin without being a
-      # rubber stamp.
-      - name: Enforce coverage threshold
-        run: |
-          COVERAGE_FILE=$(find tests/DgDevelopment.Identity.Server.UnitTests/TestResults/coverage -name coverage.cobertura.xml | head -1)
-          LINE_RATE=$(grep -oP '(?<=line-rate=")[^"]+' "$COVERAGE_FILE" | head -1)
-          THRESHOLD="0.80"
-          awk -v rate="$LINE_RATE" -v threshold="$THRESHOLD" 'BEGIN { exit (rate < threshold) }' \
-            || { echo "Line coverage $LINE_RATE is below the $THRESHOLD threshold"; exit 1; }
 
       - name: End SonarQube analysis
         run: dotnet sonarscanner end /d:sonar.token="${{ steps.sonar_auth.outputs.sonar-token }}"

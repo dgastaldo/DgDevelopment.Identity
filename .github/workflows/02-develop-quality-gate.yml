@@ -127,7 +127,7 @@ jobs:
       - name: Install SonarScanner for .NET
         run: dotnet tool install --global dotnet-sonarscanner
 
-      # Same sonar.* parameters as 01-pr-quality-gate.yml's build-test-sonar job - no sonar.pullrequest.*
+      # Same sonar.* parameters as 01-pr-quality-gate.yml's sonar job - no sonar.pullrequest.*
       # args here, so the scanner submits this as a branch analysis (develop) instead of PR decoration.
       - name: Begin SonarCloud analysis
         run: >
