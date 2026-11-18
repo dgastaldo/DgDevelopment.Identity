@@ -165,7 +165,7 @@ jobs:
       # Actions" in SonarQube Cloud's organization settings first (off by default).
       - name: Authenticate to SonarQube Cloud
         id: sonar_auth
-        uses: SonarSource/sonarqube-auth-action@v1
+        uses: SonarSource/sonarqube-auth-action@a0aa643acde4162396015b4f12536c1b9c4aab82 # v1
         with:
           export-env: "false"
 
