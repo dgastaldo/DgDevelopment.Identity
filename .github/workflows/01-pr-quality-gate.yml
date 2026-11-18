@@ -227,6 +227,9 @@ jobs:
       #   job (WebApplicationFactory), which doesn't feed coverage into this job. Excluding them
       #   here isn't "these don't need tests", it's "this specific job can't produce that data" -
       #   revisit once/if IntegrationTests' coverage is wired into the PR gate too.
+      # - RateLimitingOptions.cs: RateLimiterFactory.CreatePartitioner *is* unit-tested
+      #   (RateLimiterFactoryTests), but that test lives in IntegrationTests, same "job can't
+      #   produce that data" gap as ConnectController.cs above - revisit together with it.
       # - SessionEventClient.cs: no HubConnection mocking/test infrastructure exists in this
       #   codebase to exercise its SignalR reconnect path - revisit if that infra gets built.
       # - IdentityPlatform.Client/**: the Blazor WASM client's .razor/.razor.js files, plus its own

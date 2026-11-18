@@ -7,6 +7,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- RateLimitingOptions/RateLimiterFactory need Microsoft.AspNetCore.RateLimiting's HttpContext/
+         RateLimitPartition types (ASP.NET Core's shared framework, not a NuGet package). -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.11.0" />
     <PackageReference Include="Microsoft.Extensions.ServiceDiscovery" Version="10.11.0" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.20.1" />
