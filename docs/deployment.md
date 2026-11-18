@@ -661,22 +661,36 @@ path won out over a hand-rolled `codeql-action` job.
   number; tighten over time). Also tighten the existing Roslyn analyzer config
   (`Directory.Build.props` already sets `AnalysisMode`/`EnforceCodeStyleInBuild`) if it isn't
   already at its strictest useful setting.
-- **Snyk** — free tier, scans **dependencies** (NuGet packages) for known CVEs. Runs early in the
-  pipeline (before the test suite) so a known-bad dependency fails fast and cheap, before spending
-  time on the full test run. Uses `snyk/actions/setup` (installs the CLI) + `snyk test
-  --all-projects` directly, not the dotnet-specific `snyk/actions/dotnet` action — that one is
-  deprecated (confirmed against `snyk/actions`' own repo, listed under "Deprecated Actions"), with
-  no dotnet-specific replacement; the generic setup-action-plus-CLI path is what Snyk recommends
-  instead. Also drops the Docker-container overhead the old action had (`docker run
-  snyk/snyk:dotnet`) in favor of shelling out to the .NET SDK already on the runner.
+- **Snyk — tried, then dropped entirely.** Originally ran early in the pipeline (dependency scan,
+  fast/cheap, before the test suite) via `snyk/actions/setup` + `snyk test --all-projects`. Two
+  problems: its free tier caps at 200 tests/month, which every PR plus every push to a Dependabot
+  PR (re-tested on each commit) burns through fast; and once that quota's gone, the check comes
+  back red for a reason that has nothing to do with the PR's own code. Replaced by
+  `dependency-audit` (see below) — same CVE coverage against the same NuGet/npm advisory
+  databases, no account, token or quota. Removed entirely rather than kept as an optional extra —
+  it had nothing dependency-audit didn't already cover.
+- **dependency-audit** — the repo's one required vulnerability gate (`01-pr-quality-gate.yml`).
+  `dotnet list <project> package --vulnerable --include-transitive` for every NuGet project (one
+  at a time, not the whole `.slnx`, to dodge `Client.Maui`'s `maui-android` workload gap - see its
+  own comment in the workflow), plus `npm audit --audit-level=high --omit=dev` for the three npm
+  projects. `--omit=dev` matters: a devDependency-only finding with no fix available upstream
+  (e.g. `GHSA-fc5q-39xc-vjpf`, a `picomatch` ReDoS pulled in transitively by `@tailwindcss/cli`,
+  itself a build-time-only CSS tool that never touches untrusted input) would otherwise block
+  every PR indefinitely with no actionable remediation. A second, optional job
+  (`dependency-audit-full`, `continue-on-error: true`) re-runs the same three `npm audit` calls
+  without `--omit=dev`, purely so a new devDependency-only finding is visible on the PR instead of
+  silently invisible — it still can't gate the merge, since there's nothing actionable to gate on.
 - **SonarCloud** — **superseded the original "self-hosted SonarQube on the NUC" plan**: once the
   decision to run every workflow job on GitHub-hosted runners was made (see "Status" above), self-
   hosting SonarQube on the NUC would have meant either exposing it to the internet (so GitHub-hosted
   runners could reach it) or routing CI traffic back through a home-network tunnel — both worse than
   just using SonarCloud's free tier for a public/private-personal repo. CI wraps the build with
   `dotnet-sonarscanner` (`begin` → `dotnet build` → `dotnet test` → `end`), pointed at
-  `sonarcloud.io` (`SONAR_TOKEN` repository secret, `SONAR_ORGANIZATION` repository variable — no
-  `SONAR_HOST_URL` needed, it defaults there) instead of a local instance. Covers code smells,
+  `sonarcloud.io` instead of a local instance. Authenticates via secretless OIDC
+  (`SonarSource/sonarqube-auth-action`, needs the job's `id-token: write` permission plus an org
+  admin opting in once under SonarQube Cloud's organization settings) rather than a long-lived
+  `SONAR_TOKEN` secret — no `SONAR_HOST_URL`/`SONAR_ORGANIZATION` needed either, the auth action
+  returns the org and project key as outputs. Covers code smells,
   duplication, and maintainability, plus Security Hotspots — security-sensitive code flagged for
   manual review (not the deeper dataflow/taint-tracking CodeQL does, but real coverage). The solution
   is mixed-language (.NET + TS/JS in `Client.React`) — `dotnet-sonarscanner` wraps the general
