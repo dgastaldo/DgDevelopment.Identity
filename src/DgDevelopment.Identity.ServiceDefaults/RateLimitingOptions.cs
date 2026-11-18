@@ -1,6 +1,7 @@
 namespace DgDevelopment.Identity.ServiceDefaults;
 
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
 
 /// <summary>
