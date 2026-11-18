@@ -23,8 +23,11 @@ name: 01 - PR Quality Gate
 # as on PrintServer, but only as an optional, non-required extra that skips itself when SNYK_TOKEN
 # isn't set - so a quota failure there is just a log, never a merge blocker.
 #
-# Needs repository secrets: SONAR_TOKEN (SonarCloud - no SONAR_HOST_URL needed, it defaults to
-# sonarcloud.io), plus the SONAR_ORGANIZATION repository variable. SNYK_TOKEN is optional.
+# build-test-sonar authenticates to SonarQube Cloud via secretless OIDC (SonarSource/
+# sonarqube-auth-action) - no SONAR_TOKEN secret needed, and no SONAR_ORGANIZATION variable
+# either (the action returns both the org and the project key as outputs). Requires an org admin
+# to enable "Secretless analysis for GitHub Actions" once in SonarQube Cloud's organization
+# settings. SNYK_TOKEN is optional.
 
 on:
   pull_request:
@@ -107,10 +110,23 @@ jobs:
   build-test-sonar:
     runs-on: ubuntu-latest
     needs: dependency-audit
+    permissions:
+      contents: read
+      id-token: write # secretless SonarQube Cloud auth below - exchanges this for a 30min token
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # SonarQube wants full history for blame/new-code analysis
+
+      # Secretless analysis: exchanges this job's GitHub OIDC identity for a short-lived (30min),
+      # project-scoped SonarQube Cloud token - no more long-lived SONAR_TOKEN secret to create,
+      # rotate or revoke. Requires an org admin to have enabled "Secretless analysis for GitHub
+      # Actions" in SonarQube Cloud's organization settings first (off by default).
+      - name: Authenticate to SonarQube Cloud
+        id: sonar_auth
+        uses: SonarSource/sonarqube-auth-action@v1
+        with:
+          export-env: "false"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
@@ -208,9 +224,9 @@ jobs:
       - name: Begin SonarCloud analysis
         run: >
           dotnet sonarscanner begin
-          /k:"dgastaldo_DgDevelopment.Identity"
-          /o:"${{ vars.SONAR_ORGANIZATION }}"
-          /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+          /k:"${{ steps.sonar_auth.outputs.project-key }}"
+          /o:"${{ steps.sonar_auth.outputs.organization }}"
+          /d:sonar.token="${{ steps.sonar_auth.outputs.sonar-token }}"
           /d:sonar.cs.cobertura.reportsPaths="tests/**/TestResults/coverage/**/coverage.cobertura.xml"
           /d:sonar.exclusions="**/node_modules/**,**/bin/**,**/obj/**,**/dist/**,clients/DgDevelopment.Identity.Client.React/**,**/Migrations/**"
           /d:sonar.coverage.exclusions="src/DgDevelopment.Identity.Server/Program.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/Program.cs,src/DgDevelopment.Identity.AppHost/AppHost.cs,src/DgDevelopment.Identity.Server/Controllers/ConnectController.cs,src/DgDevelopment.Identity.Server/Controllers/AuditController.cs,src/DgDevelopment.Identity.Server/Controllers/ClientsController.cs,src/DgDevelopment.Identity.Server/Controllers/GroupsController.cs,src/DgDevelopment.Identity.Server/Controllers/PlatformsController.cs,src/DgDevelopment.Identity.Server/Controllers/RolesController.cs,src/DgDevelopment.Identity.Server/Controllers/TenantsController.cs,src/DgDevelopment.Identity.Server/Controllers/UsersController.cs,src/DgDevelopment.Identity.Server/Services/AuditService.cs,src/DgDevelopment.Identity.Application/Services/IAuditService.cs,src/DgDevelopment.Identity.Server/Pages/Account/ExpiredPassword.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/MfaEnroll.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/Register.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Connect/Authorize.cshtml.cs,src/DgDevelopment.Identity.Server/Pages/Account/Consent.cshtml.cs,clients/DgDevelopment.Identity.Client.Core/SessionEventClient.cs,clients/DgDevelopment.Identity.Client.Core/IdentityClient.cs,clients/DgDevelopment.Identity.Client.Blazor/IdentityAuthStateProvider.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/ServerIdentityAuthStateProvider.cs,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/SessionMarkerAuthenticationHandler.cs,clients/DgDevelopment.Identity.Client.Blazor/SessionMarkerService.cs,clients/DgDevelopment.Identity.Client.Blazor/wwwroot/identitySession.js,src/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform.Client/**,src/DgDevelopment.Identity.Infrastructure/Security/AzureNotificationHubNotifier.cs,src/DgDevelopment.Identity.Server/Security/SecurityHeadersMiddleware.cs"
@@ -240,7 +256,7 @@ jobs:
             || { echo "Line coverage $LINE_RATE is below the $THRESHOLD threshold"; exit 1; }
 
       - name: End SonarQube analysis
-        run: dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+        run: dotnet sonarscanner end /d:sonar.token="${{ steps.sonar_auth.outputs.sonar-token }}"
 
   # Platform-specific clients can't build on ubuntu-latest (a job is pinned to one runs-on, and
   # there's no shared logic worth forcing into one matrix), so they'd get their own job per OS in
