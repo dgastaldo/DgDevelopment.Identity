@@ -178,6 +178,9 @@ public sealed class IdentityClient(HttpClient http, OidcOptions options)
     public Task<HttpResponseMessage> ResetPasswordAsync(Guid id, string password, bool allTenants = false, CancellationToken ct = default)
         => http.PostAsJsonAsync(new Uri($"{options.Authority}/api/v1/users/{id}/reset-password?allTenants={allTenants}"), new { password }, ct);
 
+    public Task<HttpResponseMessage> ResetMfaAsync(Guid id, bool allTenants = false, CancellationToken ct = default)
+        => http.PostAsync(new Uri($"{options.Authority}/api/v1/users/{id}/mfa/reset?allTenants={allTenants}"), null, ct);
+
     public Task<PagedPermissionsResponse?> GetPermissionsAsync(string? search = null, int page = 1, int pageSize = 100, bool allTenants = false, CancellationToken ct = default)
     {
         var query = $"?page={page}&pageSize={pageSize}&allTenants={allTenants}";

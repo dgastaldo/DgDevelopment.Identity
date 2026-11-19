@@ -12,6 +12,7 @@ public interface IPushMfaService
     Task<IReadOnlyCollection<PushDeviceDto>> GetDevicesAsync(Guid userId, CancellationToken ct = default);
     Task RegisterDeviceAsync(Guid userId, string platform, string pushToken, string? deviceName, string? totpCode, CancellationToken ct = default);
     Task RemoveDeviceAsync(Guid userId, Guid deviceId, CancellationToken ct = default);
+    Task RemoveAllDevicesAsync(Guid userId, CancellationToken ct = default);
     Task<PushChallengeCreated> StartChallengeAsync(Guid userId, CancellationToken ct = default);
     Task<bool> ApproveAsync(Guid challengeId, string challengeCode, CancellationToken ct = default);
     Task<bool> DenyAsync(Guid challengeId, string challengeCode, CancellationToken ct = default);
@@ -88,6 +89,13 @@ public sealed class PushMfaService : IPushMfaService
             return;
 
         await _deviceRepository.DeleteAsync(deviceId, ct).ConfigureAwait(false);
+    }
+
+    public async Task RemoveAllDevicesAsync(Guid userId, CancellationToken ct = default)
+    {
+        var devices = await _deviceRepository.GetActiveByUserIdAsync(userId, ct).ConfigureAwait(false);
+        foreach (var device in devices)
+            await _deviceRepository.DeleteAsync(device.Id, ct).ConfigureAwait(false);
     }
 
     public async Task<PushChallengeCreated> StartChallengeAsync(Guid userId, CancellationToken ct = default)

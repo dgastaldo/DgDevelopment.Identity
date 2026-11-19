@@ -8,6 +8,7 @@ using DgDevelopment.Identity.Domain.ValueObjects;
 using DgDevelopment.Identity.Infrastructure.Data;
 using DgDevelopment.Identity.Infrastructure.Repositories;
 using DgDevelopment.Identity.Server.UnitTests.Testing;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 public sealed class MultiTenantUserServiceTests : IClassFixture<DatabaseFixture<MultiTenantUserServiceTests>>
@@ -31,7 +32,9 @@ public sealed class MultiTenantUserServiceTests : IClassFixture<DatabaseFixture<
             new TenantRepository(context),
             new FakePasswordHasher(),
             new PasswordHistoryService(new PasswordHistoryRepository(context), new FakePasswordHasher()),
-            new SessionRevocationService(new UserSessionRepository(context), new RefreshTokenRepository(context), new FakeSessionEventPublisher()));
+            new SessionRevocationService(new UserSessionRepository(context), new RefreshTokenRepository(context), new FakeSessionEventPublisher()),
+            new TotpService(new TotpSecretRepository(context), new FakeSecretProtector()),
+            new PushMfaService(new PushDeviceRepository(context), new MfaChallengeRepository(context), new TotpSecretRepository(context), new FakeSecretProtector(), []));
 
     private static async Task<Tenant> CreateTenantAsync(IdentityDbContext context, string name)
     {
@@ -239,5 +242,66 @@ public sealed class MultiTenantUserServiceTests : IClassFixture<DatabaseFixture<
         var stored = await new UserRepository(context).GetByIdAsync(userId);
         Assert.NotNull(stored);
         Assert.DoesNotContain(stored.Roles, r => r.RoleId == roleId);
+    }
+
+    [Fact]
+    public async Task ResetMfaAsyncThrowsForSystemAccount()
+    {
+        Guid userId;
+        Guid tenantId;
+        await using (var setupContext = _fixture.CreateContext())
+        {
+            var tenant = await CreateTenantAsync(setupContext, "MfaResetSystem");
+            var user = new User(Unique("system"), "hash", EmailAddress.FromString($"{Guid.NewGuid():N}@example.com"), isSystemAccount: true);
+            setupContext.Users.Add(user);
+            setupContext.TenantMemberships.Add(new TenantMembership(tenant.Id, user.Id));
+            await setupContext.SaveChangesAsync();
+            tenantId = tenant.Id;
+            userId = user.Id;
+        }
+
+        await using var context = _fixture.CreateContext();
+        var service = CreateService(context);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.ResetMfaAsync(userId, tenantId, allTenants: false));
+
+        Assert.Contains("reset-mfa", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ResetMfaAsyncDisablesTotpAndRemovesPushDevicesForRegularUser()
+    {
+        Guid userId;
+        Guid tenantId;
+        await using (var setupContext = _fixture.CreateContext())
+        {
+            var tenant = await CreateTenantAsync(setupContext, "MfaResetRegular");
+            var user = await CreateUserInTenantAsync(setupContext, tenant.Id);
+
+            var secret = new TotpSecret(user.Id, "protected-secret");
+            secret.Enable();
+            secret.AddBackupCode("hash-1");
+            setupContext.TotpSecrets.Add(secret);
+
+            setupContext.PushDevices.Add(new PushDevice(user.Id, PushPlatform.Android, "push-token", "My phone"));
+
+            await setupContext.SaveChangesAsync();
+            tenantId = tenant.Id;
+            userId = user.Id;
+        }
+
+        await using var context = _fixture.CreateContext();
+        var service = CreateService(context);
+
+        await service.ResetMfaAsync(userId, tenantId, allTenants: false);
+
+        await using var verifyContext = _fixture.CreateContext();
+        var storedSecret = await verifyContext.TotpSecrets.FirstOrDefaultAsync(s => s.UserId == userId);
+        Assert.NotNull(storedSecret);
+        Assert.False(storedSecret.IsEnabled);
+
+        var remainingDevices = await verifyContext.PushDevices.Where(d => d.UserId == userId).ToListAsync();
+        Assert.Empty(remainingDevices);
     }
 }
