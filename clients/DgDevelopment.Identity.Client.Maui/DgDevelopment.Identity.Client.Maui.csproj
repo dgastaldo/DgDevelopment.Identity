@@ -57,6 +57,19 @@
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.13"/>
 	</ItemGroup>
 
+	<!-- Firebase Cloud Messaging for real push MFA device tokens (FirebasePushTokenProvider) -
+	     Android only; iOS/Windows fall back to UnsupportedPushTokenProvider (see MauiProgram.cs).
+	     NOT YET FUNCTIONAL: needs a real Firebase project and its generated
+	     Platforms/Android/google-services.json, which can't be created without one (see
+	     CONTEXT.md's "Known, explicitly-accepted gaps"). Once that file exists, also add:
+	       <GoogleServicesJson Include="Platforms/Android/google-services.json" />
+	     to an ItemGroup conditioned the same way as this one - omitted for now since the build
+	     would fail outright on a missing file, unlike this PackageReference, which installs fine
+	     without one (FirebasePushTokenProvider just can't get a real token until it's added). -->
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+		<PackageReference Include="Xamarin.Firebase.Messaging" Version="125.1.3"/>
+	</ItemGroup>
+
 	<ItemGroup>
 	  <ProjectReference Include="..\DgDevelopment.Identity.Client.Core\DgDevelopment.Identity.Client.Core.csproj"/>
 	</ItemGroup>

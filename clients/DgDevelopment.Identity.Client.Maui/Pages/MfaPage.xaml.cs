@@ -9,12 +9,14 @@ public partial class MfaPage : ContentPage
 {
     private readonly AuthSession _authSession;
     private readonly IdentityClient _identityClient;
+    private readonly IPushTokenProvider _pushTokenProvider;
 
-    public MfaPage(AuthSession authSession, IdentityClient identityClient)
+    public MfaPage(AuthSession authSession, IdentityClient identityClient, IPushTokenProvider pushTokenProvider)
     {
         InitializeComponent();
         _authSession = authSession;
         _identityClient = identityClient;
+        _pushTokenProvider = pushTokenProvider;
     }
 
     protected override async void OnAppearing()
@@ -144,14 +146,21 @@ public partial class MfaPage : ContentPage
 
     private async void OnRegisterDeviceClicked(object? sender, EventArgs e)
     {
-        // Real push delivery needs a platform push token (Firebase Cloud Messaging on Android,
-        // APNs elsewhere) obtained via the platform's push SDK and wired into a real Azure
-        // Notification Hub - neither is configured yet. Registering with a locally-generated
-        // placeholder token proves the API round-trip works end-to-end today; replace
-        // GetPlaceholderPushToken() with the real FCM/APNs token once that's wired up.
         try
         {
-            await _identityClient.RegisterPushDeviceAsync(DeviceInfo.Platform.ToString(), GetPlaceholderPushToken(), DeviceInfo.Name).ConfigureAwait(true);
+            // Real token on Android (FirebasePushTokenProvider) once Firebase is actually
+            // configured there (see CONTEXT.md); null on every other platform/unconfigured build
+            // (UnsupportedPushTokenProvider) - surfaced as a message instead of registering a
+            // token that could never receive anything.
+            var token = await _pushTokenProvider.GetTokenAsync().ConfigureAwait(true);
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                ErrorLabel.Text = "Push notifications are not available on this device yet.";
+                ErrorLabel.IsVisible = true;
+                return;
+            }
+
+            await _identityClient.RegisterPushDeviceAsync(DeviceInfo.Platform.ToString(), token, DeviceInfo.Name).ConfigureAwait(true);
             await LoadAsync().ConfigureAwait(true);
         }
         catch (HttpRequestException)
@@ -160,6 +169,4 @@ public partial class MfaPage : ContentPage
             ErrorLabel.IsVisible = true;
         }
     }
-
-    private static string GetPlaceholderPushToken() => $"placeholder-{Guid.NewGuid():N}";
 }
