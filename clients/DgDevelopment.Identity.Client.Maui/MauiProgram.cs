@@ -18,6 +18,15 @@ internal static class MauiProgram
         builder.Services.AddTransient<IdentityAuthHandler>();
         builder.Services.AddHttpClient<IdentityClient>().AddHttpMessageHandler<IdentityAuthHandler>();
 
+#if ANDROID
+        builder.Services.AddSingleton<IPushTokenProvider, FirebasePushTokenProvider>();
+#else
+        // iOS/Windows don't have a real push token provider yet - see CONTEXT.md. Registered
+        // anyway so MfaPage (which takes IPushTokenProvider in its constructor) still resolves
+        // on those builds instead of failing DI at runtime.
+        builder.Services.AddSingleton<IPushTokenProvider, UnsupportedPushTokenProvider>();
+#endif
+
         builder.Services.AddTransient<Pages.LoginPage>();
         builder.Services.AddTransient<Pages.MainPage>();
         builder.Services.AddTransient<Pages.MfaPage>();

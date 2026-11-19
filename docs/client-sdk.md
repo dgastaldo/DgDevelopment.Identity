@@ -181,7 +181,7 @@ Both `AuthSession` (MAUI) and `IdentityAuthStateProvider` (`Client.Blazor`) wrap
 - **`ITokenStore`/`SecureStorageTokenStore`** - tokens persisted via MAUI `SecureStorage`.
 - **`IdentityAuthHandler`** - a `DelegatingHandler` that attaches the current access token to every request and clears it on a 401; registered via `AddHttpMessageHandler<IdentityAuthHandler>()` on the `IdentityClient` `HttpClient`.
 - **`Pkce`** - PKCE code-verifier/challenge generation (S256).
-- **App wiring**: `App.xaml.cs` subscribes to `AuthSession.ForceLoggedOut` and navigates back to `LoginPage` on the UI thread (`MainThread.BeginInvokeOnMainThread` - the SignalR callback isn't on it). Pages: `LoginPage`, `MainPage`, `MfaPage` (self-service TOTP enroll/enable/disable, push-device register/remove - the same endpoints `IdentityPlatform`'s own `/mfa` page uses). Push-device registration currently sends a locally-generated placeholder token - no real FCM/APNs push SDK is wired up yet.
+- **App wiring**: `App.xaml.cs` subscribes to `AuthSession.ForceLoggedOut` and navigates back to `LoginPage` on the UI thread (`MainThread.BeginInvokeOnMainThread` - the SignalR callback isn't on it). Pages: `LoginPage`, `MainPage`, `MfaPage` (self-service TOTP enroll/enable/disable, push-device register/remove - the same endpoints `IdentityPlatform`'s own `/mfa` page uses). Push-device registration uses a real FCM token on Android (`IPushTokenProvider`/`FirebasePushTokenProvider`, unverified - see `CONTEXT.md`); iOS/Windows still fall back to no token at all (`UnsupportedPushTokenProvider`), not attempted yet.
 
 ## WPF SDK (`Client.Wpf`) — Planned
 

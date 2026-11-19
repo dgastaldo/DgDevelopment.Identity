@@ -538,20 +538,25 @@ and both can be provisioned whenever, independent of getting the pipeline itself
 
 1. A **Notification Hub Namespace** (Free or Basic tier is plenty for dev traffic).
 2. A **Notification Hub** inside that namespace.
-3. **Platform credentials registered on the hub** — only Windows (WNS) matters today, since MAUI
-   Windows is the only buildable/testable target (per `docs/client-sdk.md`): a Microsoft Entra app
-   registration (Package SID + client secret) tied to the app's Windows packaging identity. FCM
-   (Android)/APNs (iOS) can be deferred — the notifier's payload-building code already handles
-   those formats, there's just no real device to test against yet.
+3. **Platform credentials registered on the hub** — **revised**: FCM (Android) is now the priority,
+   not WNS (Windows). The MAUI client's Android-side push token code
+   (`FirebasePushTokenProvider`/`AppFirebaseMessagingService`, per `CONTEXT.md`) exists now, so ANH
+   needs FCM v1 credentials from a real Firebase project registered on the hub before Android push
+   can work at all — Windows (WNS, Microsoft Entra app registration + Package SID/client secret)
+   and APNs (iOS) can still be deferred, the notifier's payload-building code already handles both
+   formats, there's just no real device/code to test either against yet.
 4. Take the namespace's connection string (ideally a dedicated SAS policy scoped to Listen+Send,
    not the full-access default) and the hub's name → these become
    `Azure:NotificationHub:ConnectionString` / `Azure:NotificationHub:Name` in each environment's
    config (a GitHub Environment secret once the actual pipeline exists, a user-secret/env var for
    now).
-5. **Caveat**: this alone doesn't make push notifications work end-to-end. `RegisterPushDeviceAsync`
-   in the MAUI client currently sends a locally-generated placeholder token (no real FCM/APNs/WNS
-   SDK wired up yet, per `CONTEXT.md`) — provisioning ANH now gets the server-side infra ready, but
-   the MAUI-side integration is a separate, not-yet-scheduled piece of work.
+5. **Caveat**: this alone doesn't make push notifications work end-to-end, and the remaining gap
+   isn't purely code anymore. `FirebasePushTokenProvider` is wired up and registered with the
+   server for real on Android (`CONTEXT.md` has the exact status — unverified, no Android SDK/
+   emulator available to test it with), but it still needs: a real Firebase project (needs a Google
+   account) and its `google-services.json`, this hub actually configured with that project's FCM
+   credentials, and a real device/emulator check. iOS/Windows are still on a no-op fallback
+   (`UnsupportedPushTokenProvider`) - not attempted.
 
 ### Getting secrets into the Compose deploy
 
