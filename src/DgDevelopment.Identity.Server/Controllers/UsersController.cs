@@ -82,6 +82,16 @@ public sealed class UsersController(
     public Task<IActionResult> UnlockUser(Guid id, [FromQuery] bool allTenants, CancellationToken ct)
         => MutateAsync(id, "user.unlock", allTenants, canSeeAllTenants => userService.SetLockAsync(id, false, tenantContext.TenantId, canSeeAllTenants, ct), ct);
 
+    // Admin-assisted MFA recovery, for a privileged user locked out of their own device + backup
+    // codes - never for a system account (MutateAsync maps EnsureNotSystemAccount's
+    // InvalidOperationException to 403). The SuperAdmin has no other admin above it to grant this
+    // through the web at all; its break-glass is the server's "reset-mfa" CLI command instead
+    // (Commands/ResetMfaCommand.cs), reachable only with shell access to the host.
+    [HttpPost("{id:guid}/mfa/reset")]
+    [RequirePermission("identity-platform.user.update")]
+    public Task<IActionResult> ResetMfa(Guid id, [FromQuery] bool allTenants, CancellationToken ct)
+        => MutateAsync(id, "user.reset-mfa", allTenants, canSeeAllTenants => userService.ResetMfaAsync(id, tenantContext.TenantId, canSeeAllTenants, ct), ct);
+
     [HttpPost("{id:guid}/reset-password")]
     [RequirePermission("identity-platform.user.update")]
     public async Task<IActionResult> ResetPassword(Guid id, [FromBody] ResetPasswordRequest request, [FromQuery] bool allTenants, CancellationToken ct)

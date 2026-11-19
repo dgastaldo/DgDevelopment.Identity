@@ -26,6 +26,9 @@ using System.Threading.RateLimiting;
 if (args.Length > 0 && args[0] == "rotate-admin-client-secret")
     return await RotateAdminClientSecretCommand.RunAsync(args).ConfigureAwait(false);
 
+if (args.Length > 0 && args[0] == "reset-mfa")
+    return await ResetMfaCommand.RunAsync(args).ConfigureAwait(false);
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();

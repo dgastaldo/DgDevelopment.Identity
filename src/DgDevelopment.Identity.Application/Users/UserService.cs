@@ -16,7 +16,9 @@ public sealed class UserService(
     ITenantRepository tenantRepository,
     IPasswordHasher passwordHasher,
     IPasswordHistoryService passwordHistoryService,
-    ISessionRevocationService sessionRevocationService) : IUserService
+    ISessionRevocationService sessionRevocationService,
+    ITotpService totpService,
+    IPushMfaService pushMfaService) : IUserService
 {
     public async Task<PagedResult<User>> GetPagedAsync(string? search, int page, int pageSize, Guid tenantId, bool allTenants, CancellationToken ct = default)
     {
@@ -78,6 +80,14 @@ public sealed class UserService(
         await passwordHistoryService.RecordChangeAsync(user.Id, previousHash, ct).ConfigureAwait(false);
         await sessionRevocationService.RevokeAllAsync(user.Id, ct).ConfigureAwait(false);
         return user;
+    }
+
+    public async Task ResetMfaAsync(Guid id, Guid tenantId, bool allTenants, CancellationToken ct = default)
+    {
+        var user = await GetRequiredAsync(id, tenantId, allTenants, ct).ConfigureAwait(false);
+        EnsureNotSystemAccount(user, "have their MFA reset here - use the server's reset-mfa CLI command instead");
+        await totpService.DisableAsync(user.Id, ct).ConfigureAwait(false);
+        await pushMfaService.RemoveAllDevicesAsync(user.Id, ct).ConfigureAwait(false);
     }
 
     public async Task AssignRoleAsync(Guid userId, Guid roleId, string? scopeType, string? scopeValue, Guid tenantId, bool allTenants, CancellationToken ct = default)
@@ -158,9 +168,9 @@ public sealed class UserService(
             throw new InvalidOperationException("The scoped client does not belong to the active tenant.");
     }
 
-    private static void EnsureNotSystemAccount(User user)
+    private static void EnsureNotSystemAccount(User user, string reason = "be deactivated here")
     {
         if (user.IsSystemAccount)
-            throw new InvalidOperationException("System accounts cannot be deactivated.");
+            throw new InvalidOperationException($"System accounts cannot {reason}.");
     }
 }

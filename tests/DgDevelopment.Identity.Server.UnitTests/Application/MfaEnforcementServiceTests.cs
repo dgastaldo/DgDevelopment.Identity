@@ -164,6 +164,7 @@ public sealed class MfaEnforcementServiceTests : IClassFixture<DatabaseFixture<M
         public Task<IReadOnlyCollection<PushDeviceDto>> GetDevicesAsync(Guid userId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task RegisterDeviceAsync(Guid userId, string platform, string pushToken, string? deviceName, string? totpCode, CancellationToken ct = default) => throw new NotSupportedException();
         public Task RemoveDeviceAsync(Guid userId, Guid deviceId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task RemoveAllDevicesAsync(Guid userId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<PushChallengeCreated> StartChallengeAsync(Guid userId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> ApproveAsync(Guid challengeId, string challengeCode, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> DenyAsync(Guid challengeId, string challengeCode, CancellationToken ct = default) => throw new NotSupportedException();
