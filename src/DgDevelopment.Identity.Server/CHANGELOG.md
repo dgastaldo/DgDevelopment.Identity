@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/dgastaldo/DgDevelopment.Identity/compare/server-v0.2.1...server-v0.3.0) (2026-11-21)
+
+
+### Features
+
+* add Terraform-managed Azure infrastructure for docs/integration/production ([#182](https://github.com/dgastaldo/DgDevelopment.Identity/issues/182)) ([671361d](https://github.com/dgastaldo/DgDevelopment.Identity/commit/671361de2e1f69802c8d98a2d5b05d44fde696d1))
+
+
+### Bug Fixes
+
+* resolve SonarCloud code smells (complexity, test sleep, hardcoded delimiter) ([#187](https://github.com/dgastaldo/DgDevelopment.Identity/issues/187)) ([ca55377](https://github.com/dgastaldo/DgDevelopment.Identity/commit/ca553776a01dba1b137705dbe620204e1bb8cfd2))
+
 ## [0.2.1](https://github.com/dgastaldo/DgDevelopment.Identity/compare/server-v0.2.0...server-v0.2.1) (2026-10-17)
 
 
