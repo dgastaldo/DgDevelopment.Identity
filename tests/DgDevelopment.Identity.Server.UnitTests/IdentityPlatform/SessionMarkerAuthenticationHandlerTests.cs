@@ -85,7 +85,7 @@ public sealed class SessionMarkerAuthenticationHandlerTests
         var context = new DefaultHttpContext();
         var handler = await CreateHandlerAsync(context);
 
-        await handler.ChallengeAsync();
+        await ((IAuthenticationHandler)handler).ChallengeAsync(null);
 
         Assert.Equal(StatusCodes.Status302Found, context.Response.StatusCode);
         Assert.Equal("/login", context.Response.Headers.Location);
