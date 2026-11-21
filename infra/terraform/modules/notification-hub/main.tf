@@ -20,11 +20,11 @@ resource "azurerm_notification_hub" "this" {
   resource_group_name = var.resource_group_name
   location            = var.location
 
-  // Both for_each values are maps (one empty, one single-key), not a list/set built from a
-  // ternary - mixing an empty tuple `[]` with a typed list/set in a ternary makes Terraform
-  // unify them into a type for_each rejects, even though each branch alone would be valid.
+  // Both branches must be the SAME explicit type (toset(...) on both sides) - a ternary mixing a
+  // bare `[]`/`{}` literal with a typed collection unifies to Terraform's "dynamic" pseudo-type,
+  // which for_each rejects outright regardless of the value's actual runtime shape.
   dynamic "apns_credential" {
-    for_each = var.apns_credential != null ? { credential = var.apns_credential } : {}
+    for_each = var.apns_credential != null ? toset([var.apns_credential]) : toset([])
     content {
       application_mode = apns_credential.value.application_mode
       bundle_id        = apns_credential.value.bundle_id
@@ -35,7 +35,7 @@ resource "azurerm_notification_hub" "this" {
   }
 
   dynamic "gcm_credential" {
-    for_each = var.fcm_api_key != null ? { credential = var.fcm_api_key } : {}
+    for_each = var.fcm_api_key != null ? toset([var.fcm_api_key]) : toset([])
     content {
       api_key = gcm_credential.value
     }
