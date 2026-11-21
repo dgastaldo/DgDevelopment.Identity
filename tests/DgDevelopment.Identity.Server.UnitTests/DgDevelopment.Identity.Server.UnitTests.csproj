@@ -39,6 +39,7 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.15" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.13" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
@@ -63,6 +64,8 @@
     <ProjectReference Include="..\..\src\DgDevelopment.Identity.Saml\DgDevelopment.Identity.Saml.csproj" />
     <ProjectReference Include="..\..\src\DgDevelopment.Identity.Infrastructure\DgDevelopment.Identity.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\DgDevelopment.Identity.Server\DgDevelopment.Identity.Server.csproj" />
+    <ProjectReference Include="..\..\src\DgDevelopment.Identity.IdentityPlatform\DgDevelopment.Identity.IdentityPlatform\DgDevelopment.Identity.IdentityPlatform.csproj" />
+    <ProjectReference Include="..\..\clients\DgDevelopment.Identity.Client.Blazor\DgDevelopment.Identity.Client.Blazor.csproj" />
   </ItemGroup>
 
 </Project>
