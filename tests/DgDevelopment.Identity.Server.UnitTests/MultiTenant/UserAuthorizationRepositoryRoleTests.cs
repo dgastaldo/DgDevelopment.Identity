@@ -127,4 +127,33 @@ public sealed class UserAuthorizationRepositoryRoleTests : IClassFixture<Databas
 
         Assert.False(result);
     }
+
+    [Fact]
+    public async Task HasAnyRoleAsyncReturnsFalseWhenTheUserDoesNotExist()
+    {
+        await using var context = _fixture.CreateContext();
+        var tenant = await CreateTenantAsync(context);
+        var platform = await CreatePlatformAsync(context, tenant.Id);
+        await CreateRoleAsync(context, tenant.Id, platform.Id, "GlobalAdmin");
+
+        var repo = new UserAuthorizationRepository(context);
+        var result = await repo.HasAnyRoleAsync(Guid.NewGuid(), tenant.Id, ["GlobalAdmin"]);
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public async Task HasAnyRoleAsyncReturnsFalseWhenTheUserHasNoGroupsAndNoDirectRoleMatch()
+    {
+        await using var context = _fixture.CreateContext();
+        var tenant = await CreateTenantAsync(context);
+        var platform = await CreatePlatformAsync(context, tenant.Id);
+        await CreateRoleAsync(context, tenant.Id, platform.Id, "GlobalAdmin");
+        var user = await CreateUserAsync(context);
+
+        var repo = new UserAuthorizationRepository(context);
+        var result = await repo.HasAnyRoleAsync(user.Id, tenant.Id, ["GlobalAdmin"]);
+
+        Assert.False(result);
+    }
 }

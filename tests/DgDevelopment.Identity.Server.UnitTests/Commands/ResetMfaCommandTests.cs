@@ -89,4 +89,62 @@ public sealed class ResetMfaCommandTests : IClassFixture<DatabaseFixture<ResetMf
         Assert.Equal(1, exitCode);
         Assert.Contains("No user found", stderr.ToString(), StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task RunAsyncThrowsForNullArgs()
+    {
+        await Assert.ThrowsAsync<ArgumentNullException>(() => ResetMfaCommand.RunAsync(null!));
+    }
+
+    [Fact]
+    public async Task RunAsyncPrintsUsageAndReturnsOneWhenTheUsernameIsMissing()
+    {
+        var originalError = Console.Error;
+        using var captured = new StringWriter();
+        Console.SetError(captured);
+        try
+        {
+            var exitCode = await ResetMfaCommand.RunAsync(["reset-mfa"]);
+            Assert.Equal(1, exitCode);
+            Assert.Contains("Usage: reset-mfa <username>", captured.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
+    }
+
+    [Fact]
+    public async Task ResetAsyncThrowsForNullArguments()
+    {
+        await using var context = _fixture.CreateContext();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() => ResetMfaCommand.ResetAsync(null!, "u", stdout, stderr));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => ResetMfaCommand.ResetAsync(context, "u", null!, stderr));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => ResetMfaCommand.ResetAsync(context, "u", stdout, null!));
+    }
+
+    [Fact]
+    public async Task ResetAsyncReportsNoTotpSecretWhenOnlyPushDevicesExist()
+    {
+        var username = Unique("push-only");
+        await using (var setupContext = _fixture.CreateContext())
+        {
+            var user = new User(username, "hash", EmailAddress.FromString($"{Guid.NewGuid():N}@example.com"), isSystemAccount: true);
+            setupContext.Users.Add(user);
+            setupContext.PushDevices.Add(new PushDevice(user.Id, PushPlatform.Android, "push-token", "My phone"));
+            await setupContext.SaveChangesAsync();
+        }
+
+        await using var context = _fixture.CreateContext();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+
+        var exitCode = await ResetMfaCommand.ResetAsync(context, username, stdout, stderr);
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains("TOTP disabled:        False", stdout.ToString(), StringComparison.Ordinal);
+    }
 }

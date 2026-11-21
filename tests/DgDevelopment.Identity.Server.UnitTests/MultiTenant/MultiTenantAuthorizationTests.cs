@@ -148,4 +148,34 @@ public sealed class MultiTenantAuthorizationTests : IClassFixture<DatabaseFixtur
         Assert.Contains(permissionsInA, p => p.Name == "identity-platform.group.read");
         Assert.DoesNotContain(permissionsInB, p => p.Name == "identity-platform.group.read");
     }
+
+    [Fact]
+    public async Task ADirectlyGrantedPermissionIsIncludedWithoutAnyRole()
+    {
+        await using var context = _fixture.CreateContext();
+        var tenant = await CreateTenantAsync(context, "DirectGrantTenant");
+        var permission = await context.Permissions.SingleAsync(p => p.Name == "identity-platform.permission.read");
+
+        var user = await CreateUserAsync(context);
+        user.GrantPermission(tenant.Id, permission, scopeType: "department", scopeValue: "finance");
+        context.Users.Update(user);
+        context.TenantMemberships.Add(new TenantMembership(tenant.Id, user.Id));
+        await context.SaveChangesAsync();
+
+        var repo = new UserAuthorizationRepository(context);
+        var permissions = await repo.GetEffectivePermissionsAsync(user.Id, tenant.Id);
+
+        Assert.Contains(permissions, p => p.Name == "identity-platform.permission.read" && p.ScopeValue == "finance");
+    }
+
+    [Fact]
+    public async Task GetEffectivePermissionsAsyncReturnsEmptyForANonexistentUser()
+    {
+        await using var context = _fixture.CreateContext();
+        var repo = new UserAuthorizationRepository(context);
+
+        var permissions = await repo.GetEffectivePermissionsAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.Empty(permissions);
+    }
 }
