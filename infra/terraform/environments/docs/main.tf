@@ -9,6 +9,22 @@ module "resource_group" {
   tags     = local.tags
 }
 
+// Private networking: SQL gets a Private Endpoint (no public access at all), reachable only from
+// the compute subnet App Service's VNet Integration attaches to.
+module "networking" {
+  source = "../../modules/networking"
+
+  name_prefix         = "identity-docs"
+  resource_group_name = module.resource_group.name
+  location            = var.location
+  tags                = local.tags
+
+  compute_subnet_delegation = {
+    service_name = "Microsoft.Web/serverFarms"
+    actions      = ["Microsoft.Network/virtualNetworks/subnets/action"]
+  }
+}
+
 module "sql" {
   source = "../../modules/sql"
 
@@ -19,6 +35,8 @@ module "sql" {
   administrator_login_password = var.sql_admin_password
   sku_name                     = "Basic"
   tags                         = local.tags
+  private_endpoint_subnet_id   = module.networking.private_endpoint_subnet_id
+  private_dns_zone_id          = module.networking.sql_private_dns_zone_id
 }
 
 module "notification_hub" {
@@ -46,6 +64,7 @@ module "app_service" {
   ghcr_token                     = var.ghcr_token
   identity_platform_app_settings = {}
   tags                           = local.tags
+  vnet_integration_subnet_id     = module.networking.compute_subnet_id
   server_app_settings = {
     "Parameters__IdentityDb" = module.sql.connection_string
   }

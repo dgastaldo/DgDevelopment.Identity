@@ -29,3 +29,9 @@ variable "tags" {
   type    = map(string)
   default = {}
 }
+
+variable "vnet_subnet_id" {
+  type        = string
+  description = "The networking module's compute_subnet_id - required to reach a Private-Endpoint-only SQL server. Null keeps the node pool on AKS's default kubenet network."
+  default     = null
+}

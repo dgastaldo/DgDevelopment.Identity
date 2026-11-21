@@ -48,3 +48,9 @@ variable "tags" {
   type    = map(string)
   default = {}
 }
+
+variable "vnet_integration_subnet_id" {
+  type        = string
+  description = "The networking module's delegated compute_subnet_id - required for this site to reach a Private-Endpoint-only SQL server. Null keeps the site without VNet Integration (can only reach a publicly-accessible SQL server)."
+  default     = null
+}

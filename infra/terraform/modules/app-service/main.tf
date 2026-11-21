@@ -40,6 +40,10 @@ resource "azurerm_linux_web_app" "server" {
     "DOCKER_REGISTRY_SERVER_PASSWORD" = var.ghcr_token
   })
 
+  // Routes this site's outbound traffic (including to the SQL server) through the VNet, so it can
+  // reach a Private-Endpoint-only SQL server - see the networking module's compute_subnet_id.
+  virtual_network_subnet_id = var.vnet_integration_subnet_id
+
   identity {
     type = "SystemAssigned"
   }
@@ -71,6 +75,8 @@ resource "azurerm_linux_web_app" "identity_platform" {
     "DOCKER_REGISTRY_SERVER_USERNAME" = var.ghcr_username
     "DOCKER_REGISTRY_SERVER_PASSWORD" = var.ghcr_token
   })
+
+  virtual_network_subnet_id = var.vnet_integration_subnet_id
 
   identity {
     type = "SystemAssigned"

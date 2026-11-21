@@ -8,10 +8,9 @@ resource "azurerm_mssql_server" "this" {
   minimum_tls_version          = "1.2"
   tags                         = var.tags
 
-  // Explicit, not relied-on-by-default: reachability is still gated by the AllowAzureServices
-  // firewall rule below (no arbitrary public IP can connect) - a real private-networking
-  // alternative (Private Endpoint/VNet integration) is a follow-up, not yet in scope here.
-  public_network_access_enabled = true
+  // Genuinely closed, not just accepted: with a Private Endpoint wired (private_endpoint_subnet_id
+  // set), the server has no public network path at all - reachable only from inside the VNet.
+  public_network_access_enabled = var.private_endpoint_subnet_id == null
 
   // Not used for authentication today (SQL login/password above) - declared so a future move to
   // Azure AD-only auth, or to a managed-identity-based connection, has an identity to attach to.
@@ -29,12 +28,36 @@ resource "azurerm_mssql_database" "identity_db" {
   tags           = var.tags
 }
 
-// Lets Azure services (the AKS cluster / App Service running this environment's app) reach the
-// server without enumerating individual outbound IPs - narrower, IP-scoped rules can replace this
-// once the compute environment's egress IPs are known/stable.
+// Only relevant when public access is on (private_endpoint_subnet_id is null) - kept as a
+// fallback for any future environment that doesn't wire private networking, not used by
+// docs/integration/production once they pass private_endpoint_subnet_id.
 resource "azurerm_mssql_firewall_rule" "allow_azure_services" {
+  count = var.private_endpoint_subnet_id == null ? 1 : 0
+
   name             = "AllowAzureServices"
   server_id        = azurerm_mssql_server.this.id
   start_ip_address = "0.0.0.0"
   end_ip_address   = "0.0.0.0"
+}
+
+resource "azurerm_private_endpoint" "sql" {
+  count = var.private_endpoint_subnet_id != null ? 1 : 0
+
+  name                = "${var.server_name}-pe"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  subnet_id           = var.private_endpoint_subnet_id
+  tags                = var.tags
+
+  private_service_connection {
+    name                           = "${var.server_name}-psc"
+    private_connection_resource_id = azurerm_mssql_server.this.id
+    subresource_names              = ["sqlServer"]
+    is_manual_connection           = false
+  }
+
+  private_dns_zone_group {
+    name                 = "default"
+    private_dns_zone_ids = [var.private_dns_zone_id]
+  }
 }

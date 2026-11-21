@@ -17,17 +17,18 @@ sketched in `docs/deployment.md`; that section of the doc needs a follow-up edit
 infra/terraform/
   modules/              # reusable building blocks, one Azure concept each
     resource-group/
+    networking/          # VNet + compute/private-endpoint subnets + SQL private DNS zone
     notification-hub/   # push MFA (Azure Notification Hub)
     communication-services/  # email (Azure Communication Services) - not consumed by app code yet
-    sql/                 # Azure SQL server + IdentityDb database
-    app-service/         # docs' Linux Web App x2 (Server + IdentityPlatform), GHCR-sourced containers
-    aks/                 # integration/production's AKS cluster
+    sql/                 # Azure SQL server + IdentityDb database, Private-Endpoint-only
+    app-service/         # docs' Linux Web App x2 (Server + IdentityPlatform), GHCR-sourced containers, VNet-integrated
+    aks/                 # integration/production's AKS cluster, VNet-attached node pool
     ghcr-pull-secret/    # k8s imagePullSecret for GHCR, used by aks environments
   environments/
     personal/   # RG + its own Notification Hub only - personal itself stays on the NUC
     shared/     # RG + one Communication Services resource, shared by develop + personal
-    docs/       # RG + SQL + Notification Hub + App Service
-    integration/# RG + SQL + Notification Hub + AKS + GHCR pull secret
+    docs/       # RG + networking + SQL + Notification Hub + App Service
+    integration/# RG + networking + SQL + Notification Hub + AKS + GHCR pull secret
     production/ # same shape as integration, fully separate resource group/cluster
 ```
 
@@ -99,16 +100,21 @@ this environment; review before applying for real.
   `app-service`'s two Linux Web Apps authenticate to `ghcr.io` with a plain username/PAT via
   `DOCKER_REGISTRY_SERVER_*` app settings — rotate that PAT the same way the AKS pull secret's PAT
   gets rotated.
-- **SQL firewall / public network access**: `public_network_access_enabled = true` on the SQL
-  server, mitigated only by the `AllowAzureServices` firewall rule (0.0.0.0/0.0.0.0 in Azure's own
-  convention, meaning "any Azure-hosted service," not the open internet) — SonarCloud flags this as
-  a BLOCKER-severity finding (`terraform:S6329`) regardless, since a static scanner can't account
-  for the firewall rule's actual effect. This is a real tradeoff, not yet resolved: the
-  alternative is Private Endpoint/VNet integration between the SQL server and each compute
-  environment (AKS/App Service), which is real follow-up work, not a config flag. Narrow the
-  firewall rule to the compute environment's real egress IPs once they're stable in the meantime,
-  if you want tighter isolation than "any Azure service" without doing the full private-networking
-  work.
+- **SQL network access — resolved via Private Endpoint**: `docs`/`integration`/`production` each
+  get a `networking` module (VNet + a delegated/undelegated compute subnet + a Private Endpoint
+  subnet + a `privatelink.database.windows.net` zone). `sql`'s
+  `public_network_access_enabled` is now `false` whenever a Private Endpoint subnet is passed in
+  (always, for these three environments) — the server has no public network path at all, only
+  reachable from inside the VNet. App Service uses VNet Integration (`virtual_network_subnet_id`)
+  to reach it; AKS attaches its node pool directly to the compute subnet (`vnet_subnet_id`, forcing
+  Azure CNI instead of the default kubenet). This is a genuine fix, not a mitigated-but-still-open
+  risk — SonarCloud's `terraform:S6329` should no longer fire once this applies for real.
+- **App Service `auth_settings` — accepted, not fixable in code**: SonarCloud's `terraform:S6380`
+  still flags `auth_settings { enabled = false }` on both Linux Web Apps as a hotspot to review.
+  There's no code change that "really closes" this one: Server and IdentityPlatform **are** the
+  OIDC identity provider, so turning on App Service's own built-in authentication in front of them
+  would be circular (you'd need to already be authenticated to reach the login page). This needs a
+  human to mark it Safe/Won't Fix in SonarCloud's UI, not a Terraform change.
 - **No `terraform fmt`/`validate`/`init` run against these files** — written without a Terraform
   CLI or Azure credentials available in this session. Run `terraform fmt -recursive` and
   `terraform validate` (per environment, after `init`) before the first real `plan`.
