@@ -11,12 +11,16 @@ name: Auto-approve
 #     once they are no longer drafts.
 # The approval comes from github-actions[bot], so it is a different identity from the PR author. The
 # required status checks still have to pass and the merge itself stays a manual click.
-# pull_request_target (not pull_request) is required for Dependabot PRs to receive repo secrets/
-# the default token - safe here since this job only reads PR metadata and posts an approval, it
-# never checks out or executes anything from the PR's own branch.
+# Plain pull_request (not pull_request_target): Dependabot opens its PRs from branches of this same
+# repository, not forks, so the default GITHUB_TOKEN and repo secrets are already available without
+# needing pull_request_target's elevated, base-branch-pinned execution model - which GitHub is
+# blocking by default on public repos from 2026-12-02 unless an Actions policy explicitly allows it
+# (see https://gh.io/securely-using-pull_request_target#default-policy-for-pull_request_target).
+# A real fork PR would simply get a read-only token and no secrets under this trigger, same as any
+# other pull_request workflow - this job would just fail to approve rather than do anything unsafe.
 
 on:
-  pull_request_target:
+  pull_request:
     branches: [develop]
     types: [opened, synchronize, reopened, ready_for_review]
 
