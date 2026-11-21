@@ -192,10 +192,17 @@ public sealed class UserTests
         var user = CreateUser();
         var before = user.PasswordChangedAt;
 
-        Thread.Sleep(10);
-        user.SetPassword("new-hash");
+        // Spin instead of Thread.Sleep: two UtcNow reads back-to-back can land on the same tick,
+        // so this re-sets the password until the timestamp actually moves, rather than sleeping a
+        // fixed (and either flaky-short or needlessly-long) amount of wall-clock time.
+        DateTime after;
+        do
+        {
+            user.SetPassword("new-hash");
+            after = user.PasswordChangedAt;
+        } while (after == before);
 
-        Assert.True(user.PasswordChangedAt > before);
+        Assert.True(after > before);
     }
 
     [Fact]

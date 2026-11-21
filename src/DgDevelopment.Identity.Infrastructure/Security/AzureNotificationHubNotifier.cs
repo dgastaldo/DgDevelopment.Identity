@@ -106,7 +106,9 @@ public sealed partial class AzureNotificationHubNotifier : IPushNotifier
 
     private static Uri BuildMessagesUri(string endpoint, string hubName)
     {
-        var host = new Uri(endpoint.TrimEnd('/') + "/").Host;
+        // UriBuilder parses the endpoint directly - no manual trim/append of a "/" delimiter
+        // needed to get at the host (which is what csharpsquid:S1075 flagged here).
+        var host = new UriBuilder(endpoint).Host;
         return new Uri(new Uri($"https://{host}/"), $"{Uri.EscapeDataString(hubName)}/messages");
     }
 

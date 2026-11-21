@@ -12,8 +12,12 @@ IResourceBuilder<IResourceWithConnectionString> sqlServer = deployTarget is "per
     ? builder.AddSqlServer("sql").AddDatabase("IdentityDb")
     : builder.AddConnectionString("IdentityDb");
 
+// AddProject<T> is obsolete as of Aspire 17 (external_roslyn:CS0618) in favor of AddDotnetProject,
+// which takes an explicit project path instead of a source-generated Projects.* type - the
+// ProjectReference entries above still make these builds/publishes work the same way.
 var server = builder
-    .AddProject<Projects.DgDevelopment_Identity_Server>("identity-server", launchProfileName: HttpsEndpoint)
+    .AddDotnetProject("identity-server", "../DgDevelopment.Identity.Server/DgDevelopment.Identity.Server.csproj",
+        o => o.LaunchProfileName = HttpsEndpoint)
     .WithEndpoint(HttpsEndpoint, endpoint => endpoint.IsProxied = false)
     .WithEndpoint("http", endpoint => endpoint.IsProxied = false)
     .WithReference(sqlServer);
@@ -22,7 +26,9 @@ var adminClientId = builder.Configuration["Identity:AdminClientId"] ?? "";
 var adminClientSecret = builder.Configuration["Identity:AdminClientSecret"] ?? "";
 
 var identityPlatform = builder
-    .AddProject<Projects.DgDevelopment_Identity_IdentityPlatform>("identity-platform", launchProfileName: HttpsEndpoint)
+    .AddDotnetProject("identity-platform",
+        "../DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform/DgDevelopment.Identity.IdentityPlatform.csproj",
+        o => o.LaunchProfileName = HttpsEndpoint)
     .WithEndpoint(HttpsEndpoint, endpoint => endpoint.IsProxied = false)
     .WithEndpoint("http", endpoint => endpoint.IsProxied = false)
     .WithReference(server)
