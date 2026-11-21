@@ -81,12 +81,15 @@ public sealed class AuditLogRepositoryTests : IClassFixture<DatabaseFixture<Audi
     public async Task GetPagedAsyncAllTenantsIgnoresTheTenantFilter()
     {
         var tenantId = await _fixture.GetSeededTenantIdAsync();
-        var otherTenantId = Guid.NewGuid();
         await using var context = _fixture.CreateContext();
+        var otherTenant = new Tenant($"other-{Guid.NewGuid():N}", $"other-{Guid.NewGuid():N}");
+        context.Tenants.Add(otherTenant);
+        await context.SaveChangesAsync();
+
         var repo = new AuditLogRepository(context);
         var marker = $"cross-tenant-{Guid.NewGuid():N}";
 
-        await repo.AddAsync(new AuditLog(otherTenantId, marker, AuditOutcome.Success));
+        await repo.AddAsync(new AuditLog(otherTenant.Id, marker, AuditOutcome.Success));
 
         var scoped = await repo.GetPagedAsync(new AuditLogFilter(tenantId, AllTenants: false, Action: marker));
         Assert.Empty(scoped);

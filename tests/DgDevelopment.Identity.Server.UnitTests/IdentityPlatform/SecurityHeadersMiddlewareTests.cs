@@ -27,7 +27,7 @@ public sealed class SecurityHeadersMiddlewareTests
             .StartAsync();
 
         using var client = host.GetTestClient();
-        return await client.GetAsync("/");
+        return await client.GetAsync(new Uri("/", UriKind.Relative));
     }
 
     [Fact]

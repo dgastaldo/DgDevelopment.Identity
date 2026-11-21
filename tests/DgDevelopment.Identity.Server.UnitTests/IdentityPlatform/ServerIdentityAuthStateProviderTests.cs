@@ -23,12 +23,13 @@ public sealed class ServerIdentityAuthStateProviderTests
         public Task<string?> GetAsync(CancellationToken ct = default) => Task.FromResult(raw);
     }
 
-    private static ServerIdentityAuthStateProvider CreateProvider(IHttpContextAccessor accessor, ISessionMarkerService? markerService = null)
+    private static ServerIdentityAuthStateProvider CreateProvider(
+        HttpClient httpClient, SessionEventClient sessionEventClient, IHttpContextAccessor accessor, ISessionMarkerService? markerService = null)
         => new(
-            new IdentityClient(new HttpClient(), new OidcOptions()),
+            new IdentityClient(httpClient, new OidcOptions()),
             new FakeTokenStore(),
             markerService ?? new FakeSessionMarkerService(null),
-            new SessionEventClient(),
+            sessionEventClient,
             new OidcOptions(),
             accessor);
 
@@ -38,7 +39,9 @@ public sealed class ServerIdentityAuthStateProviderTests
         var identity = new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, "ssr-user")], "marker");
         var httpContext = new DefaultHttpContext { User = new ClaimsPrincipal(identity) };
         var accessor = new HttpContextAccessor { HttpContext = httpContext };
-        var provider = CreateProvider(accessor);
+        using var httpClient = new HttpClient();
+        await using var sessionEventClient = new SessionEventClient();
+        var provider = CreateProvider(httpClient, sessionEventClient, accessor);
 
         var state = await provider.GetAuthenticationStateAsync();
 
@@ -51,7 +54,9 @@ public sealed class ServerIdentityAuthStateProviderTests
         var accessor = new HttpContextAccessor { HttpContext = null };
         var marker = new SessionMarkerDto("circuit-user", "Circuit User", "circuit@example.com");
         var markerService = new FakeSessionMarkerService(System.Text.Json.JsonSerializer.Serialize(marker));
-        var provider = CreateProvider(accessor, markerService);
+        using var httpClient = new HttpClient();
+        await using var sessionEventClient = new SessionEventClient();
+        var provider = CreateProvider(httpClient, sessionEventClient, accessor, markerService);
 
         var state = await provider.GetAuthenticationStateAsync();
 
@@ -63,7 +68,9 @@ public sealed class ServerIdentityAuthStateProviderTests
     public async Task GetAuthenticationStateAsyncReturnsAnonymousWhenNeitherSourceHasAUser()
     {
         var accessor = new HttpContextAccessor { HttpContext = null };
-        var provider = CreateProvider(accessor);
+        using var httpClient = new HttpClient();
+        await using var sessionEventClient = new SessionEventClient();
+        var provider = CreateProvider(httpClient, sessionEventClient, accessor);
 
         var state = await provider.GetAuthenticationStateAsync();
 
