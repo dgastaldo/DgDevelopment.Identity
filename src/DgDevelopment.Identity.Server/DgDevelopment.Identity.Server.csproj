@@ -28,7 +28,7 @@
     <PackageReference Include="Swashbuckle.AspNetCore.Swagger" Version="10.3.1"/>
     <PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="10.3.1"/>
     <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.3.1"/>
-    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.15" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.15"/>
   </ItemGroup>
 
   <PropertyGroup>
@@ -39,7 +39,7 @@
     <!-- Bumped automatically by release-please (component "server") - see docs/deployment.md's
          "Client and application versioning" section. Not tied to the personal/docs/integration/main
          deploy tags, which mark deployment events rather than meaningful version history. -->
-    <Version>0.2.1</Version>
+    <Version>0.3.0</Version>
   </PropertyGroup>
 
   <Target Name="BuildTailwindCss" BeforeTargets="PrepareForBuild" Condition="Exists('node_modules') And '$(DesignTimeBuild)' != 'true'">
