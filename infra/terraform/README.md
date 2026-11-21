@@ -99,10 +99,16 @@ this environment; review before applying for real.
   `app-service`'s two Linux Web Apps authenticate to `ghcr.io` with a plain username/PAT via
   `DOCKER_REGISTRY_SERVER_*` app settings — rotate that PAT the same way the AKS pull secret's PAT
   gets rotated.
-- **SQL firewall**: the `sql` module opens `AllowAzureServices` (0.0.0.0/0.0.0.0 in Azure's own
-  firewall-rule convention, which actually means "any Azure-hosted service," not public internet) —
-  narrow this to the compute environment's real egress IPs once they're stable, if you want tighter
-  isolation than that.
+- **SQL firewall / public network access**: `public_network_access_enabled = true` on the SQL
+  server, mitigated only by the `AllowAzureServices` firewall rule (0.0.0.0/0.0.0.0 in Azure's own
+  convention, meaning "any Azure-hosted service," not the open internet) — SonarCloud flags this as
+  a BLOCKER-severity finding (`terraform:S6329`) regardless, since a static scanner can't account
+  for the firewall rule's actual effect. This is a real tradeoff, not yet resolved: the
+  alternative is Private Endpoint/VNet integration between the SQL server and each compute
+  environment (AKS/App Service), which is real follow-up work, not a config flag. Narrow the
+  firewall rule to the compute environment's real egress IPs once they're stable in the meantime,
+  if you want tighter isolation than "any Azure service" without doing the full private-networking
+  work.
 - **No `terraform fmt`/`validate`/`init` run against these files** — written without a Terraform
   CLI or Azure credentials available in this session. Run `terraform fmt -recursive` and
   `terraform validate` (per environment, after `init`) before the first real `plan`.

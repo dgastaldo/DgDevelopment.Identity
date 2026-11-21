@@ -27,6 +27,12 @@ resource "azurerm_linux_web_app" "server" {
     }
   }
 
+  // Explicitly off: Server IS the identity provider - App Service's own built-in auth (easy auth)
+  // would be redundant/circular in front of an OIDC server, not an extra layer of protection.
+  auth_settings {
+    enabled = false
+  }
+
   app_settings = merge(var.server_app_settings, {
     "WEBSITES_PORT"                   = "8080"
     "DOCKER_REGISTRY_SERVER_URL"      = "https://ghcr.io"
@@ -51,6 +57,12 @@ resource "azurerm_linux_web_app" "identity_platform" {
       docker_image_name   = var.identity_platform_image
       docker_registry_url = "https://ghcr.io"
     }
+  }
+
+  // Explicitly off - IdentityPlatform authenticates its own users against Server's OIDC flow;
+  // App Service's built-in auth has no role to play here either.
+  auth_settings {
+    enabled = false
   }
 
   app_settings = merge(var.identity_platform_app_settings, {

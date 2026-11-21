@@ -21,7 +21,7 @@ resource "azurerm_notification_hub" "this" {
   location            = var.location
 
   dynamic "apns_credential" {
-    for_each = var.apns_credential == null ? [] : [var.apns_credential]
+    for_each = var.apns_credential == null ? [] : toset([var.apns_credential])
     content {
       application_mode = apns_credential.value.application_mode
       bundle_id        = apns_credential.value.bundle_id
@@ -32,7 +32,7 @@ resource "azurerm_notification_hub" "this" {
   }
 
   dynamic "gcm_credential" {
-    for_each = var.fcm_api_key == null ? [] : [var.fcm_api_key]
+    for_each = var.fcm_api_key == null ? [] : toset([var.fcm_api_key])
     content {
       api_key = gcm_credential.value
     }
