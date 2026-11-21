@@ -41,11 +41,11 @@
                     <button disabled="@(Busy || string.IsNullOrWhiteSpace(SelectedRoleId))" @onclick="AssignRoleAsync" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800 disabled:opacity-50">Assign</button>
                 </div>
                 <ul class="mt-5 divide-y divide-slate-100">
-                    @foreach (var assigned in User.Roles)
+                    @foreach (var roleId in User.Roles.Select(assigned => assigned.RoleId))
                     {
                         <li class="flex items-center justify-between py-3">
-                            <p class="text-sm font-semibold text-slate-800">@RoleName(assigned.RoleId)</p>
-                            <button disabled="@Busy" @onclick="() => RemoveRoleAsync(assigned.RoleId)" class="text-xs font-semibold text-rose-600 hover:text-rose-800">Remove</button>
+                            <p class="text-sm font-semibold text-slate-800">@RoleName(roleId)</p>
+                            <button disabled="@Busy" @onclick="() => RemoveRoleAsync(roleId)" class="text-xs font-semibold text-rose-600 hover:text-rose-800">Remove</button>
                         </li>
                     }
                     @if (User.Roles.Count == 0)
@@ -68,11 +68,11 @@
                     <button disabled="@(Busy || string.IsNullOrWhiteSpace(SelectedGroupId))" @onclick="AssignGroupAsync" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800 disabled:opacity-50">Assign</button>
                 </div>
                 <ul class="mt-5 divide-y divide-slate-100">
-                    @foreach (var assigned in User.Groups)
+                    @foreach (var groupId in User.Groups.Select(assigned => assigned.GroupId))
                     {
                         <li class="flex items-center justify-between py-3">
-                            <p class="text-sm font-semibold text-slate-800">@GroupName(assigned.GroupId)</p>
-                            <button disabled="@Busy" @onclick="() => RemoveGroupAsync(assigned.GroupId)" class="text-xs font-semibold text-rose-600 hover:text-rose-800">Remove</button>
+                            <p class="text-sm font-semibold text-slate-800">@GroupName(groupId)</p>
+                            <button disabled="@Busy" @onclick="() => RemoveGroupAsync(groupId)" class="text-xs font-semibold text-rose-600 hover:text-rose-800">Remove</button>
                         </li>
                     }
                     @if (User.Groups.Count == 0)
@@ -97,11 +97,11 @@
                 <button disabled="@(Busy || string.IsNullOrWhiteSpace(SelectedPermissionId))" @onclick="AssignPermissionAsync" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800 disabled:opacity-50">Assign</button>
             </div>
             <ul class="mt-5 divide-y divide-slate-100">
-                @foreach (var assigned in User.Permissions)
+                @foreach (var permissionId in User.Permissions.Select(assigned => assigned.PermissionId))
                 {
                     <li class="flex items-center justify-between py-3">
-                        <p class="text-sm font-semibold text-slate-800">@PermissionName(assigned.PermissionId)</p>
-                        <button disabled="@Busy" @onclick="() => RemovePermissionAsync(assigned.PermissionId)" class="text-xs font-semibold text-rose-600 hover:text-rose-800">Remove</button>
+                        <p class="text-sm font-semibold text-slate-800">@PermissionName(permissionId)</p>
+                        <button disabled="@Busy" @onclick="() => RemovePermissionAsync(permissionId)" class="text-xs font-semibold text-rose-600 hover:text-rose-800">Remove</button>
                     </li>
                 }
                 @if (User.Permissions.Count == 0)
