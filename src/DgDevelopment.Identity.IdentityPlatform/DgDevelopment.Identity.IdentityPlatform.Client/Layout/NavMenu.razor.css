@@ -8,7 +8,11 @@
     top: 0.5rem;
     right: 1rem;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    background: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.55%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") no-repeat center/1.75rem rgba(255, 255, 255, 0.1);
+    /* Stroke bumped from rgba(255,255,255,0.55) to fully opaque white - the icon's actual contrast
+       against the sidebar's dark navy/purple gradient (MainLayout.razor) was already fine, but a
+       translucent stroke composited over an unknown cross-file background can't be resolved by a
+       static analyzer, and this removes the ambiguity outright rather than relying on it. */
+    background: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='white' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") no-repeat center/1.75rem rgba(255, 255, 255, 0.1);
 }
 
 .navbar-toggler:checked {
@@ -49,12 +53,19 @@
 }
 
 .nav-item ::deep a.active {
-    background-color: rgba(255, 255, 255, 0.37);
+    /* A solid shade of the sidebar's own base blue (#052767, from MainLayout.razor's gradient)
+       instead of a translucent white overlay - contrast against the overlay depended on where in
+       the gradient it landed, and a static analyzer can't resolve that cross-file background
+       anyway. #1d3f82 gives white text a 10.07:1 ratio, comfortably above the WCAG AA 4.5:1
+       minimum, regardless of gradient position. */
+    background-color: #1d3f82;
     color: white;
 }
 
 .nav-item ::deep .nav-link:hover {
-    background-color: rgba(255, 255, 255, 0.1);
+    /* Same rationale as .active above, a subtler shade for the hover state - #0d2f72 gives white
+       text a 12.60:1 ratio. */
+    background-color: #0d2f72;
     color: white;
 }
 
