@@ -1,0 +1,113 @@
+name: 07 - Terraform (Azure infrastructure)
+
+# Owns every Azure resource this project needs (Notification Hub, Communication Services, Azure
+# SQL, App Service, AKS) across personal/shared/docs/integration/production - see
+# infra/terraform/README.md for the full design and the one-time manual bootstrap it still needs
+# (state storage account, OIDC app registration) before this workflow can actually apply anything.
+# Aspire/aspire deploy provisions nothing - it stays scoped to personal/develop's Docker Compose
+# stack only.
+#
+# plan runs on every PR that touches infra/terraform/** (decoration only, no credentials needed
+# beyond read-only ones, so it can safely run on fork PRs too once the repo is public - same
+# posture as 01-pr-quality-gate.yml). apply runs only on push to each environment's own branch,
+# gated by that branch's GitHub Environment (same approval gate the app deploy workflows use).
+
+on:
+  pull_request:
+    paths:
+      - "infra/terraform/**"
+  push:
+    branches: [personal, docs, integration, main]
+    paths:
+      - "infra/terraform/**"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment folder under infra/terraform/environments to run against"
+        required: true
+        type: choice
+        options: [personal, shared, docs, integration, production]
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write # OIDC azure/login - no static Azure credential stored anywhere
+
+jobs:
+  # Maps a branch push to its environment folder name (production's folder != main's branch name).
+  resolve-environment:
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.map.outputs.environment }}
+    steps:
+      - name: Map branch to environment folder
+        id: map
+        run: |
+          case "${{ github.ref_name }}" in
+            personal) echo "environment=personal" >> "$GITHUB_OUTPUT" ;;
+            docs) echo "environment=docs" >> "$GITHUB_OUTPUT" ;;
+            integration) echo "environment=integration" >> "$GITHUB_OUTPUT" ;;
+            main) echo "environment=production" >> "$GITHUB_OUTPUT" ;;
+            *) echo "environment=" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+  plan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env_dir: [personal, shared, docs, integration, production]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.9"
+
+      - name: Terraform fmt check
+        run: terraform fmt -check -recursive infra/terraform
+        continue-on-error: true # advisory - don't block the PR on formatting alone
+
+      - name: Terraform init (no backend - plan-only validation)
+        working-directory: infra/terraform/environments/${{ matrix.env_dir }}
+        run: terraform init -backend=false
+
+      - name: Terraform validate
+        working-directory: infra/terraform/environments/${{ matrix.env_dir }}
+        run: terraform validate
+
+  apply:
+    needs: resolve-environment
+    if: github.event_name == 'push' && needs.resolve-environment.outputs.environment != ''
+    runs-on: ubuntu-latest
+    environment: ${{ needs.resolve-environment.outputs.environment }}
+    env:
+      TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_ghcr_username: ${{ github.actor }}
+      TF_VAR_ghcr_token: ${{ secrets.GHCR_PULL_TOKEN }}
+      TF_VAR_sql_admin_password: ${{ secrets.SQL_ADMIN_PASSWORD }}
+      TF_VAR_fcm_api_key: ${{ secrets.FCM_API_KEY }}
+      TF_VAR_kubernetes_version: ${{ vars.AKS_KUBERNETES_VERSION }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.9"
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Terraform init
+        working-directory: infra/terraform/environments/${{ needs.resolve-environment.outputs.environment }}
+        run: terraform init
+
+      - name: Terraform apply
+        working-directory: infra/terraform/environments/${{ needs.resolve-environment.outputs.environment }}
+        run: terraform apply -auto-approve
