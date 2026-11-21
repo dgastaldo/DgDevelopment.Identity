@@ -23,5 +23,9 @@
     "@types/react": "^19.0.0",
     "jest": "^30.5.2",
     "typescript": "^7.0.2"
+  },
+  "overrides": {
+    "minimatch": "^11.0.5",
+    "glob": "^14.0.2"
   }
 }
