@@ -132,28 +132,13 @@ builder.Services.AddOptions<JwtBearerOptions>("Bearer")
         // every other Bearer endpoint via URL.
         options.Events = new JwtBearerEvents
         {
-            OnMessageReceived = context =>
-            {
-                var accessToken = context.Request.Query["access_token"];
-                if (!string.IsNullOrEmpty(accessToken) && context.HttpContext.Request.Path.StartsWithSegments("/hubs/session", StringComparison.Ordinal))
-                    context.Token = accessToken;
-
-                return Task.CompletedTask;
-            }
+            OnMessageReceived = OnSessionHubMessageReceived
         };
     });
 builder.Services.AddAuthentication().AddJwtBearer("Bearer", _ => { });
 builder.Services.AddProblemDetails(options =>
 {
-    options.CustomizeProblemDetails = context =>
-    {
-        if (!context.HttpContext.RequestServices.GetRequiredService<IHostEnvironment>().IsDevelopment())
-            return;
-
-        var error = context.HttpContext.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
-        if (error is not null)
-            context.ProblemDetails.Extensions["exception"] = error.ToString();
-    };
+    options.CustomizeProblemDetails = AddExceptionDetailsInDevelopment;
 });
 
 builder.Services.AddSignalR();
@@ -248,6 +233,29 @@ app.MapHub<DgDevelopment.Identity.Server.Hubs.SessionHub>("/hubs/session");
 
 await app.RunAsync();
 return 0;
+
+// Extracted out of the JwtBearerEvents/ProblemDetails configuration lambdas above: a local
+// function's own nesting starts back at 0, where the same logic inline inside this top-level
+// file's single implicit "method" was stacking its nesting depth on top of everything else here
+// (csharpsquid:S3776 cognitive complexity).
+static Task OnSessionHubMessageReceived(Microsoft.AspNetCore.Authentication.JwtBearer.MessageReceivedContext context)
+{
+    var accessToken = context.Request.Query["access_token"];
+    if (!string.IsNullOrEmpty(accessToken) && context.HttpContext.Request.Path.StartsWithSegments("/hubs/session", StringComparison.Ordinal))
+        context.Token = accessToken;
+
+    return Task.CompletedTask;
+}
+
+static void AddExceptionDetailsInDevelopment(ProblemDetailsContext context)
+{
+    if (!context.HttpContext.RequestServices.GetRequiredService<IHostEnvironment>().IsDevelopment())
+        return;
+
+    var error = context.HttpContext.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
+    if (error is not null)
+        context.ProblemDetails.Extensions["exception"] = error.ToString();
+}
 
 // protected, not public: WebApplicationFactory<Program> only needs the type itself, never
 // instantiates Program directly (it builds the host its own way).
