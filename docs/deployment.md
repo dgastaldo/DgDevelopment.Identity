@@ -21,9 +21,16 @@ infrastructure is still entirely unprovisioned, so their deploy workflows don't 
 
 Turn the branch-per-stage convention into an actual automated publishing pipeline: pushing a
 tag/release on a branch builds and ships that branch's code to its own environment, with GitHub
-Actions as the CI/CD engine. Deployment itself goes through the Aspire CLI (`aspire publish`/
-`aspire deploy`) rather than hand-rolled Dockerfiles/Helm/Bicep — see "Aspire-native deployment
-model" below for why.
+Actions as the CI/CD engine. For `personal`/`develop`, deployment goes through the Aspire CLI
+(`aspire publish`/`aspire deploy`) — see "Aspire-native deployment model" below. **For
+`docs`/`integration`/`main`: superseded.** Aspire does not provision Azure infrastructure for
+these — `infra/terraform/` (Terraform) owns the Azure resources (AKS, App Service, Azure SQL,
+Notification Hub, Communication Services) instead, applied by its own
+`.github/workflows/07-terraform.yml`, independent of the app's own deploy workflow. The app itself
+still deploys via a plain build-image → push-to-GHCR → `az webapp config container set`/`kubectl
+set image` step (not yet written) — the same build mechanism `05-deploy-personal.yml` already
+uses, just pointed at infrastructure Terraform provisioned rather than something Aspire created.
+See `infra/terraform/README.md` for the full design and why.
 
 ## Why `develop` gets an ephemeral test stack, not an always-on deployment
 
@@ -300,11 +307,18 @@ New workflow, **`06-publish-client-maui.yml`**, triggered on `push: tags: ['clie
 
 ## Aspire-native deployment model
 
-This repo ships a bundled Microsoft skill, `.agents/skills/aspire-deployment`, which explicitly
-owns Aspire deployment routing and says not to hand-roll Dockerfiles/Helm/Bicep when an AppHost
-already exists (it does: `src/DgDevelopment.Identity.AppHost`). The design here follows that: the
-AppHost model plus `aspire publish`/`aspire deploy` handle building, pushing, and provisioning;
-GitHub Actions just drives the Aspire CLI with the right credentials/parameters per branch.
+**Scope revised: `personal`/`develop` only.** This repo ships a bundled Microsoft skill,
+`.agents/skills/aspire-deployment`, which explicitly owns Aspire deployment routing and says not
+to hand-roll Dockerfiles/Helm/Bicep when an AppHost already exists (it does:
+`src/DgDevelopment.Identity.AppHost`). That still holds for `personal`/`develop`'s Docker Compose
+stack below — nothing changes there. **It no longer holds for `docs`/`integration`/`main`**:
+rather than have `AppHost.cs` provision Azure infrastructure itself via
+`AddAzureAppServiceEnvironment`/`AddAzureKubernetesEnvironment` (the plan this section originally
+described), that infrastructure is now owned by Terraform (`infra/terraform/`) instead, with
+Aspire/`aspire deploy` not used for those three environments at all — see
+`infra/terraform/README.md` for the full reasoning. `AppHost.cs`'s `deployTarget` switch therefore
+never grows a `"docs"`/`"integration"`/`"main"` case; it stays exactly as it is today
+(`personal`/`develop` only).
 
 Because the chain forward-merges, `AppHost.cs` ends up byte-identical (modulo not-yet-merged
 commits) across every branch — maintaining divergent AppHost files per target would fight that

@@ -20,6 +20,8 @@ public static class ResetMfaCommand
 {
     public static async Task<int> RunAsync(string[] args)
     {
+        ArgumentNullException.ThrowIfNull(args);
+
         if (args.Length < 2 || string.IsNullOrWhiteSpace(args[1]))
         {
             await Console.Error.WriteLineAsync("Usage: reset-mfa <username>").ConfigureAwait(false);

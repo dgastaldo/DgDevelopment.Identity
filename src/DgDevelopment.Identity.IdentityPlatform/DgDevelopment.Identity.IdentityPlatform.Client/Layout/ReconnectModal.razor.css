@@ -158,3 +158,22 @@
         opacity: 0;
     }
 }
+
+/* Users who've asked the OS for reduced motion get an instant show/hide instead of the modal's
+   slide/fade transitions and the spinner's looping animation - same information, no motion. */
+@media (prefers-reduced-motion: reduce) {
+    #components-reconnect-modal {
+        transition: none;
+        animation: none;
+        opacity: 1;
+    }
+
+    #components-reconnect-modal[open] {
+        animation: none;
+    }
+
+    .components-rejoining-animation div {
+        animation: none;
+        opacity: 1;
+    }
+}

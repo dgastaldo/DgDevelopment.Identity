@@ -33,10 +33,11 @@ var identityPlatform = builder
 identityPlatform.WithEnvironment("AdminBaseUrl", identityPlatform.GetEndpoint(HttpsEndpoint));
 
 // deploy-target selects the one compute-environment resource relevant to this run - see
-// docs/deployment.md's "Aspire-native deployment model". Only personal/develop are wired up so far
-// (Docker Compose, self-hosted runner on the home PC); docs/integration/main get their own case
-// (and NuGet packages: Aspire.Hosting.Azure.AppService / Aspire.Hosting.Azure.Kubernetes) once
-// those environments are actually provisioned - not yet, per explicit scope.
+// docs/deployment.md's "Aspire-native deployment model". personal/develop are the only cases this
+// switch ever gets: docs/integration/main's Azure infrastructure (AKS, App Service, Azure SQL) is
+// owned by Terraform (infra/terraform/), not Aspire - see infra/terraform/README.md. Those three
+// branches deploy via a plain build-image/push-to-GHCR/kubectl-or-az-webapp step instead, never
+// through aspire deploy.
 switch (deployTarget)
 {
     case "personal":
