@@ -383,6 +383,80 @@ public sealed class TokenServiceTests : IClassFixture<DatabaseFixture<TokenServi
     }
 
     [Fact]
+    public async Task ProcessDeviceCodeAsyncRejectsAnAlreadyUsedDeviceCode()
+    {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
+        var clientId = await _fixture.GetSeededClientIdAsync();
+        var userId = await _fixture.GetSeededUserIdAsync();
+        var deviceCodeValue = $"dc-{Guid.NewGuid():N}";
+
+        await using var context = _fixture.CreateContext();
+        var deviceRepo = new DeviceCodeRepository(context);
+        var stored = new DeviceCode(Hash(deviceCodeValue), Hash($"uc-{Guid.NewGuid():N}"), clientId, ["openid"]);
+        await deviceRepo.AddAsync(stored);
+        await deviceRepo.AuthorizeAsync(stored.Id, tenantId, userId);
+        using var keyMaterial = new KeyMaterialService(new SigningKeyRepository(context));
+        var service = CreateService(context, keyMaterial);
+        await service.ProcessDeviceCodeAsync(deviceCodeValue, TestConstants.AdminClientId);
+
+        var exception = await Assert.ThrowsAsync<DeviceAuthorizationException>(() =>
+            service.ProcessDeviceCodeAsync(deviceCodeValue, TestConstants.AdminClientId));
+
+        Assert.Equal("invalid_grant", exception.ErrorCode);
+        Assert.Equal("Device code has already been used.", exception.Message);
+    }
+
+    [Fact]
+    public async Task ProcessDeviceCodeAsyncRejectsAnUnknownClient()
+    {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
+        var clientId = await _fixture.GetSeededClientIdAsync();
+        var userId = await _fixture.GetSeededUserIdAsync();
+        var deviceCodeValue = $"dc-{Guid.NewGuid():N}";
+
+        await using var context = _fixture.CreateContext();
+        var deviceRepo = new DeviceCodeRepository(context);
+        var stored = new DeviceCode(Hash(deviceCodeValue), Hash($"uc-{Guid.NewGuid():N}"), clientId, ["openid"]);
+        await deviceRepo.AddAsync(stored);
+        await deviceRepo.AuthorizeAsync(stored.Id, tenantId, userId);
+        using var keyMaterial = new KeyMaterialService(new SigningKeyRepository(context));
+        var service = CreateService(context, keyMaterial);
+
+        var exception = await Assert.ThrowsAsync<DeviceAuthorizationException>(() =>
+            service.ProcessDeviceCodeAsync(deviceCodeValue, $"no-such-client-{Guid.NewGuid():N}"));
+
+        Assert.Equal("invalid_client", exception.ErrorCode);
+    }
+
+    [Fact]
+    public async Task ProcessDeviceCodeAsyncRejectsAClientThatDidNotRequestTheDeviceCode()
+    {
+        var tenantId = await _fixture.GetSeededTenantIdAsync();
+        var clientId = await _fixture.GetSeededClientIdAsync();
+        var userId = await _fixture.GetSeededUserIdAsync();
+        var deviceCodeValue = $"dc-{Guid.NewGuid():N}";
+
+        await using var context = _fixture.CreateContext();
+        var clientRepo = new ClientRepository(context);
+        var otherClientId = $"other-{Guid.NewGuid():N}";
+        var otherClient = CreateOtherClient(tenantId, otherClientId, "secret", "openid");
+        await clientRepo.AddAsync(otherClient);
+
+        var deviceRepo = new DeviceCodeRepository(context);
+        var stored = new DeviceCode(Hash(deviceCodeValue), Hash($"uc-{Guid.NewGuid():N}"), clientId, ["openid"]);
+        await deviceRepo.AddAsync(stored);
+        await deviceRepo.AuthorizeAsync(stored.Id, tenantId, userId);
+        using var keyMaterial = new KeyMaterialService(new SigningKeyRepository(context));
+        var service = CreateService(context, keyMaterial);
+
+        var exception = await Assert.ThrowsAsync<DeviceAuthorizationException>(() =>
+            service.ProcessDeviceCodeAsync(deviceCodeValue, otherClient.ClientId.ToString()));
+
+        Assert.Equal("invalid_grant", exception.ErrorCode);
+        Assert.Equal("Device code was not issued to this client.", exception.Message);
+    }
+
+    [Fact]
     public async Task ProcessClientCredentialsAsyncReturnsAccessToken()
     {
         await using var context = _fixture.CreateContext();
