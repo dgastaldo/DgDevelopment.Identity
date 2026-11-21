@@ -15,6 +15,9 @@ resource "azurerm_email_communication_service" "this" {
 }
 
 resource "azurerm_email_communication_service_domain" "this" {
+  // "AzureManagedDomain" is the fixed name Azure expects for the free managed subdomain; a
+  // CustomerManaged domain's name is the actual domain name being verified (e.g. "mail.example.com").
+  name              = var.custom_domain_management_type == null ? "AzureManagedDomain" : var.custom_domain_name
   email_service_id  = azurerm_email_communication_service.this.id
   domain_management = var.custom_domain_management_type == null ? "AzureManaged" : var.custom_domain_management_type
 }

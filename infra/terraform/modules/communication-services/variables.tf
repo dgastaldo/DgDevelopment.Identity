@@ -22,6 +22,12 @@ variable "custom_domain_management_type" {
   default     = null
 }
 
+variable "custom_domain_name" {
+  type        = string
+  description = "Only used when custom_domain_management_type is \"CustomerManaged\" - the actual domain name being verified, e.g. \"mail.example.com\"."
+  default     = null
+}
+
 variable "tags" {
   type    = map(string)
   default = {}

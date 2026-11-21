@@ -32,10 +32,10 @@ variable "fcm_api_key" {
 variable "apns_credential" {
   type = object({
     application_mode = string
-    bundle_id         = string
-    key_id            = string
-    team_id           = string
-    token             = string
+    bundle_id        = string
+    key_id           = string
+    team_id          = string
+    token            = string
   })
   description = "APNs (iOS) credential. Null leaves iOS push unconfigured - not attempted yet per CONTEXT.md (no Mac/Apple Developer account)."
   default     = null

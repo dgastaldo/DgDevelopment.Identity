@@ -28,7 +28,7 @@ resource "azurerm_linux_web_app" "server" {
   }
 
   app_settings = merge(var.server_app_settings, {
-    "WEBSITES_PORT"               = "8080"
+    "WEBSITES_PORT"                   = "8080"
     "DOCKER_REGISTRY_SERVER_URL"      = "https://ghcr.io"
     "DOCKER_REGISTRY_SERVER_USERNAME" = var.ghcr_username
     "DOCKER_REGISTRY_SERVER_PASSWORD" = var.ghcr_token
@@ -54,7 +54,7 @@ resource "azurerm_linux_web_app" "identity_platform" {
   }
 
   app_settings = merge(var.identity_platform_app_settings, {
-    "WEBSITES_PORT"               = "8080"
+    "WEBSITES_PORT"                   = "8080"
     "DOCKER_REGISTRY_SERVER_URL"      = "https://ghcr.io"
     "DOCKER_REGISTRY_SERVER_USERNAME" = var.ghcr_username
     "DOCKER_REGISTRY_SERVER_PASSWORD" = var.ghcr_token

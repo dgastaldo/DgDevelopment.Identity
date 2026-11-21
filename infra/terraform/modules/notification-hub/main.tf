@@ -24,10 +24,10 @@ resource "azurerm_notification_hub" "this" {
     for_each = var.apns_credential == null ? [] : [var.apns_credential]
     content {
       application_mode = apns_credential.value.application_mode
-      bundle_id         = apns_credential.value.bundle_id
-      key_id            = apns_credential.value.key_id
-      team_id           = apns_credential.value.team_id
-      token             = apns_credential.value.token
+      bundle_id        = apns_credential.value.bundle_id
+      key_id           = apns_credential.value.key_id
+      team_id          = apns_credential.value.team_id
+      token            = apns_credential.value.token
     }
   }
 

@@ -12,13 +12,13 @@ module "resource_group" {
 module "sql" {
   source = "../../modules/sql"
 
-  server_name                   = "sql-identity-docs"
-  resource_group_name           = module.resource_group.name
-  location                      = var.location
-  administrator_login           = var.sql_admin_login
-  administrator_login_password  = var.sql_admin_password
-  sku_name                      = "Basic"
-  tags                          = local.tags
+  server_name                  = "sql-identity-docs"
+  resource_group_name          = module.resource_group.name
+  location                     = var.location
+  administrator_login          = var.sql_admin_login
+  administrator_login_password = var.sql_admin_password
+  sku_name                     = "Basic"
+  tags                         = local.tags
 }
 
 module "notification_hub" {
@@ -36,19 +36,19 @@ module "notification_hub" {
 module "app_service" {
   source = "../../modules/app-service"
 
-  name_prefix              = "identity-docs"
-  resource_group_name      = module.resource_group.name
-  location                 = var.location
-  sku_name                 = "B1"
-  server_image             = "ghcr.io/dgastaldo/dgdevelopment-identity-server:docs-latest"
-  identity_platform_image  = "ghcr.io/dgastaldo/dgdevelopment-identity-platform:docs-latest"
-  ghcr_username             = var.ghcr_username
-  ghcr_token                = var.ghcr_token
+  name_prefix                    = "identity-docs"
+  resource_group_name            = module.resource_group.name
+  location                       = var.location
+  sku_name                       = "B1"
+  server_image                   = "ghcr.io/dgastaldo/dgdevelopment-identity-server:docs-latest"
+  identity_platform_image        = "ghcr.io/dgastaldo/dgdevelopment-identity-platform:docs-latest"
+  ghcr_username                  = var.ghcr_username
+  ghcr_token                     = var.ghcr_token
+  identity_platform_app_settings = {}
+  tags                           = local.tags
   server_app_settings = {
     "Parameters__IdentityDb" = module.sql.connection_string
   }
-  identity_platform_app_settings = {}
-  tags = local.tags
 }
 
 locals {
